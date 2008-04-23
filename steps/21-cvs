@@ -1,0 +1,29 @@
+#!/usr/bin/perl -w
+# CVS checkout
+
+return unless i_has("cvs");
+
+my @cvs = i_isa_fetchall("cvs");
+package_check("cvs") if @cvs;
+
+text_install("/root/.cvspass", <<EOF);
+/1 :pserver:rollout\@cvs.domain:2401/home/cvs Ahohlasd=
+EOF
+
+text_install("/root/.cvsrc", <<EOF);
+cvs -z3 -q
+update -d -P
+checkout -P
+diff -u -b -B
+EOF
+
+foreach (@cvs)
+{
+	while (my($dir, $x) = each(%$_))
+	{
+		w "No module specified for $dir" or next unless $x->{module};
+
+		cvs_checkout(-dest => $dir, -module => $x->{module}, -rev => $x->{rev}, -repo => $x->{repository}, -cmd => $x->{post_cmd});
+	}
+}
+

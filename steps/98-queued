@@ -1,0 +1,22 @@
+#!/usr/bin/perl -w
+# Run any queued commands or queued code blocks
+
+foreach (i_isa_fetchall("queue_command"))
+{
+	$_ = [ $_ ] unless ref $_ eq 'ARRAY';
+	while (@$_)
+	{
+		command(shift @$_);
+	}
+}
+
+foreach (i_isa_fetchall("queue_code"))
+{
+	$_ = [ $_ ] unless ref $_ eq 'ARRAY';
+	while (@$_)
+	{
+		my $sub = shift @$_;
+		$sub->();
+	}
+}
+

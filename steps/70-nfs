@@ -1,0 +1,107 @@
+#!/usr/bin/perl -w
+# Set up both NFS shares and NFS mounts
+
+foreach (i_isa_fetchall("nfs_share"))
+{
+	# Make sure the NFS server gets installed
+	add_isa("Nfs_Server") unless i_isa("Nfs_Server");
+	package_check("nfs-common", "nfs-kernel-server") if i_isa("Debian");
+	package_check("nfs-utils") if i_isa("RHEL4");
+
+	my $restart = 0;
+	foreach my $dir (keys %$_)
+	{
+		my %clients;
+		while (my($client, $opts) = each(%{$_->{$dir}}))
+		{
+			my @c = expand_network($client);
+			if (@c)
+			{
+				foreach my $ip (@c)
+				{
+					$clients{$ip} = $opts;
+				}
+			}
+			else
+			{
+				$clients{$client} = $opts;
+			}
+			next;
+		}
+
+		file_append("/etc/exports",
+			"$dir ". join(" ", map { "$_($clients{$_})" } keys %clients),
+			$dir) && $restart++;
+	}
+
+	if (-f "/etc/default/nfs-common")
+	{
+		# Debian / Ubuntu
+		file_modify("/etc/default/nfs-common", "/etc/init.d/nfs-common restart",
+			's/^#?STATDOPTS=.*/STATDOPTS="--port 4000"/',
+			's/^#?NEED_LOCKD=.*/NEED_LOCKD=/') && $restart++;
+		file_modify("/etc/default/nfs-kernel-server", "/etc/init.d/nfs-kernel-server restart",
+			's/^#?RPCMOUNTDOPTS=.*/RPCMOUNTDOPTS="--port 4002"/') && $restart++;
+	}
+	else
+	{
+		# RedHat
+		text_install("/etc/sysconfig/nfs", <<EOF, "service nfs restart") && $restart++;
+MOUNTD_PORT=4002
+RQUOTAD_PORT=4003
+LOCKD_TCPPORT=4001
+LOCKD_UDPPORT=4001
+STATD_PORT=4000
+EOF
+	}
+
+	if ($restart)
+	{
+		if (-f "/etc/init.d/nfs")
+		{
+			# RHEL
+			command("/etc/init.d/portmap restart");
+			command("/etc/init.d/nfs restart");
+			command("/etc/init.d/nfslock restart");
+		}
+		elsif (-f "/etc/init.d/nfs-common")
+		{
+			# Debian / Ubuntu
+			command("/etc/init.d/portmap restart");
+			command("/etc/init.d/nfs-common restart");
+			command("/etc/init.d/nfs-kernel-server restart");
+		}
+	}
+}
+
+foreach (i_isa_fetchall("nfs_mount"))
+{
+	# Make sure the NFS server gets installed
+	add_isa("Nfs_Client") unless i_isa("Nfs_Client");
+	package_check("nfs-common") if i_isa("Debian");
+
+	foreach my $dir (keys %$_)
+	{
+		dir_check($dir);
+ 		my $o = (ref $_->{$dir} eq 'HASH')
+ 			? $_->{$dir}
+ 			: { path => $_->{$dir} };
+ 		if (!$o->{path})
+ 		{
+ 			w "No path specified for $dir";
+ 			next;
+ 		}
+ 
+ 		$o->{options} ||= [];
+ 		push @{$o->{options}}, 'rw' unless grep /^r[ow]$/, @{$o->{options}};
+ 		push @{$o->{options}}, 'async' unless grep /^a?sync$/, @{$o->{options}};
+ 		push @{$o->{options}}, 'rsize=32768' unless grep /^rsize=/, @{$o->{options}};
+ 		push @{$o->{options}}, 'wsize=32768' unless grep /^wsize=/, @{$o->{options}};
+ 		push @{$o->{options}}, 'bg' unless grep /^(fg|bg)$/, @{$o->{options}};
+ 		push @{$o->{options}}, 'hard' unless grep /^(hard|soft)$/, @{$o->{options}};
+ 		push @{$o->{options}}, 'intr' unless grep /^(no)?intr$/, @{$o->{options}};
+ 
+ 		file_append("/etc/fstab", "$o->{path} $dir nfs ". join(",", @{$o->{options}}). " 0 0" , qr/\s$dir\s/, (grep /^noauto$/, @{$o->{options}}) ? "" : "mount $dir");
+	}
+}
+

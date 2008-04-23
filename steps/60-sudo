@@ -1,0 +1,40 @@
+#!/usr/bin/perl -w
+
+return unless i_isa_fetchall("sudo");
+
+my $text = <<EOF;
+# sudoers file.
+#
+# This file is rebuilt by rollout, so any changes made locally will be lost
+# next time rollout is run.
+
+# Root can run anything as any other user
+root   ALL=(ALL) ALL
+
+# Allow people in group wheel to run all commands, but still require password
+\%wheel ALL=(ALL) ALL
+
+Defaults syslog=auth
+
+EOF
+
+my %sudo;
+foreach (i_isa_fetchall("sudo"))
+{
+	while(my($username, $commands) = each(%$_))
+	{
+		$sudo{$username} ||= {};
+		foreach (@$commands)
+		{
+			$sudo{$username}->{$_}++ foreach (@$commands);
+		}
+	}
+}
+
+foreach (keys %sudo)
+{
+	$text .= "$_ ALL = ". join(", ", keys %{$sudo{$_}}). "\n";
+}
+
+text_install(-file => "/etc/sudoers", -text => $text, -cmd => "visudo -c", -mode => 0440, -owner => 'root');
+

@@ -1,0 +1,49 @@
+#!/usr/bin/perl -w
+# svn checkout
+
+my @svn = i_isa_fetchall("svn");
+return unless @svn;
+
+package_check("subversion");
+
+dir_check("/root/.subversion/auth/svn.simple");
+text_install("/root/.subversion/config", <<EOF);
+[auth]
+store-passwords = yes
+store-auth-creds = yes
+
+[miscellany]
+global-ignores = *.o *.lo *.la #*# .*.rej *.rej .*~ *~ .#* .DS_Store
+EOF
+
+# You will need to set up subversion authorzation first. Something like this:
+#text_install("/root/.subversion/auth/svn.simple/9d08aae7faefae89dbd1349e9496af13", <<EOF);
+#K 8
+#passtype
+#V 6
+#simple
+#K 8
+#password
+#V 8
+#principe
+#K 15
+#svn:realmstring
+#V 53
+#<http://svn.domain:80> My Subversion Repository
+#K 8
+#username
+#V 7
+#rollout
+#END
+#EOF
+
+foreach (@svn)
+{
+	while (my($dir, $x) = each(%$_))
+	{
+		w "No module specified for $dir" or next unless $x->{url};
+
+		svn_checkout($dir, $x->{url}, $x->{rev}, $x->{post_cmd});
+	}
+} 
+

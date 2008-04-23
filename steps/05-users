@@ -1,0 +1,139 @@
+#!/usr/bin/perl -w
+# This step creates system users and groups
+
+my(%users, %groups);
+
+# Deal with groups first
+foreach (i_isa_fetchall("group"))
+{
+	foreach my $group (keys %{$_})
+	{
+		$groups{$group} ||= $_->{$group};
+	}
+}
+
+foreach (keys %groups)
+{
+	my($gid) = getgrnam($_);
+	if (!$gid)
+	{
+		# Create Group
+		l("Create group $_");
+		command("groupadd", ($groups{$_}->{gid} ? ("-g", $groups{$_}->{gid}, "-f") : ()), $_);
+	}
+	else
+	{
+		# Group exists
+		if ($groups{$_}->{gid} && $groups{$_}->{gid} != $gid)
+		{
+			l("Update gid for $_");
+			command("groupmod", "-g", $groups{$_}->{gid}, "-o", , $_);
+		}
+	}
+}
+
+
+# Now all the users
+foreach (i_isa_fetchall("user"))
+{
+	foreach my $username (keys %{$_})
+	{
+		$users{$username} ||= $_->{$username};
+		while (my($key, $value) = each %{$_->{$username}})
+		{
+			if (!defined $users{$username}{$key})
+			{
+				$users{$username}{$key} = $value;
+			}
+			elsif (ref $value eq 'ARRAY')
+			{
+				$users{$username}{$key} ||= [];
+				local $_;
+				foreach my $v (@$value)
+				{
+					push @{$users{$username}{$key}}, @$value
+						unless grep { $_ eq $v } @{$users{$username}{$key}};
+				}
+			}
+			elsif (ref $value eq 'HASH')
+			{
+				$users{$username}{$key} ||= {};
+				push @{$users{$username}{$key}}, @$value;
+			}
+		}
+	}
+}
+
+foreach my $username (keys %users)
+{
+	v "Checking user $username";
+	$users{$username}->{name} ||= "";
+	$users{$username}->{name} =~ s/\$hostname/$hostname/;
+
+	my($name, $passwd, $uid, $gid, $quota, $comment, $gcos, $dir, $shell, $expire) = getpwnam($username);
+
+	if (!$name)
+	{
+		# Create User
+		l "Create user $username";
+		command("useradd",
+			($users{$username}->{uid} ? ("-u", $users{$username}->{uid}, "-o") : ()),
+			($users{$username}->{gid} ? ("-g", $users{$username}->{gid}) : ()),
+			($users{$username}->{groups} ? ("-G", join(",", @{$users{$username}->{groups}}), "-n") : ()),
+			($users{$username}->{home} ? ("-d", $users{$username}->{home}, "-m") : ()),
+			($users{$username}->{password} ? ("-p", $users{$username}->{password}) : ()),
+			($users{$username}->{name} ? ("-c", $users{$username}->{name}) : ()),
+			($users{$username}->{shell} ? ("-s", $users{$username}->{shell}) : ()),
+			$username
+		);
+	}
+	else
+	{
+		# User exists
+		my $modify = 0;
+		$modify++ if $users{$username}->{uid} && $users{$username}->{uid} != $uid;
+		$modify++ if $users{$username}->{home} && ($users{$username}->{home} ne $dir || !-d $dir);
+		$modify++ if $users{$username}->{password} && $users{$username}->{password} ne $passwd
+			&& $users{$username}->{force_password};
+		$modify++ if $users{$username}->{shell} && $users{$username}->{shell} ne $shell;
+		$modify++ if $users{$username}->{name} && $users{$username}->{name} ne $gcos;
+		if ($users{$username}->{groups})
+		{
+			foreach (@{$users{$username}->{groups}})
+			{
+				my($gname,$gpasswd,$ggid,$gmembers) = getgrnam($_);
+				if ($gname)
+				{
+					if (!grep({ $_ eq $name } split(/ /, $gmembers)))
+					{
+						v "$name should be in ". join(" ", @{$users{$username}->{groups}}). ", but isn't in all";
+						$modify++;
+					}
+				}
+			}
+		}
+		if ($modify)
+		{
+			l "Updating user $username";
+			command("usermod", 
+				($users{$username}->{uid} ? ("-u", $users{$username}->{uid}, "-o") : ()),
+				($users{$username}->{gid} ? ("-g", $users{$username}->{gid}) : ()),
+				($users{$username}->{groups} ? ("-G", join(",", @{$users{$username}->{groups}})) : ()),
+				($users{$username}->{home} ? ("-d", $users{$username}->{home}, "-m") : ()),
+				($users{$username}->{password} && $users{$username}->{force_password}
+					? ("-p", $users{$username}->{password}) : ()),
+				($users{$username}->{name} ? ("-c", $users{$username}->{name}) : ()),
+				($users{$username}->{shell} ? ("-s", $users{$username}->{shell}) : ()),
+				$username
+			);
+		}
+	}
+
+	dir_check($users{$username}->{home}, {
+			mode => 0750,
+			owner => $users{$username}->{uid} || 0,
+			group => $users{$username}->{gid} || 0,
+		}
+	) if $users{$username}->{home};
+}
+

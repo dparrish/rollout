@@ -1,0 +1,12 @@
+#!/usr/bin/perl -w
+
+foreach (i_isa_fetchall("dir_check"))
+{
+	foreach my $x (@$_)
+	{
+		$x = [ $x ] unless ref $x eq 'ARRAY';
+		v "Checking for dir $x->[0]";
+		dir_check(@$x);
+	}
+}
+

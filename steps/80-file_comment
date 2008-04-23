@@ -1,0 +1,20 @@
+#!/usr/bin/perl -w
+
+foreach (i_isa_fetchall("file_comment"))
+{
+	while (my($file, $regex) = each(%$_))
+	{
+		$regex = [ $regex ] unless ref $regex eq 'ARRAY';
+		file_comment($file, undef, @$regex)
+	}
+}
+
+foreach (i_isa_fetchall("file_uncomment"))
+{
+	while (my($file, $regex) = each(%$_))
+	{
+		$regex = [ $regex ] unless ref $regex eq 'ARRAY';
+		file_uncomment($file, undef, @$regex)
+	}
+}
+

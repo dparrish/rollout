@@ -1,0 +1,236 @@
+#!/usr/bin/perl -w
+# Configure the network interfaces
+
+# This is considered a dangerous operation and will always be run in safe mode
+# unless "-f network" is specified
+
+local $safe_mode = grep(/^network$/, @force_dangerous) ? 0 : 1;
+
+my $changes = 0;
+
+if (-d "/etc/sysconfig/network-scripts")
+{
+	my %interface_files;
+	foreach my $x (i_isa_fetchall("interfaces"))
+	{
+		foreach my $device (keys %$x)
+		{
+			my $d = $x->{$device};
+			my @c = (
+				"DEVICE=$device",
+				"TYPE=Ethernet",
+				"IPV6INIT=". ($d->{ipv6} ? "yes" : "no"),
+				"USERCTL=no",
+				"ONBOOT=". ($d->{inactive} ? "no" : "yes"),
+			);
+			push @c, "GATEWAY=$d->{gateway}" if $d->{gateway};
+			push @c, "HWADDR=$d->{mac}" if $d->{mac};
+
+			if ($d->{ip})
+			{
+				push @c, "IPADDR=$d->{ip}",
+					"NETMASK=". ($d->{netmask} || "255.255.255.0");
+			}
+			elsif ($d->{dhcp})
+			{
+				push @c, "BOOTPROTO=dhcp",
+					"DHCP_HOSTNAME=". ($d->{dhcp} !~ /^1$/ ? $d->{dhcp} : $hostname),
+					"PEERDNS=yes";
+			}
+
+			if ($device =~ /^bond(\d+)/)
+			{
+				foreach (@{$d->{slaves} || []})
+				{
+					# Create a device entry for each slave interface
+					my @c = (
+						"DEVICE=$_",
+						"ONBOOT=no",
+						"TYPE=Ethernet",
+						"MASTER=$device",
+						"SLAVE=yes",
+						"PEERDNS=yes",
+						"USERCTL=no",
+						"IPV6INIT=no",
+					);
+					push @c, "HWADDR=$m{$hostname}->{interfaces}{$_}{mac}" if $m{$hostname}->{interfaces}{$_}{mac};
+					$interface_files{$_} = \@c;
+				}
+			}
+			$interface_files{$device} ||= \@c;
+
+			my $routes = join("", map { "$_ via $d->{routes}->{$_} dev $device\n" } keys %{$d->{routes} || {}});
+			if ($routes && text_install("/etc/sysconfig/network-scripts/route-$device", $routes, undef, { mode => 0644 }))
+			{
+				$changes++;
+				if (!$safe_mode)
+				{
+					w "Network configuration has been changed for $device, you must restart the interface manually to apply the changes.";
+				}       
+			}
+		}
+	}
+
+	my $alerted = 0;
+	if (keys %interface_files)
+	{
+		if (grep /^bond\d+$/, keys %interface_files)
+		{
+			file_append("/etc/modprobe.conf", "options bonding mode=1 miimon=100 downdelay=300 updelay=300 max_bonds=4", qr/^options bond(?:\d+|ing) /);
+		}
+		foreach (keys %interface_files)
+		{
+			file_append("/etc/modprobe.conf", "alias $_ bonding", qr/^alias $_/) if /^bond\d+$/;
+			if (text_install("/etc/sysconfig/network-scripts/ifcfg-$_", join("\n", @{$interface_files{$_}}). "\n", undef, { mode => 0644 }))
+			{
+				$changes++;
+				if (!$safe_mode)
+				{
+					w "Network configuration has been changed for $_, you must restart the interface manually to apply the changes.";
+				}
+			}
+		}
+	}
+}
+elsif (-f "/etc/network/interfaces")
+{
+	my %interfaces;
+	my %macs;
+	foreach my $x (i_isa_fetchall("interfaces"))
+	{
+		foreach my $device (keys %$x)
+		{
+			my $d = $x->{$device};
+			my @c;
+			push @c, "auto $device" unless $d->{inactive};
+			push @c, "iface $device inet ". ($d->{dhcp} ? "dhcp" : "static");
+
+			if ($d->{ip})
+			{
+				push @c, "	address $d->{ip}";
+				push @c, "	netmask ". ($d->{netmask} || "255.255.255.0");
+				push @c, "	network $d->{network}" if $d->{network};
+				push @c, "	broadcast $d->{broadcast}" if $d->{broadcast};
+			}
+			push @c, "	gateway $d->{gateway}" if $d->{gateway};
+			if ($d->{'pre-up'})
+			{
+				$d->{'pre-up'} = [$d->{'pre-up'}] unless ref $d->{'pre-up'} eq 'ARRAY';
+				push @c, map { "	pre-up $_" } @{$d->{'pre-up'}};
+			}
+			if ($d->{'up'})
+			{
+				$d->{'up'} = [$d->{'up'}] unless ref $d->{'up'} eq 'ARRAY';
+				push @c, map { "	up $_" } @{$d->{'up'}};
+			}
+			if ($d->{bridge})
+			{
+				# Bridging Interface
+				$m{$hostname}->{packages} ||= [];
+				push @{$m{$hostname}->{packages}}, "bridge-utils";
+				push @c, "      bridge_ports ". join(" ", @{$d->{bridge}});
+				push @c, "      bridge_fd 9";
+				push @c, "      bridge_hello 2";
+				push @c, "      bridge_maxage 12";
+				push @c, "      bridge_stp off ";
+			}
+
+			while (my($dest, $gw) = each(%{$d->{routes} || {}}))
+			{
+				if ($dest =~ /\//)
+				{
+					$dest = "-net $dest";
+				}
+				else
+				{
+					$dest = "-host $dest";
+				}
+				if ($gw)
+				{
+					push @c, "	up route add -net $dest gw $gw";
+				}
+				else
+				{
+					push @c, "	up route add -net $dest dev $device";
+				}
+			}
+
+			$interfaces{$device} ||= \@c;
+		}
+	}
+
+	if (keys %interfaces)
+	{
+		my $text = <<EOF;
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+EOF
+
+		my $alerted = 0;
+		foreach (sort keys %interfaces)
+		{
+			$text .= join("\n", @{$interfaces{$_}}). "\n\n";
+		}
+
+		if (text_install("/etc/network/interfaces", $text))
+		{
+			$changes++;
+			if (!$safe_mode)
+			{
+				w "Network configuration has been changed, you must restart the interfaces manually to apply the changes.";
+			}
+		}
+
+		if (-f "/etc/etc/udev/rules.d/70-persistent-net.rules")
+		{
+			my $text = "";
+			$text .= "SUBSYSTEM==\"net\", DRIVERS==\"?*\", ATTRS{address}==\"$macs{$_}\", ATTRS{type}==\"1\", NAME=\"_\"\n" foreach (keys %macs);
+			text_install("/etc/etc/udev/rules.d/70-persistent-net.rules", $text) && $changes++;
+		}
+		elsif (-f "/etc/iftab")
+		{
+			my $text = "";
+			$text .= "$_ mac $macs{$_} arp 1\n" foreach (keys %macs);
+			text_install("/etc/iftab", $text) && $changes++;
+		}
+	}
+}
+
+if (hostname ne $hostname)
+{
+	l "Changing hostname from ". hostname. " to $hostname";
+	command("hostname", $hostname) && $changes++;
+	if (-f "/etc/hostname")
+	{
+		text_install(-file => "/etc/hostname", -text => $hostname, -owner => 'root', -mode => 0644) && $changes++
+	}
+	elsif (-f "/etc/sysconfig/network")
+	{
+		file_modify(-file => "/etc/sysconfig/network",
+			-modify => [ "s/^HOSTNAME=.*/HOSTNAME=$hostname/" ]) && $changes++
+	}
+}
+
+file_append(-file => "/etc/resolv.conf", -add => "options timeout:5 attempts:2", -match => qr/^options/) && $changes++;
+foreach my $x (i_isa_fetchall("nameservers"))
+{
+	file_append(-file => "/etc/resolv.conf", -add => "nameserver $_", -match => qr/^nameserver $_/) foreach @$x;
+}
+
+foreach (i_isa_fetchall("domain_name"))
+{
+	v "Setting domain name to $_";
+	file_append("/etc/resolv.conf", "search $_", qr/^search /);
+	last;
+}
+
+if ($safe_mode && $changes)
+{
+	return l "Network config is considered dangerous, changes won't be applied\n\tunless you specify the \"-f network\" argument.";
+}
+

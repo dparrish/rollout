@@ -1,0 +1,16 @@
+Rollout Server installation instructions:
+
+1. Install apache or some other web server.
+
+2. Extract rollout into a directory accessable to the web server
+
+3. Configure the access list in .htaccess to allow your IP ranges.
+ ^ THIS IS THE ONLY SECURITY ROLLOUT HAS (so far), SO GET IT RIGHT ^
+
+4. Run rollout on a client, using something like the following:
+   URL=http://rollout.domain; wget -O- $URL/rollout | perl - -s -u $URL
+
+   Replace "rollout.domain" with the hostname or IP of your rollout server. You
+   also may need to add a path to the URL if rollout isn't in the root
+   directory of the domain.
+

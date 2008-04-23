@@ -1,0 +1,148 @@
+#!/usr/bin/perl -w
+
+use vars qw( %networks );
+
+# This first step has to be done without safe mode
+local $safe_mode = 0;
+
+# Install rollout locally, keeping the rollout URL parameter permanently
+my $rollout = http_file "/rollout";
+fatal "Can't download rollout to install locally" unless $rollout;
+
+$rollout =~ s/^\$rollout_url = ".+?";/\$rollout_url = "$rollout_url";/m;
+my($rc, @output) = compile_perl($rollout);
+if ($rc)
+{
+	l map { "$_\n" } @output;
+	fatal "The rollout script could be not correctly parsed, and won't be installed";
+	exit;
+}
+
+if (text_install(-file => "/usr/local/sbin/rollout", -text => $rollout, -mode => 0750, -owner => 'root', -group => 'root' ))
+{
+	# rollout has been updated, switch to it
+	l "rollout has been updated, re-executing";
+	exec("/usr/local/sbin/rollout", @original_argv);
+}
+
+my $machines_data = http_file "rollout.cfg";
+carp "Can't retrieve rollout configuration rollout.cfg: $@" unless $machines_data;
+
+eval $machines_data;
+die "Can't parse rollout configuration rollout.cfg: $@" unless keys %m;
+
+my @fragments = http_index "fragments";
+foreach (sort @fragments)
+{
+	my $_class = $_;
+	my $text = http_file "fragments/$_";
+	eval $text if $text;
+	if ($@)
+	{
+		fatal "Config fragment \"$_\" failed: $@";
+	}
+}
+
+v "Evaluated Rollout config: ". scalar(grep /^[a-z]/, keys %m). " devices, ". scalar(grep /^[A-Z]/, keys %m). " classes";
+fatal "Can't find configuration entry for $hostname" unless $m{$hostname};
+
+foreach (i_isa_fetchall("skip_steps"))
+{
+	foreach my $step (@$_)
+	{
+		push @skip_steps, $step unless grep { $_ eq $step } @skip_steps;
+	}
+}
+
+sub _expand_network
+{
+	my($network) = @_;
+	return () unless $network;
+
+	$network =~ s/(^\[|\]$)//g;
+	return ($network) if $network =~ /^\d+\.\d+\.\d+\.\d+/;
+
+	my @hosts;
+
+	foreach my $d (keys %m)
+	{
+		next unless $m{$d}->{interfaces};
+		next unless $m{$d}->{network} && grep { $_ eq $network } @{$m{$d}->{network}};
+
+		foreach (values %{$m{$d}->{interfaces}})
+		{
+			push @hosts, $_->{ip} if $_->{ip};
+		}
+	}
+	return @hosts;
+}
+
+foreach (keys %m)
+{
+	$m{$_}->{network} = [ $m{$_}->{network} ] if $m{$_}->{network} && ref $m{$_}->{network} ne 'ARRAY';
+}
+
+foreach my $n (map { $_->{network} } grep { $_->{network} } values %m)
+{
+	foreach my $network (@$n)
+	{
+		$networks{$network} ||= [];
+		foreach my $host (_expand_network($network))
+		{
+			push @{$networks{$network}}, $host unless grep { $_ eq $host } @{$networks{$network}};
+		}
+	}
+}
+
+foreach my $d (grep { $m{$_}->{ISA} } keys %m)
+{
+	next unless $m{$d}->{interfaces};
+	foreach (i_isa_classes($d))
+	{
+		$networks{$_} ||= [];
+		foreach my $i (values %{$m{$d}->{interfaces}})
+		{
+			push @{$networks{$_}}, $i->{ip} if $i->{ip};
+		}
+	}
+
+	foreach my $i (values %{$m{$d}->{interfaces}})
+	{
+		next unless $i->{ip};
+		$networks{$d} ||= [];
+		push @{$networks{$d}}, $i->{ip};
+	}
+}
+
+sub compile_perl
+{
+	my($code) = @_;
+	my $pid;
+
+	use POSIX ":sys_wait_h";
+	use IPC::Open2;
+
+	local $SIG{CHLD} = sub {
+		waitpid(-1, WNOHANG);
+		$pid = 0;
+	};
+
+	my($rd, $wr);
+	$pid = open2($rd, $wr, "$^X -wc - 2>&1");
+	print $wr $code;
+	close $wr;
+	my @output;
+	while (<$rd>)
+	{
+		chomp;
+		push @output, $_;
+	}
+	close($wr);
+
+	pop @output if @output && $output[$#output] =~ /^- (?:syntax OK|had compilation errors)/;
+
+	while ($pid) {sleep(1)}
+
+	return wantarray ? ($?, @output) : $?;
+}
+

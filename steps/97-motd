@@ -1,0 +1,25 @@
+#!/usr/bin/perl -w
+# Update /etc/motd
+
+my $text = `uname -a`;
+
+my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
+if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/)
+{
+	$host = $1 || "127.0.0.1";
+	$port = $2 || 0;
+	my $x = `host $host` || "";
+	if ($x =~ /domain name pointer (.*)\./)
+	{
+		$host = $1;
+	}
+}
+
+$text .= "\nUpdated by rollout at ". localtime(time). " from $host\n\n";
+
+foreach (i_isa_fetchall("motd"))
+{
+	$text .= "$_\n";
+}
+
+text_install("/etc/motd", $text);

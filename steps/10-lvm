@@ -1,0 +1,44 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+foreach (i_isa_fetchall("lvm"))
+{
+	while (my($part, $l) = each(%$_))
+	{
+		w "No size specified for volume $part" and next unless $l->{size};
+		w "No volume group specified for volume $part" and next unless $l->{vg};
+		w "Invalid volume" and next unless $part =~ /^[a-z0-9_-]+$/;
+
+		system("lvdisplay /dev/$l->{vg}/$part > /dev/null 2>/dev/null");
+		if ($? == 0)
+		{
+			# Volume already exists
+			v "Logical Volume $part exists";
+		}
+		else
+		{
+			# Volume doesn't e4xist
+			l "Creating Logical Volume \"$part\"";
+			command("lvcreate", "-n", "$part", "-L", $l->{size}, $l->{vg});
+		}
+
+		if ($l->{filesystem} && $l->{mountpoint})
+		{
+			my $fstab = slurp_file("/etc/fstab");
+			if ($fstab !~ /\s+$l->{mountpoint}\s+/)
+			{
+				$l->{mkfsoptions} ||= "";
+				command("mkfs -t $l->{filesystem} $l->{mkfsoptions} /dev/$l->{vg}/$part");
+			}
+			w "Invalid mountpoint" and next unless $l->{mountpoint} =~ /^[a-z0-9\/_-]+$/;
+			$l->{mount_order} ||= 2;
+			$l->{mount_options} ||= "defaults";
+			file_append("/etc/fstab",
+				"/dev/$l->{vg}/$part $l->{mountpoint} $l->{filesystem} $l->{mount_options} 0 $l->{mount_order}\n",
+				qr/\s+$l->{mountpoint}\s+/,
+				"mount $l->{mountpoint}");
+		}
+	}
+}
+

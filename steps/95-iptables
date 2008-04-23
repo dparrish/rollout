@@ -1,0 +1,139 @@
+#!/usr/bin/perl -w
+# Build and activate firewall rules
+
+return if i_has("skip_firewall");
+return unless i_has("firewall_allow") || i_has("firewall_deny") || i_has("firewall_append");
+
+# Make sure iptables is installed
+if (-f "/etc/debian_version")
+{
+	dir_check("/var/lib/iptables");
+	file_modify("/etc/default/iptables", undef,
+		's/enable_autosave=true/enable_autosave=false/',
+		's/enable_save_counters=true/enable_save_counters=false/')
+		if -f "/etc/default/iptables";
+}
+elsif (-f "/etc/redhat-release")
+{
+	package_check("iptables");
+}
+
+my @rules;
+push @rules, (
+	"*filter",
+	":INPUT ACCEPT [0:0]",
+	":FORWARD ACCEPT [0:0]",
+	":OUTPUT ACCEPT [0:0]",
+	"# Standard setup",
+	"-A INPUT -i lo -j ACCEPT",
+	"-A INPUT -p icmp --icmp-type echo-reply -j ACCEPT",
+	"-A INPUT -p icmp --icmp-type destination-unreachable -j ACCEPT",
+	"-A INPUT -p icmp --icmp-type time-exceeded -j ACCEPT",
+	# limit any other ICMP to 2 per second
+	"-A INPUT -p icmp --icmp-type any -m limit --limit 6/second -j ACCEPT",
+	"-A INPUT -d 224.0.0.251 -p udp -m udp --dport 5353 -j ACCEPT",
+	"-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT",
+	"# Drop broadcast traffic",
+	"-A INPUT -d 255.255.255.255 -j DROP",
+	"# Host specific rules",
+);
+
+push @rules, "-A INPUT -p udp --sport bootps -j DROP" unless i_isa("Dhcp_Server");
+
+sub add_rules
+{
+	my($action, @r) = @_;
+	foreach (@r)
+	{
+		for (my $i = 0; $i < @$_; $i += 2)
+		{
+			my($source, $port) = ($_->[$i], $_->[$i + 1]);
+			if ($source =~ /^#/)
+			{
+				push @rules, $source;
+				$i--;
+				next;
+			}
+			my $proto = "tcp";
+			$proto = $1 if ($port =~ s/:(udp|tcp)$//);
+
+			my @hosts = $source eq 'any' ? () : expand_network($source);
+			if ($source ne 'any' && $source =~ /[a-zA-Z]/ && !@hosts)
+			{
+				if ($source =~ /^[A-Z]/)
+				{
+					# Class name, skip it
+					w "Can't expand network $source";
+					next;
+				}
+				else
+				{
+					# All lower case, assume it's a host name
+					@hosts = ($source);
+				}
+			}
+			@hosts = (undef) unless @hosts;
+			push @rules, "# $action $port from $source";
+			push @rules, "-A INPUT". ($_ ? " -s $_" : ""). " -p $proto --dport $port -j $action" foreach @hosts;
+		}
+	}
+}
+
+add_rules('DROP', i_isa_fetchall("firewall_deny"));
+add_rules('ACCEPT', i_isa_fetchall("firewall_allow"));
+
+foreach (i_isa_fetchall("firewall_append"))
+{
+	push @rules, @$_;
+}
+
+push @rules, (
+	"# Log & Reject everything else",
+	"-A INPUT -j LOG --log-prefix \"DENY INPUT \" --log-tcp-sequence --log-ip-options",
+	"-A INPUT -p tcp -j REJECT --reject-with tcp-reset",
+	"-A INPUT -p udp -j REJECT --reject-with icmp-port-unreachable",
+	"-A INPUT -j REJECT",
+#	"-A INPUT -j DROP",
+	"# Don't forward anything",
+	"-A FORWARD -j DROP",
+	"COMMIT",
+);
+
+if (i_has("firewall_nat_append"))
+{
+	push @rules, (
+		"*nat",
+		":PREROUTING ACCEPT [0:0]",
+		":POSTROUTING ACCEPT [0:0]",
+		":OUTPUT ACCEPT [0:0]",
+	);
+	push @rules, @$_ foreach (i_isa_fetchall("firewall_nat_append"));
+	push @rules, "COMMIT";
+}
+
+if (i_has("firewall_mangle_append"))
+{
+	push @rules, (
+		"*mangle",
+		":PREROUTING ACCEPT [0:0]",
+		":INPUT ACCEPT [0:0]",
+		":FORWARD ACCEPT [0:0]",
+		":OUTPUT ACCEPT [0:0]",
+		":POSTROUTING ACCEPT [0:0]",
+	);
+	push @rules, @$_ foreach (i_isa_fetchall("firewall_mangle_append"));
+	push @rules, "COMMIT";
+}
+
+if (-f "/etc/redhat-release")
+{
+	text_install("/etc/sysconfig/iptables", join("", map { "$_\n" } @rules),
+		"iptables-restore /etc/sysconfig/iptables");
+}
+elsif (-f "/etc/debian_version")
+{
+	dir_check("/var/lib/iptables");
+	text_install("/var/lib/iptables/active", join("", map { "$_\n" } @rules),
+		"iptables-restore /var/lib/iptables/active");
+}
+

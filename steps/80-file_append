@@ -1,0 +1,10 @@
+#!/usr/bin/perl -w
+# Modify files according to the file_append section
+
+foreach my $x (i_isa_fetchall("file_append"))
+{
+	foreach (@$x)
+	{
+		file_append(@$_)
+	}
+}

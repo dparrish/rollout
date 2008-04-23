@@ -1,0 +1,38 @@
+#!/usr/bin/perl -w
+# Install files
+
+my %done_files;
+
+foreach (i_isa_fetchall("file_install"))
+{
+	while (my($dest, $f) = each(%$_))
+	{
+                next if $done_files{$dest}++;
+		next if i_immutable_file($dest);
+		if ($f->{source})
+		{
+			file_install(-file => $dest, -src => $f->{source}, -cmd => $f->{command} || undef, -flags => $f);
+		}
+		elsif ($f->{text})
+		{
+			if ($f->{text} =~ /^\n?(\s+)/m)
+			{
+				my $strip = $1;
+				v "Stripping \"$strip\" from the start of text";
+				my @text = split(/\n/, $f->{text});
+				$f->{text} = "";
+				foreach (@text) { s/^$strip//; $f->{text} .= "$_\n"; };
+			}
+			text_install($dest, $f->{text}, $f->{command} || undef, $f);
+		}
+	}
+}
+
+foreach (i_isa_fetchall("symlink_check"))
+{
+	while (my($dest, $source) = each(%$_))
+	{
+		symlink_check($source, $dest);
+	}
+}
+
