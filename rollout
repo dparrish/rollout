@@ -30,6 +30,7 @@ use Getopt::Long;
 use POSIX qw( setsid );
 use File::Temp qw/ tempfile tempdir /;
 use Fcntl ':flock';
+use English;
 
 use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps );
 $rollout_url = "http://rollout.domain";
@@ -1071,8 +1072,7 @@ sub apt
 	command("apt-get -qq update") unless $m{$hostname}->{_done_apt_update}++;
 	if (-x "/usr/bin/dpkg")
 	{
-		return command("apt-get", "-qy", "-oStopOnError=false", "-oDPkg::Options={\"--force-confol
-	--force-yes", "--allow-unauthenticated", "install", @packages);
+		return command("apt-get", "-qy", "-oStopOnError=false", "-oDPkg::Options={\"--force-confold\"}", "--force-yes", "--allow-unauthenticated", "install", @packages);
 	}
 	else
 	{
@@ -1130,8 +1130,16 @@ sub package_status_rpm
 
 	if (!defined $status->{$package})
 	{
-		`rpm -q $package 2>/dev/null >/dev/null`;
-		$status->{$package} = ($? == 0);
+		my $return_pkg_val = `rpm -q $package --queryformat "%{NAME}.%{ARCH}\n"`;
+		$status->{$package} = $?;
+		if (($status->{$package} == 0) && ($return_pkg_val =~ m/^\Q$package/))
+		{
+			$status->{$package} = 0;
+		}
+		else
+		{
+			$status->{$package} = 1;
+		}
 	}
 
 	return $status->{$package};
@@ -1140,6 +1148,13 @@ sub package_status_rpm
 sub package_check
 {
 	my(@packages) = @_;
+
+	my $apt;
+	foreach my $base (i_isa_fetchall("apt_base")) {
+		$base = [ $base ] unless ref $base eq 'ARRAY';
+		$apt .= "$_\n" foreach @$base;
+	}
+	text_install("/etc/apt/sources.list", $apt) if $apt;
 
 	my $available_packages = $m{$hostname}->{_available_packages};
 	$m{$hostname}->{_done_packages} ||= {};
@@ -1401,7 +1416,7 @@ sub svn_checkout
 		dir_check($base);
 		return w "Checkout to $p->{-dest} failed" unless -d $base;
 		chdir $base;
-		command("svn", "checkout", 
+		command("svn", "checkout",
 			($p->{-rev} ? ("-r", $p->{-rev}) : ()),
 			$p->{-url},
 			$newdir);
