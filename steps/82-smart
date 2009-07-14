@@ -7,12 +7,12 @@ return unless i_has("smart_disks");
 my $text;
 foreach (i_isa_fetchall("smart_disks"))
 {
-  for (my $i = 0; $i < @$_; $i += 2)
-  {
-    my($disk, $driver) = ($_->[$i], $_->[$i + 1]);
-    next unless $disk && $driver;
-    $text .= "$disk -a -o on -H -S on -d $driver -m root\n";
-  }
+	for (my $i = 0; $i < @$_; $i += 2)
+	{
+		my($disk, $driver) = ($_->[$i], $_->[$i + 1]);
+		next unless $disk && $driver;
+		$text .= "$disk -a -o on -H -S on -d $driver -m root\n";
+	}
 }
 
 return unless $text;
@@ -21,17 +21,17 @@ $m{$hostname}{_smart_configured_} = 1;
 
 if (-f '/etc/debian_version')
 {
-  package_check("smartmontools");
-  text_install("/etc/smartd.conf", $text, "/etc/init.d/smartmontools restart");
+	package_check("smartmontools");
+	text_install("/etc/smartd.conf", $text, "/etc/init.d/smartmontools restart");
 }
 elsif (-f '/etc/redhat-release')
 {
-  package_check("kernel-utils");
-  text_install("/etc/smartd.conf", $text, "/etc/init.d/smartd restart");
-  command("chkconfig smartd on");
+	package_check("kernel-utils");
+	text_install("/etc/smartd.conf", $text, "/etc/init.d/smartd restart");
+	command("chkconfig smartd on");
 }
 else
 {
-  w "Can't deal with SMART configuration";
+	w "Can't deal with SMART configuration";
 }
 

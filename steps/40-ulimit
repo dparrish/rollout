@@ -2,14 +2,14 @@
 # Update user/group limits in /etc/security/limits.conf
 #
 # ulimit => {
-#   user1 => {
-#    nofile => 2048,
-#    maxlogins => 3,
-#    -c => 5000,    # ulimit style parameters supported
-#  },
-#   '@group1' => {
-#    maxlogins => 15,
-#  },
+# 	user1 => {
+#		nofile => 2048,
+#		maxlogins => 3,
+#		-c => 5000,		# ulimit style parameters supported
+#	},
+# 	'@group1' => {
+#		maxlogins => 15,
+#	},
 # },
 
 use strict;
@@ -18,35 +18,35 @@ return unless -f "/etc/security/limits.conf";
 return unless i_isa_fetchall("ulimit");
 
 my %all_limits = (
-  "-c" => "core",
-  "-d" => "data",
-  "-e" => "priority",
-  "-f" => "fsize",
-  "-i" => "sigpending",
-  "-l" => "memlock",
-  "-m" => "rss",
-  "-n" => "nofile",
-  "-q" => "msgqueue",
-  "-r" => "rtprio",
-  "-s" => "stack",
-  "-t" => "cpu",
-  "-u" => "nproc",
-  "-v" => "as",
-  "-x" => "locks",
+	"-c" => "core",
+	"-d" => "data",
+	"-e" => "priority",
+	"-f" => "fsize",
+	"-i" => "sigpending",
+	"-l" => "memlock",
+	"-m" => "rss",
+	"-n" => "nofile",
+	"-q" => "msgqueue",
+	"-r" => "rtprio",
+	"-s" => "stack",
+	"-t" => "cpu",
+	"-u" => "nproc",
+	"-v" => "as",
+	"-x" => "locks",
 );
 
 foreach (i_isa_fetchall("ulimit"))
 {
-  while (my($name, $l) = each(%$_))
-  {
-    while (my($limit, $value) = each(%$l))
-    {
-      $limit = $all_limits{$limit} if $all_limits{$limit};
+	while (my($name, $l) = each(%$_))
+	{
+		while (my($limit, $value) = each(%$l))
+		{
+			$limit = $all_limits{$limit} if $all_limits{$limit};
 
-      file_append("/etc/security/limits.conf",
-        "$name - $limit $value",
-        qr/^$name.*\b$limit\b/);
-    }
-  }
+			file_append("/etc/security/limits.conf",
+				"$name - $limit $value",
+				qr/^$name.*\b$limit\b/);
+		}
+	}
 }
 

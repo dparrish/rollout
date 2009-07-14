@@ -3,25 +3,25 @@
 
 foreach (i_isa_fetchall("port_check"))
 {
-  for (my $i = 0; $i < @$_; $i += 2)
-  {
-    my($name, $port, $comment) = ($_->[$i], $_->[$i + 1], undef);
-    if (ref $port eq 'HASH')
-    {
-      $comment = $port->{comment};
-      $port = $port->{port};
-    }
-    next unless $name && $port;
+	for (my $i = 0; $i < @$_; $i += 2)
+	{
+		my($name, $port, $comment) = ($_->[$i], $_->[$i + 1], undef);
+		if (ref $port eq 'HASH')
+		{
+			$comment = $port->{comment};
+			$port = $port->{port};
+		}
+		next unless $name && $port;
 
-    $comment ||= "";
-    $port = "$port/tcp" unless $port =~ /\//;
+		$comment ||= "";
+		$port = "$port/tcp" unless $port =~ /\//;
 
-    file_append(
-      -file => "/etc/services",
-      -add => sprintf("%-15s %-20s # %s", $name, $port, $comment),
-      -match => qr/^$name\s+$port/,
-    );
+		file_append(
+			-file => "/etc/services",
+			-add => sprintf("%-15s %-20s # %s", $name, $port, $comment),
+			-match => qr/^$name\s+$port/,
+		);
 
-  }
+	}
 }
 

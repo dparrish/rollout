@@ -6,39 +6,39 @@ return unless -d "/etc/apt" && -f "/usr/bin/apt-get";
 my $apt;
 foreach my $base (i_isa_fetchall("apt_base"))
 {
-  $base = [ $base ] unless ref $base eq 'ARRAY';
-  $apt .= "$_\n" foreach @$base;
+	$base = [ $base ] unless ref $base eq 'ARRAY';
+	$apt .= "$_\n" foreach @$base;
 }
 text_install(-file => "/etc/apt/sources.list.d/rollout.list", -text => $apt, -mode => 0644, -owner => 'root') if $apt;
 
 if (i_has("deb_options") && -f "/usr/bin/debconf-set-selections")
 {
-  my $text;
-  foreach (i_isa_fetchall("deb_options"))
-  {
-    foreach my $line (@$_)
-    {
-      $text .= "$line\n";
-    }
-  }
-  if ($text && open(DEBCONF, "|debconf-set-selections"))
-  {
-    print DEBCONF $text;
-    close(DEBCONF);
-  }
+	my $text;
+	foreach (i_isa_fetchall("deb_options"))
+	{
+		foreach my $line (@$_)
+		{
+			$text .= "$line\n";
+		}
+	}
+	if ($text && open(DEBCONF, "|debconf-set-selections"))
+	{
+		print DEBCONF $text;
+		close(DEBCONF);
+	}
 }
 
 my @install;
 foreach (i_isa_fetchall("packages"))
 {
-  s/\.32bit$// foreach @$_;
-  push @install, @$_;
+	s/\.32bit$// foreach @$_;
+	push @install, @$_;
 }
 package_check(@install);
 
 foreach (i_isa_fetchall("packages_remove"))
 {
-  s/\.32bit$// foreach @$_;
-  package_uncheck(@$_);
+	s/\.32bit$// foreach @$_;
+	package_uncheck(@$_);
 }
 

@@ -21,19 +21,19 @@ EOF
 my %sudo;
 foreach (i_isa_fetchall("sudo"))
 {
-  while(my($username, $commands) = each(%$_))
-  {
-    $sudo{$username} ||= {};
-    foreach (@$commands)
-    {
-      $sudo{$username}->{$_}++ foreach (@$commands);
-    }
-  }
+	while(my($username, $commands) = each(%$_))
+	{
+		$sudo{$username} ||= {};
+		foreach (@$commands)
+		{
+			$sudo{$username}->{$_}++ foreach (@$commands);
+		}
+	}
 }
 
 foreach (keys %sudo)
 {
-  $text .= "$_ ALL = ". join(", ", keys %{$sudo{$_}}). "\n";
+	$text .= "$_ ALL = ". join(", ", keys %{$sudo{$_}}). "\n";
 }
 
 text_install(-file => "/etc/sudoers", -text => $text, -cmd => "visudo -c", -mode => 0440, -owner => 'root');

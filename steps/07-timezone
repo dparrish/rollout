@@ -4,20 +4,20 @@ return unless i_has("timezone");
 
 foreach my $t (i_isa_fetchall("timezone"))
 {
-  text_install("/etc/timezone", "$t\n");
+	text_install("/etc/timezone", "$t\n");
 
-  if (-f "/etc/sysconfig/clock")
-  {
-    # RedHat specific
-    file_append("/etc/sysconfig/clock", "ZONE=\"$t\"", qr/^ZONE=/);
-  }
+	if (-f "/etc/sysconfig/clock")
+	{
+		# RedHat specific
+		file_append("/etc/sysconfig/clock", "ZONE=\"$t\"", qr/^ZONE=/);
+	}
 
-  if (-e "/etc/localtime" && !$safe_mode)
-  {
-    unlink("/etc/localtime") unless -l "/etc/localtime";
-    symlink_check("/usr/share/zoneinfo/$t", "/etc/localtime");
-  }
+	if (-e "/etc/localtime" && !$safe_mode)
+	{
+		unlink("/etc/localtime") unless -l "/etc/localtime";
+		symlink_check("/usr/share/zoneinfo/$t", "/etc/localtime");
+	}
 
-  last;
+	last;
 }
 

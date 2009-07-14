@@ -4,66 +4,66 @@
 
 if (!$safe_mode)
 {
-  my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
-  if ($ENV{SSH_CLIENT} =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/)
-  {
-    $host = $1 || "127.0.0.1";
-    $port = $2 || 0;
-    my $x = `host $host` || "";
-    if ($x =~ /domain name pointer (.*)\./)
-    {
-      $host = $1;
-    }
-  }
+	my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
+	if ($ENV{SSH_CLIENT} =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/)
+	{
+		$host = $1 || "127.0.0.1";
+		$port = $2 || 0;
+		my $x = `host $host` || "";
+		if ($x =~ /domain name pointer (.*)\./)
+		{
+			$host = $1;
+		}
+	}
 
-  my $end_time = time;
-  my $duration = abs($end_time - $start_time);
+	my $end_time = time;
+	my $duration = abs($end_time - $start_time);
 
-  # Uncomment this section to notify a central server of each rollout
-#  eval
-#  {
-#    require URI::Escape;
-#    import URI::Escape;
-#    print http_post("$rollout_url/complete.php",
-#      hostname  => $hostname,
-#      on_host    => hostname,
-#      start_time  => $start_time,
-#      end_time  => $end_time,
-#      duration  => $duration,
-#      from    => $host,
-#      from_port  => $port,
-#      comment    => $rollout_comment,
-#      'log'    => $log,
-#    );
+	# Uncomment this section to notify a central server of each rollout
+#	eval
+#	{
+#		require URI::Escape;
+#		import URI::Escape;
+#		print http_post("$rollout_url/complete.php",
+#			hostname	=> $hostname,
+#			on_host		=> hostname,
+#			start_time	=> $start_time,
+#			end_time	=> $end_time,
+#			duration	=> $duration,
+#			from		=> $host,
+#			from_port	=> $port,
+#			comment		=> $rollout_comment,
+#			'log'		=> $log,
+#		);
 #
-#    sub http_post
-#    {
-#      my($url, %v) = @_;
+#		sub http_post
+#		{
+#			my($url, %v) = @_;
 #
-#      my($h, $p, $path) = $url =~ /^(?:http:\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
-#      my $s = Net::HTTP->new(Host => $h, PeerPort => $p || 80) || return w $@;
+#			my($h, $p, $path) = $url =~ /^(?:http:\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
+#			my $s = Net::HTTP->new(Host => $h, PeerPort => $p || 80) || return w $@;
 #
-#      $s->write_request(POST => $path, 'User-Agent' => "Rollout/1.0", 'Content-Type' => 'application/x-www-form-urlencoded', join("&", map { "$_=". uri_escape($v{$_}) } keys %v));
-#      my($code, $mess, %h) = $s->read_response_headers;
+#			$s->write_request(POST => $path, 'User-Agent' => "Rollout/1.0", 'Content-Type' => 'application/x-www-form-urlencoded', join("&", map { "$_=". uri_escape($v{$_}) } keys %v));
+#			my($code, $mess, %h) = $s->read_response_headers;
 #
-#      if ($code != 200)
-#      {
-#        w "POST $url returned $code";
-#        return undef;
-#      }
+#			if ($code != 200)
+#			{
+#				w "POST $url returned $code";
+#				return undef;
+#			}
 #
-#      my $res = "";
-#      while (1)
-#      {
-#        my $buf;
-#        my $n = $s->read_entity_body($buf, 1024);
-#        fatal "Read failed: $!" unless defined $n;
-#        last unless $n;
-#        $res .= $buf;
-#      }
+#			my $res = "";
+#			while (1)
+#			{
+#				my $buf;
+#				my $n = $s->read_entity_body($buf, 1024);
+#				fatal "Read failed: $!" unless defined $n;
+#				last unless $n;
+#				$res .= $buf;
+#			}
 #
-#      return $res;
-#    }
-#  };
+#			return $res;
+#		}
+#	};
 }
 

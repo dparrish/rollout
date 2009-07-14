@@ -19,11 +19,11 @@ EOF
 
 foreach (@cvs)
 {
-  while (my($dir, $x) = each(%$_))
-  {
-    w "No module specified for $dir" or next unless $x->{module};
+	while (my($dir, $x) = each(%$_))
+	{
+		w "No module specified for $dir" or next unless $x->{module};
 
-    cvs_checkout(-dest => $dir, -module => $x->{module}, -rev => $x->{rev}, -repo => $x->{repository}, -cmd => $x->{post_cmd});
-  }
+		cvs_checkout(-dest => $dir, -module => $x->{module}, -rev => $x->{rev}, -repo => $x->{repository}, -cmd => $x->{post_cmd});
+	}
 }
 

@@ -30,7 +30,6 @@ use Getopt::Long;
 use POSIX qw( setsid );
 use File::Temp qw/ tempfile tempdir /;
 use Fcntl ':flock';
-use English;
 
 use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps );
 $rollout_url = "http://rollout.domain";
@@ -40,32 +39,32 @@ my $hostname = hostname;
 my @original_argv = @ARGV;
 
 GetOptions(
-  "verbose|v"  => sub { $verbosity++ },
-  "quiet|q"  => sub { $verbosity = 0 },
-  "safe_mode|s"  => \$safe_mode,
-  "url|u=s"  => \$rollout_url,
-  "skip_step|k=s"  => \@skip_steps,
-  "hostname|h=s"  => \$hostname,
-  "only|o=s"  => \@only_steps,
-  "help|?"  => \&usage,
-  "force|f=s"  => \@force_dangerous,
+	"verbose|v"	=> sub { $verbosity++ },
+	"quiet|q"	=> sub { $verbosity = 0 },
+	"safe_mode|s"	=> \$safe_mode,
+	"url|u=s"	=> \$rollout_url,
+	"skip_step|k=s"	=> \@skip_steps,
+	"hostname|h=s"	=> \$hostname,
+	"only|o=s"	=> \@only_steps,
+	"help|?"	=> \&usage,
+	"force|f=s"	=> \@force_dangerous,
 ) or usage();
 
 sub usage
 {
-  print "Command line arguments are:\n";
-  print " verbose|v      Increase verbosity\n";
-  print " quiet|q        Don't print anything except fatal errors\n";
-  print " safe_mode|s    Show what will be changed, but don't actually do anything\n";
-  print " url|u          Set the base Rollout HTTP url\n";
-  print " skip_step|k=s  Specify a step to be skipped, may be specified multiple times\n";
-  print " hostname|h=s   Rollout configuration for a different host. If -f network is provided, the hostname will be changed\n";
-  print " only|o=s       Only run a specific step (can be specified multiple times)\n";
-  print " force|f=s      Force a dangerous step to be run\n";
-  print "\n";
-  print "Steps which are considered dangerous are always run in safe mode, unless the -f parameter is specified with a step name as argument.\n";
-  print "\n";
-  exit;
+	print "Command line arguments are:\n";
+	print " verbose|v      Increase verbosity\n";
+	print " quiet|q        Don't print anything except fatal errors\n";
+	print " safe_mode|s    Show what will be changed, but don't actually do anything\n";
+	print " url|u          Set the base Rollout HTTP url\n";
+	print " skip_step|k=s  Specify a step to be skipped, may be specified multiple times\n";
+	print " hostname|h=s   Rollout configuration for a different host. If -f network is provided, the hostname will be changed\n";
+	print " only|o=s       Only run a specific step (can be specified multiple times)\n";
+	print " force|f=s      Force a dangerous step to be run\n";
+	print "\n";
+	print "Steps which are considered dangerous are always run in safe mode, unless the -f parameter is specified with a step name as argument.\n";
+	print "\n";
+	exit;
 }
 
 # Global variables
@@ -79,37 +78,37 @@ my $pid = $$;
 # Logging wrappers {{{
 sub l(@)
 {
-  my($text, $indent) = @_;
-  return unless $verbosity;
-  $indent = 2 unless defined $indent;
-  $indent = " " x $indent;
-  my $newtext = $text;
-  $newtext =~ s/^/$indent/mg;
-  print "$newtext\n";
-  $log .= "$text\n";
-  return 0;
+	my($text, $indent) = @_;
+	return unless $verbosity;
+	$indent = 2 unless defined $indent;
+	$indent = " " x $indent;
+	my $newtext = $text;
+	$newtext =~ s/^/$indent/mg;
+	print "$newtext\n";
+	$log .= "$text\n";
+	return 0;
 }
 
 sub w(@) {
-  my($text, $indent) = @_;
-  return unless $text;
+	my($text, $indent) = @_;
+	return unless $text;
 
-  $indent = 2 unless defined $indent;
-  $indent = " " x $indent;
-  my $newtext = $text;
-  $newtext =~ s/^/${indent}WARNING: /mg;
-  print "$newtext\n";
-  $log .= "$text\n";
+	$indent = 2 unless defined $indent;
+	$indent = " " x $indent;
+	my $newtext = $text;
+	$newtext =~ s/^/${indent}WARNING: /mg;
+	print "$newtext\n";
+	$log .= "$text\n";
 
-  return 0;
+	return 0;
 }
 
 sub fatal(@)
 {
-  print "------ FATAL ERROR ------\n";
-  print "$_\n" foreach (@_);
-  print "Current Step: $current_step\n" if $current_step;
-  exit 1 if $current_step;
+	print "------ FATAL ERROR ------\n";
+	print "$_\n" foreach (@_);
+	print "Current Step: $current_step\n" if $current_step;
+	exit 1 if $current_step;
 }
 
 sub d($) { return v(Dumper(@_)) }
@@ -118,193 +117,193 @@ sub v(@) { return l(@_) if $verbosity > 1 }
 # }}}
 sub named_params(\@$) #{{{
 {
-  my($params, $defaults) = @_;
-  return undef unless $params && @$params;
-  return $params->[0] if ref $params->[0] eq 'HASH' && @$params == 1;
-  my $return = {};
+	my($params, $defaults) = @_;
+	return undef unless $params && @$params;
+	return $params->[0] if ref $params->[0] eq 'HASH' && @$params == 1;
+	my $return = {};
 
-  if (@$params % 2 != 0 || $params->[0] !~ /^-/)
-  {
-    # Positional parameters
-    my @order;
-    for (my $i = 0; $i < @$defaults; $i += 2)
-    {
-      my($key, $value) = ($defaults->[$i], $defaults->[$i + 1]);
-      push @order, $key;
-    }
-    return $params unless @order;
+	if (@$params % 2 != 0 || $params->[0] !~ /^-/)
+	{
+		# Positional parameters
+		my @order;
+		for (my $i = 0; $i < @$defaults; $i += 2)
+		{
+			my($key, $value) = ($defaults->[$i], $defaults->[$i + 1]);
+			push @order, $key;
+		}
+		return $params unless @order;
 
-    foreach (@order)
-    {
-      last unless @$params;
-      $_ = "-$_" unless /^-/;
-      $return->{$_} = shift @$params;
-    }
+		foreach (@order)
+		{
+			last unless @$params;
+			$_ = "-$_" unless /^-/;
+			$return->{$_} = shift @$params;
+		}
 
-    return $return;
-  }
+		return $return;
+	}
 
-  # Named parameters
-  for (my $i = 0; $i < @$defaults; $i += 2)
-  {
-    my($key, $value) = ($defaults->[$i], $defaults->[$i + 1]);
-    $return->{$key} = $value if defined $value;
-  }
+	# Named parameters
+	for (my $i = 0; $i < @$defaults; $i += 2)
+	{
+		my($key, $value) = ($defaults->[$i], $defaults->[$i + 1]);
+		$return->{$key} = $value if defined $value;
+	}
 
-  for (my $i = 0; $i < @$params; $i += 2)
-  {
-    my($key, $value) = ($params->[$i], $params->[$i + 1]);
-    $return->{$key} = $value;
-  }
-  return $return;
+	for (my $i = 0; $i < @$params; $i += 2)
+	{
+		my($key, $value) = ($params->[$i], $params->[$i + 1]);
+		$return->{$key} = $value;
+	}
+	return $return;
 }
 #}}}
 # HTTP functions {{{
 
 sub http_file(@)
 {
-  my $p = named_params @_, [ -url => undef, -dest => undef ];
-  my $file = $p->{-url};
-  return undef unless $file;
+	my $p = named_params @_, [ -url => undef, -dest => undef ];
+	my $file = $p->{-url};
+	return undef unless $file;
 
-  my $url = $file =~ /^http:\/\//
-    ? $file
-    : "$rollout_url/$file";
+	my $url = $file =~ /^http:\/\//
+		? $file
+		: "$rollout_url/$file";
 
-  my($host, $port, $path) = $url =~ /^(?:http:\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
+	my($host, $port, $path) = $url =~ /^(?:http:\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
 
-  my $s = Net::HTTP->new(Host => $host, PeerPort => $port || 80) || fatal $@;
+	my $s = Net::HTTP->new(Host => $host, PeerPort => $port || 80) || fatal $@;
 
-  $s->write_request(GET => $path, 'User-Agent' => "Rollout/1.0");
-  my($code, $mess, %h) = $s->read_response_headers;
+	$s->write_request(GET => $path, 'User-Agent' => "Rollout/1.0");
+	my($code, $mess, %h) = $s->read_response_headers;
 
-  if ($code != 200)
-  {
-    w "GET $url returned $code";
-    return undef;
-  }
+	if ($code != 200)
+	{
+		w "GET $url returned $code";
+		return undef;
+	}
 
-  my $fh;
-  if ($p->{-dest})
-  {
-    v "Writing to $p->{-dest}.$$";
-    if (!($fh = new IO::File ">$p->{-dest}.$$"))
-    {
-      w "Can't write to $p->{-dest}.$$: $!";
-      return undef;
-    }
-  }
+	my $fh;
+	if ($p->{-dest})
+	{
+		v "Writing to $p->{-dest}.$$";
+		if (!($fh = new IO::File ">$p->{-dest}.$$"))
+		{
+			w "Can't write to $p->{-dest}.$$: $!";
+			return undef;
+		}
+	}
 
-  my $res;
-  while (1)
-  {
-    my $buf;
-    my $n = $s->read_entity_body($buf, 1024);
-    fatal "Read failed: $!" unless defined $n;
-    last unless $n;
-    if ($fh)
-    {
-      if (syswrite($fh, $buf, $n) < $n)
-      {
-        fatal "Error writing to $p->{-dest}.$$: $!";
-        $fh->close;
-        unlink("$p->{-dest}.$$");
-      }
-      $res += $n;
-    }
-    else
-    {
-      $res .= $buf;
-    }
-  }
+	my $res;
+	while (1)
+	{
+		my $buf;
+		my $n = $s->read_entity_body($buf, 1024);
+		fatal "Read failed: $!" unless defined $n;
+		last unless $n;
+		if ($fh)
+		{
+			if (syswrite($fh, $buf, $n) < $n)
+			{
+				fatal "Error writing to $p->{-dest}.$$: $!";
+				$fh->close;
+				unlink("$p->{-dest}.$$");
+			}
+			$res += $n;
+		}
+		else
+		{
+			$res .= $buf;
+		}
+	}
 
-  if ($p->{-dest})
-  {
-    $fh->close;
-    if (-f $p->{-dest} && -s $p->{-dest} && !-s "$p->{-dest}.$$")
-    {
-      w "Not overwriting existing file with nothing";
-      unlink "$p->{-dest}.$$";
-      return undef;
-    }
-    if (!rename("$p->{-dest}.$$", $p->{-dest}))
-    {
-      w "Unable to rename $p->{-dest}.$$ to $p->{-dest}";
-    }
-  }
+	if ($p->{-dest})
+	{
+		$fh->close;
+		if (-f $p->{-dest} && -s $p->{-dest} && !-s "$p->{-dest}.$$")
+		{
+			w "Not overwriting existing file with nothing";
+			unlink "$p->{-dest}.$$";
+			return undef;
+		}
+		if (!rename("$p->{-dest}.$$", $p->{-dest}))
+		{
+			w "Unable to rename $p->{-dest}.$$ to $p->{-dest}";
+		}
+	}
 
-  return $res;
+	return $res;
 }
 
 sub http_index(@)
 {
-  my $p = named_params @_, [ -url => undef ];
-  my $base = $p->{-url};
-  return undef unless $base;
+	my $p = named_params @_, [ -url => undef ];
+	my $base = $p->{-url};
+	return undef unless $base;
 
-  $base .= "/" unless $base =~ /\/$/;
+	$base .= "/" unless $base =~ /\/$/;
 
-  my $html = http_file -url => $base;
-  return () unless $html;
+	my $html = http_file -url => $base;
+	return () unless $html;
 
-  my @files;
-  while ($html =~ /^(?:<tr><td valign="top">)?<img src="[^"]+" alt="[^"]+">(?:<\/td><td>| )?<a href="([^"]+)">(.+?)<\/a>(?:<\/td>| )/mg)
-  {
-    my($filename, $name) = ($1, $2);
-    next if !$filename || $name =~ /Parent Directory/i || $filename =~ /\?/;
-    push @files, $filename;
-  }
-  return @files;
+	my @files;
+	while ($html =~ /^(?:<tr><td valign="top">)?<img src="[^"]+" alt="[^"]+">(?:<\/td><td>| )?<a href="([^"]+)">(.+?)<\/a>(?:<\/td>| )/mg)
+	{
+		my($filename, $name) = ($1, $2);
+		next if !$filename || $name =~ /Parent Directory/i || $filename =~ /\?/;
+		push @files, $filename;
+	}
+	return @files;
 }
 
 # Install a whole directory's files
 sub dir_install
 {
-  my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => undef ];
+	my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => undef ];
 
-  my $dir_flags = { %{$p->{-flags}} };
-  $dir_flags->{mode} = $dir_flags->{dir_mode} || 0755;
-  dir_check($p->{-dest}, $dir_flags);
+	my $dir_flags = { %{$p->{-flags}} };
+	$dir_flags->{mode} = $dir_flags->{dir_mode} || 0755;
+	dir_check($p->{-dest}, $dir_flags);
 
-  return w "No source specified" unless $p->{-src};
-  return w "No destination specified" unless $p->{-dest};
+	return w "No source specified" unless $p->{-src};
+	return w "No destination specified" unless $p->{-dest};
 
-  $p->{-src} =~ s/^rollout:/$rollout_url/;
-  my $restart = 0;
-  if ($p->{-src} =~ /^http:\/\//)
-  {
-    my @files = http_index $p->{-src};
-    return w "Couldn't retrieve index $p->{-src}" unless @files;
-    foreach my $filename (@files)
-    {
-      if ($filename =~ /\/$/)
-      {
-        # It's a directory
-        $filename =~ s/\/$//;
-        if (!$p->{-flags}->{no_recurse})
-        {
-          v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
-          dir_install(-src => "$p->{-src}/$filename", -dest => "$p->{-dest}/$filename", -flags => $p->{-flags}) && $restart++;
-        }
-      }
-      else
-      {
-        v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
-        my $file = http_file -url => "$p->{-src}/$filename";
-        if ($file)
-        {
-          text_install("$p->{-dest}/$filename", $file, undef, $p->{-flags}) && $restart++;
-        }
-        else
-        {
-          w "Error retrieving $p->{-src}/$filename";
-        }
-      }
-    }
-  }
+	$p->{-src} =~ s/^rollout:/$rollout_url/;
+	my $restart = 0;
+	if ($p->{-src} =~ /^http:\/\//)
+	{
+		my @files = http_index $p->{-src};
+		return w "Couldn't retrieve index $p->{-src}" unless @files;
+		foreach my $filename (@files)
+		{
+			if ($filename =~ /\/$/)
+			{
+				# It's a directory
+				$filename =~ s/\/$//;
+				if (!$p->{-flags}->{no_recurse})
+				{
+					v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
+					dir_install(-src => "$p->{-src}/$filename", -dest => "$p->{-dest}/$filename", -flags => $p->{-flags}) && $restart++;
+				}
+			}
+			else
+			{
+				v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
+				my $file = http_file -url => "$p->{-src}/$filename";
+				if ($file)
+				{
+					text_install("$p->{-dest}/$filename", $file, undef, $p->{-flags}) && $restart++;
+				}
+				else
+				{
+					w "Error retrieving $p->{-src}/$filename";
+				}
+			}
+		}
+	}
 
-  command($p->{-cmd}) if $restart && $p->{-cmd};
-  return $restart ? 1 : 0;
+	command($p->{-cmd}) if $restart && $p->{-cmd};
+	return $restart ? 1 : 0;
 }
 
 #}}}
@@ -312,156 +311,156 @@ sub dir_install
 
 sub i_has
 {
-  my($class, $m) = @_;
+	my($class, $m) = @_;
 
-  $m ||= $hostname;
-  return 0 unless $m{$m};
+	$m ||= $hostname;
+	return 0 unless $m{$m};
 
-  return $m{$m}->{$class} if defined $m{$m}->{$class};
-  return $m{$m}->{ISA}{$class} if $m{$m}->{ISA} && $m{$m}->{ISA}{$class};
+	return $m{$m}->{$class} if defined $m{$m}->{$class};
+	return $m{$m}->{ISA}{$class} if $m{$m}->{ISA} && $m{$m}->{ISA}{$class};
 
-  foreach (keys %{$m{$m}->{ISA} || {}})
-  {
-    my $ret = i_has($class, $_);
-    return $ret if $ret;
-  }
-  return 0;
+	foreach (keys %{$m{$m}->{ISA} || {}})
+	{
+		my $ret = i_has($class, $_);
+		return $ret if $ret;
+	}
+	return 0;
 }
 
 sub i_immutable_file
 {
-  my($file, $m) = @_;
+	my($file, $m) = @_;
 
-  $m ||= $hostname;
-  return 0 unless $m{$m};
+	$m ||= $hostname;
+	return 0 unless $m{$m};
 
-  return 1 if $m{$m}->{immutable_file} && grep { $_ eq $file } @{$m{$m}->{immutable_file}};
+	return 1 if $m{$m}->{immutable_file} && grep { $_ eq $file } @{$m{$m}->{immutable_file}};
 
-  foreach (keys %{$m{$m}->{ISA} || {}})
-  {
-    my $ret = i_immutable_file($file, $_);
-    return $ret if $ret;
-  }
-  return 0;
+	foreach (keys %{$m{$m}->{ISA} || {}})
+	{
+		my $ret = i_immutable_file($file, $_);
+		return $ret if $ret;
+	}
+	return 0;
 }
 
 sub i_unsafe_file
 {
-  my($file, $m) = @_;
+	my($file, $m) = @_;
 
-  $m ||= $hostname;
-  return 0 unless $m{$m};
+	$m ||= $hostname;
+	return 0 unless $m{$m};
 
-  return 1 if $m{$m}->{unsafe_file} && grep { $_ eq $file } @{$m{$m}->{unsafe_file}};
+	return 1 if $m{$m}->{unsafe_file} && grep { $_ eq $file } @{$m{$m}->{unsafe_file}};
 
-  foreach (keys %{$m{$m}->{ISA} || {}})
-  {
-    my $ret = i_unsafe_file($file, $_);
-    return $ret if $ret;
-  }
-  return 0;
+	foreach (keys %{$m{$m}->{ISA} || {}})
+	{
+		my $ret = i_unsafe_file($file, $_);
+		return $ret if $ret;
+	}
+	return 0;
 }
 
 sub i_unsafe_dir
 {
-  my($file, $m) = @_;
+	my($file, $m) = @_;
 
-  $m ||= $hostname;
-  return 0 unless $m{$m};
+	$m ||= $hostname;
+	return 0 unless $m{$m};
 
-  return 1 if $m{$m}->{unsafe_dir} && grep { $_ eq $file } @{$m{$m}->{unsafe_dir}};
+	return 1 if $m{$m}->{unsafe_dir} && grep { $_ eq $file } @{$m{$m}->{unsafe_dir}};
 
-  foreach (keys %{$m{$m}->{ISA} || {}})
-  {
-    my $ret = i_unsafe_dir($file, $_);
-    return $ret if $ret;
-  }
-  return 0;
+	foreach (keys %{$m{$m}->{ISA} || {}})
+	{
+		my $ret = i_unsafe_dir($file, $_);
+		return $ret if $ret;
+	}
+	return 0;
 }
 
 sub i_isa
 {
-  my($class, $m) = @_;
+	my($class, $m) = @_;
 
-  $m ||= $hostname;
-  return 0 unless $m{$m} && $m{$m}->{ISA};
-  return $m{$m}->{ISA}{$class} if $m{$m}->{ISA}{$class};
+	$m ||= $hostname;
+	return 0 unless $m{$m} && $m{$m}->{ISA};
+	return $m{$m}->{ISA}{$class} if $m{$m}->{ISA}{$class};
 
-  foreach (keys %{$m{$m}->{ISA}})
-  {
-    my $ret = i_isa($class, $_);
-    return $ret if $ret;
-  }
-  return 0;
+	foreach (keys %{$m{$m}->{ISA}})
+	{
+		my $ret = i_isa($class, $_);
+		return $ret if $ret;
+	}
+	return 0;
 }
 
 sub add_isa
 {
-  my($class, $m) = @_;
+	my($class, $m) = @_;
 
-  $m ||= $hostname;
-  return 0 unless $m{$m};
-  $m{$m}->{ISA} ||= {};
-  $m{$m}->{ISA}{$class} ||= 1;
+	$m ||= $hostname;
+	return 0 unless $m{$m};
+	$m{$m}->{ISA} ||= {};
+	$m{$m}->{ISA}{$class} ||= 1;
 }
 
 sub i_isa_fetchall
 {
-  my($class, $m, $donecache) = @_;
+	my($class, $m, $donecache) = @_;
 
-  $m ||= $hostname;
-  $donecache ||= {};
+	$m ||= $hostname;
+	$donecache ||= {};
 
-  my @list;
-  return () unless $m{$m};
-  return () if $donecache->{$m}++;
+	my @list;
+	return () unless $m{$m};
+	return () if $donecache->{$m}++;
 
-  push @list, $m{$m}->{$class} if $m{$m}->{$class};
+	push @list, $m{$m}->{$class} if $m{$m}->{$class};
 
-  foreach (keys %{$m{$m}->{ISA} || {}})
-  {
-    push @list, i_isa_fetchall($class, $_, $donecache);
-  }
+	foreach (keys %{$m{$m}->{ISA} || {}})
+	{
+		push @list, i_isa_fetchall($class, $_, $donecache);
+	}
 
-  return ($m eq $hostname)
-    ? wantarray ? @list : \@list
-     : @list;
+	return ($m eq $hostname)
+		? wantarray ? @list : \@list
+	 	: @list;
 }
 
 sub i_isa_classes
 {
-  my($class) = @_;
+	my($class) = @_;
 
-  $class ||= $hostname;
+	$class ||= $hostname;
 
-  my %list;
-  return () unless $m{$class};
+	my %list;
+	return () unless $m{$class};
 
-  foreach (keys %{$m{$class}->{ISA} || {}})
-  {
-    if ($m{$class})
-    {
-      $list{$_} = 1 foreach i_isa_classes($_);
-    }
-    $list{$_} = 1;
-  }
+	foreach (keys %{$m{$class}->{ISA} || {}})
+	{
+		if ($m{$class})
+		{
+			$list{$_} = 1 foreach i_isa_classes($_);
+		}
+		$list{$_} = 1;
+	}
 
-  return keys %list;
+	return keys %list;
 }
 
 sub i_ip
 {
-  my($host) = @_;
-  foreach (i_isa_fetchall("interfaces", $host))
-  {
-    while (my($name, $int) = each(%$_))
-    {
-      next unless $int->{primary};
-      next unless $int->{gateway};
-      next unless $int->{ip};
-      return $int->{ip};
-    }
-  }
+	my($host) = @_;
+	foreach (i_isa_fetchall("interfaces", $host))
+	{
+		while (my($name, $int) = each(%$_))
+		{
+			next unless $int->{primary};
+			next unless $int->{gateway};
+			next unless $int->{ip};
+			return $int->{ip};
+		}
+	}
        return undef;
 }
 
@@ -469,492 +468,492 @@ sub i_ip
 
 sub queue_step
 {
-  my($step) = @_;
+	my($step) = @_;
 
-  my($x) = grep /((?:\d+-)?$step)/, @all_steps;
-  fatal "Can't find step $step to queue" unless $x;
-  return if grep /$x/, @steps;
+	my($x) = grep /((?:\d+-)?$step)/, @all_steps;
+	fatal "Can't find step $step to queue" unless $x;
+	return if grep /$x/, @steps;
 
-  v "Queueing step $x";
-  unshift @steps, $x;
+	v "Queueing step $x";
+	unshift @steps, $x;
 }
 
 # Adds a command to be run just before completion
 sub queue_command
 {
-  my($cmd) = @_;
+	my($cmd) = @_;
 
-  $m{$hostname}->{queue_command} ||= [];
-  $m{$hostname}->{queue_command} = [ $m{$hostname}->{queue_command} ] unless ref $m{$hostname}->{queue_command} eq 'ARRAY';
-  v "Queueing command $cmd";
-  push @{$m{$hostname}->{queue_command}}, $cmd
-    unless grep { $_ eq $cmd } @{$m{$hostname}->{queue_command}};
+	$m{$hostname}->{queue_command} ||= [];
+	$m{$hostname}->{queue_command} = [ $m{$hostname}->{queue_command} ] unless ref $m{$hostname}->{queue_command} eq 'ARRAY';
+	v "Queueing command $cmd";
+	push @{$m{$hostname}->{queue_command}}, $cmd
+		unless grep { $_ eq $cmd } @{$m{$hostname}->{queue_command}};
 }
 
 # Adds a sub to be run just before completion
 sub queue_code
 {
-  my($sub) = @_;
+	my($sub) = @_;
 
-  $m{$hostname}->{queue_code} ||= [];
-  $m{$hostname}->{queue_code} = [ $m{$hostname}->{queue_code} ] unless ref $m{$hostname}->{queue_code} eq 'ARRAY';
+	$m{$hostname}->{queue_code} ||= [];
+	$m{$hostname}->{queue_code} = [ $m{$hostname}->{queue_code} ] unless ref $m{$hostname}->{queue_code} eq 'ARRAY';
 
-  v "Queueing code $sub";
-  push @{$m{$hostname}->{queue_code}}, $sub
-    unless grep { $_ eq $sub } @{$m{$hostname}->{queue_code}};
+	v "Queueing code $sub";
+	push @{$m{$hostname}->{queue_code}}, $sub
+		unless grep { $_ eq $sub } @{$m{$hostname}->{queue_code}};
 }
 
 # File & Directory modification #{{{
 
 sub slurp_file($)
 {
-  my $file = shift;
-  local $/;
+	my $file = shift;
+	local $/;
 
-  my $fh = IO::File->new($file) or return w "Can't open file $file: $!";
-  return <$fh>;
+	my $fh = IO::File->new($file) or return w "Can't open file $file: $!";
+	return <$fh>;
 }
 
 sub file_append
 {
-  my $p = named_params @_, [ -file => undef, -add => undef, -match => undef, -cmd => undef, -create => 0 ];
-  local $_;
+	my $p = named_params @_, [ -file => undef, -add => undef, -match => undef, -cmd => undef, -create => 0 ];
+	local $_;
 
-  if (defined $p->{-match} and $p->{-add} !~ /$p->{-match}/)
-  {
-    w "Skipping append of $p->{-file}: '$p->{-match}' does NOT match '$p->{-add}'";
-    return 0;
-  }
+	if (defined $p->{-match} and $p->{-add} !~ /$p->{-match}/)
+	{
+		w "Skipping append of $p->{-file}: '$p->{-match}' does NOT match '$p->{-add}'";
+		return 0;
+	}
 
-  # Only compare first line for multiline $p->{-add}
-  my ($firstline) = $p->{-add};
-  $firstline =~ s/\n.*$/\n/s;
+	# Only compare first line for multiline $p->{-add}
+	my ($firstline) = $p->{-add};
+	$firstline =~ s/\n.*$/\n/s;
 
-  unless (-f $p->{-file})
-  {
-    return w "$p->{-file} does not exist!" if $safe_mode;
-    IO::File->new(">$p->{-file}")->close if $p->{-create}; # Touch file.
-  }
+	unless (-f $p->{-file})
+	{
+		return w "$p->{-file} does not exist!" if $safe_mode;
+		IO::File->new(">$p->{-file}")->close if $p->{-create}; # Touch file.
+	}
 
-  my $t = '';
-  my $fh = IO::File->new($p->{-file}) or return w "$p->{-file} unable to be opened: $!";
+	my $t = '';
+	my $fh = IO::File->new($p->{-file}) or return w "$p->{-file} unable to be opened: $!";
 
-  while (<$fh>)
-  {
-    if ($p->{-match} and /$p->{-match}/)
-    {
-      if (/^\Q$firstline\E[\r\n]*/)
-      {
-        $fh->close;
-        return 0;
-      }
-    }
-    else
-    {
-      $t .= $_;
-    }
-  }
+	while (<$fh>)
+	{
+		if ($p->{-match} and /$p->{-match}/)
+		{
+			if (/^\Q$firstline\E[\r\n]*/)
+			{
+				$fh->close;
+				return 0;
+			}
+		}
+		else
+		{
+			$t .= $_;
+		}
+	}
 
-  $fh->close;
+	$fh->close;
 
-  $t .= $p->{-add};
-  $t .= "\n" unless $p->{-add} =~ /\n$/;
+	$t .= $p->{-add};
+	$t .= "\n" unless $p->{-add} =~ /\n$/;
 
-  l "Modified $p->{-file} by appending $p->{-add}";
-  safe_write(-file => $p->{-file}, -text => $t);
+	l "Modified $p->{-file} by appending $p->{-add}";
+	safe_write(-file => $p->{-file}, -text => $t);
 
-  if (defined $p->{-cmd} && !$safe_mode)
-  {
-    l "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
-  }
+	if (defined $p->{-cmd} && !$safe_mode)
+	{
+		l "Running $p->{-cmd} to finish install of $p->{-file}";
+		command($p->{-cmd});
+	}
 
-  return 1;
+	return 1;
 }
 
 sub file_modify
 {
-  my $p = named_params @_, [ -file => undef, -cmd => undef, -modify => [] ];
-  my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
-  local $_;
+	my $p = named_params @_, [ -file => undef, -cmd => undef, -modify => [] ];
+	my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
+	local $_;
 
-  (-f $p->{-file}) or return l "$p->{-file} does not exist!";
+	(-f $p->{-file}) or return l "$p->{-file} does not exist!";
 
-  my $fh = IO::File->new($p->{-file}) or return l "$p->{-file} unable to be opened: $!";
+	my $fh = IO::File->new($p->{-file}) or return l "$p->{-file} unable to be opened: $!";
 
-  my ($changes, $f, %c);
-  while (<$fh>)
-  {
-    my $original = $_;
+	my ($changes, $f, %c);
+	while (<$fh>)
+	{
+		my $original = $_;
 
-    foreach my $e (@expr)
-    {
-      eval $e;
-    }
+		foreach my $e (@expr)
+		{
+			eval $e;
+		}
 
-    $changes++ unless $original eq $_;
-    $f .= $_;
-  }
+		$changes++ unless $original eq $_;
+		$f .= $_;
+	}
 
-  $fh->close;
-  return unless $changes;
+	$fh->close;
+	return unless $changes;
 
-  l "Modified $p->{-file} with ". join(", ", @expr);
-  safe_write(-file => $p->{-file}, -text => $f);
+	l "Modified $p->{-file} with ". join(", ", @expr);
+	safe_write(-file => $p->{-file}, -text => $f);
 
-  if (defined $p->{-cmd} && !$safe_mode)
-  {
-    l "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
-  }
+	if (defined $p->{-cmd} && !$safe_mode)
+	{
+		l "Running $p->{-cmd} to finish install of $p->{-file}";
+		command($p->{-cmd});
+	}
 
-  return 1;
+	return 1;
 }
 
 sub safe_write
 {
-  my $p = named_params @_, [ -file => undef, -text => undef, -mode => undef, -comment => undef ];
+	my $p = named_params @_, [ -file => undef, -text => undef, -mode => undef, -comment => undef ];
 
-  my ($dir, $file) = $p->{-file} =~ /(?:(.*)\/)?(.*)/;
-  $p->{-mode} ||= (stat($p->{-file}))[2];
-  $p->{-comment} ||= "Rollout";
+	my ($dir, $file) = $p->{-file} =~ /(?:(.*)\/)?(.*)/;
+	$p->{-mode} ||= (stat($p->{-file}))[2];
+	$p->{-comment} ||= "Rollout";
 
-  return 1 if $safe_mode;
+	return 1 if $safe_mode;
 
-  $dir ||= ".";
+	$dir ||= ".";
 
-  if (!-x "/usr/bin/ci" || i_unsafe_file($file) || i_unsafe_dir($dir))
-  {
-    # RCS is not installed, don't do version control
-    safe_write_file(-file => $p->{-file}, -text => $p->{-text});
-    chmod $p->{-mode}, $p->{-file} if $p->{-mode};
-    return 1;
-  }
+	if (!-x "/usr/bin/ci" || i_unsafe_file($file) || i_unsafe_dir($dir))
+	{
+		# RCS is not installed, don't do version control
+		safe_write_file(-file => $p->{-file}, -text => $p->{-text});
+		chmod $p->{-mode}, $p->{-file} if $p->{-mode};
+		return 1;
+	}
 
-  my $rcs = "$dir/RCS/$file,v";
+	my $rcs = "$dir/RCS/$file,v";
 
-  if (-f "$dir/$file")
-  {
-    mkdir("$dir/RCS", 0700) if not -d "$dir/RCS" and -w $dir;
-    system("ci", "-q", "-m\"Untracked Changes\"", "-t-\"Initial Checkin\"", "-l", "$dir/$file");
-    system("rcs", "-q", "-ko", "$dir/$file");
-  }
+	if (-f "$dir/$file")
+	{
+		mkdir("$dir/RCS", 0700) if not -d "$dir/RCS" and -w $dir;
+		system("ci", "-q", "-m\"Untracked Changes\"", "-t-\"Initial Checkin\"", "-l", "$dir/$file");
+		system("rcs", "-q", "-ko", "$dir/$file");
+	}
 
-  safe_write_file(-file => $p->{-file}, -text => $p->{-text});
+	safe_write_file(-file => $p->{-file}, -text => $p->{-text});
 
-  if (-f "$dir/$file")
-  {
-    mkdir("$dir/RCS", 0700) if not -d "$dir/RCS" and -w $dir;
-    system("ci", "-q", "-t-\"Initial checkin\"", "-m\"$p->{-comment}\"", "-l", "$dir/$file");
-    system("rcs", "-q", "-ko", "$dir/$file");
-  }
+	if (-f "$dir/$file")
+	{
+		mkdir("$dir/RCS", 0700) if not -d "$dir/RCS" and -w $dir;
+		system("ci", "-q", "-t-\"Initial checkin\"", "-m\"$p->{-comment}\"", "-l", "$dir/$file");
+		system("rcs", "-q", "-ko", "$dir/$file");
+	}
 
-  chmod $p->{-mode}, $p->{-file} if $p->{-mode};
+	chmod $p->{-mode}, $p->{-file} if $p->{-mode};
 
-  return 1;
+	return 1;
 }
 
 sub safe_write_file
 {
-  my $p = named_params @_, [ -file => undef, -text => undef ];
-  my $file = $p->{-file};
+	my $p = named_params @_, [ -file => undef, -text => undef ];
+	my $file = $p->{-file};
 
-  return 1 if $safe_mode;
+	return 1 if $safe_mode;
 
-  my $fh = IO::File->new(">$file.$$") or fatal "Unable to open $file: $!";
+	my $fh = IO::File->new(">$file.$$") or fatal "Unable to open $file: $!";
 
-  # If the argument is a filehandle, use that.
-  if (ref $p->{-file} and defined fileno $p->{-file})
-  {
-    local ($_, $!);
-    my $in = $p->{-file};
-    $fh->print($_) while <$in>;
-    fatal "Unable to write $file: $!" if $!;
-  }
-  else
-  {
-    $fh->print($p->{-text}) or fatal "Unable to write to $file: $!";
-  }
+	# If the argument is a filehandle, use that.
+	if (ref $p->{-file} and defined fileno $p->{-file})
+	{
+		local ($_, $!);
+		my $in = $p->{-file};
+		$fh->print($_) while <$in>;
+		fatal "Unable to write $file: $!" if $!;
+	}
+	else
+	{
+		$fh->print($p->{-text}) or fatal "Unable to write to $file: $!";
+	}
 
-  $fh->close or fatal "Unable to write to $file: $!";
+	$fh->close or fatal "Unable to write to $file: $!";
 
-  rename("$file.$$", $file) or fatal "Unable to rename $file.$$: $!";
+	rename("$file.$$", $file) or fatal "Unable to rename $file.$$: $!";
 }
 
 sub set_attr
 {
-  my $p = named_params @_, [ -file => undef, -mode => undef, -uid => undef, -gid => undef ];
-  $p->{-file} ||= $p->{-dir};
-  return w "No filename given to set_attr" unless $p->{-file};
+	my $p = named_params @_, [ -file => undef, -mode => undef, -uid => undef, -gid => undef ];
+	$p->{-file} ||= $p->{-dir};
+	return w "No filename given to set_attr" unless $p->{-file};
 
-  my $mode;
-  my $uid;
-  my $gid;
+	my $mode;
+	my $uid;
+	my $gid;
 
-  for ($p->{-mode})
-  {
-    last unless defined;
-    if (/^\d+$/)
-    {
-      $mode = $_ & 07777;
-    }
-    elsif (/^([r-][w-][stx-]){3}$/)
-    {
-      $mode = 0;
-      my $shift = 2;
-      for (/^(...)(...)(...)$/)
-      {
-        $mode |= 1 <<  (9 + $shift)       if s/[st]/x/;
-        $mode |= 1 << (($shift * 3) + 2)  if /r/;
-        $mode |= 1 << (($shift * 3) + 1)  if /w/;
-        $mode |= 1 <<  ($shift * 3)       if /x/;
-        $shift--;
-      }
-    }
-    else
-    {
-      fatal "Invalid mode $_";
-    }
-  }
+	for ($p->{-mode})
+	{
+		last unless defined;
+		if (/^\d+$/)
+		{
+			$mode = $_ & 07777;
+		}
+		elsif (/^([r-][w-][stx-]){3}$/)
+		{
+			$mode = 0;
+			my $shift = 2;
+			for (/^(...)(...)(...)$/)
+			{
+				$mode |= 1 <<  (9 + $shift)       if s/[st]/x/;
+				$mode |= 1 << (($shift * 3) + 2)  if /r/;
+				$mode |= 1 << (($shift * 3) + 1)  if /w/;
+				$mode |= 1 <<  ($shift * 3)       if /x/;
+				$shift--;
+			}
+		}
+		else
+		{
+			fatal "Invalid mode $_";
+		}
+	}
 
-  for ($p->{-owner} || $p->{-uid})
-  {
-    last unless defined;
-    if (/^\d+$/)
-    {
-      $uid = $_;
-    }
-    else
-    {
-      unless (defined ($uid = getpwnam $_))
-      {
-        w "Can't find user $_";
-        $uid = -1;
-      }
-    }
-  }
+	for ($p->{-owner} || $p->{-uid})
+	{
+		last unless defined;
+		if (/^\d+$/)
+		{
+			$uid = $_;
+		}
+		else
+		{
+			unless (defined ($uid = getpwnam $_))
+			{
+				w "Can't find user $_";
+				$uid = -1;
+			}
+		}
+	}
 
-  for ($p->{-group} || $p->{-gid})
-  {
-    last unless defined;
-    if (/^\d+$/)
-    {
-      $gid = $_;
-    }
-    else
-    {
-      unless (defined ($gid = getgrnam $_))
-      {
-        w "Can't find group $_";
-        $gid = -1;
-      }
-    }
-  }
+	for ($p->{-group} || $p->{-gid})
+	{
+		last unless defined;
+		if (/^\d+$/)
+		{
+			$gid = $_;
+		}
+		else
+		{
+			unless (defined ($gid = getgrnam $_))
+			{
+				w "Can't find group $_";
+				$gid = -1;
+			}
+		}
+	}
 
-  return 0 unless defined $mode or defined $uid or defined $gid;
+	return 0 unless defined $mode or defined $uid or defined $gid;
 
-  my @stat = stat $p->{-file};
-  unless (@stat)
-  {
-    # May not exist yet
-    w "Can't stat $p->{-file}: $!" unless $safe_mode;
-    return 0;
-  }
+	my @stat = stat $p->{-file};
+	unless (@stat)
+	{
+		# May not exist yet
+		w "Can't stat $p->{-file}: $!" unless $safe_mode;
+		return 0;
+	}
 
-  my $changed = 0;
-  if (defined $mode and ($stat[2] & 07777) != $mode)
-  {
-    l sprintf("Changing mode of %s to %o", $p->{-file}, $mode);
-    $changed++;
-    unless ($safe_mode)
-    {
-      chmod $mode, $p->{-file} or
-        w sprintf("chmod %o %s failed: $!", $mode, $p->{-file});
-    }
-  }
+	my $changed = 0;
+	if (defined $mode and ($stat[2] & 07777) != $mode)
+	{
+		l sprintf("Changing mode of %s to %o", $p->{-file}, $mode);
+		$changed++;
+		unless ($safe_mode)
+		{
+			chmod $mode, $p->{-file} or
+				w sprintf("chmod %o %s failed: $!", $mode, $p->{-file});
+		}
+	}
 
-  if (defined $uid and $stat[4] != $uid)
-  {
-    l "Changing owner of $p->{-file} to $uid";
-    $changed++;
-  }
-  else
-  {
-    $uid = -1;
-  }
+	if (defined $uid and $stat[4] != $uid)
+	{
+		l "Changing owner of $p->{-file} to $uid";
+		$changed++;
+	}
+	else
+	{
+		$uid = -1;
+	}
 
-  if (defined $gid and $stat[5] != $gid)
-  {
-    l "Changing group of $p->{-file} to $gid";
-    $changed++;
-  }
-  else
-  {
-    $gid = -1;
-  }
+	if (defined $gid and $stat[5] != $gid)
+	{
+		l "Changing group of $p->{-file} to $gid";
+		$changed++;
+	}
+	else
+	{
+		$gid = -1;
+	}
 
-  if ($uid != -1 or $gid != -1)
-  {
-    unless ($safe_mode)
-    {
-      chown $uid, $gid, $p->{-file} or
-        w sprintf("chown %d:%d %s failed: $!", $uid, $gid, $p->{-file});
-    }
-  }
+	if ($uid != -1 or $gid != -1)
+	{
+		unless ($safe_mode)
+		{
+			chown $uid, $gid, $p->{-file} or
+				w sprintf("chown %d:%d %s failed: $!", $uid, $gid, $p->{-file});
+		}
+	}
 
-  return $changed;
+	return $changed;
 }
 
 sub text_install
 {
-  my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {} ];
-  my $changed = 1;
+	my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {} ];
+	my $changed = 1;
 
-  # Create containing directory if it doesn't exist
+	# Create containing directory if it doesn't exist
 
-  (my $path = $p->{-file}) =~ s,/[^/]+$,,;
-  command("mkdir -p $path") if $path and $path ne $p->{-file} and ! -d $path;
+	(my $path = $p->{-file}) =~ s,/[^/]+$,,;
+	command("mkdir -p $path") if $path and $path ne $p->{-file} and ! -d $path;
 
-  $p->{-flags}->{srcfn} ||= "text";
+	$p->{-flags}->{srcfn} ||= "text";
 
-  # If they are the same, don't bother ..
-  #   and they can't have the same md5 if they're different sizes ..
+	# If they are the same, don't bother ..
+	#   and they can't have the same md5 if they're different sizes ..
 
-  if (-f $p->{-file} and -s _ == length($p->{-text}))
-  {
-    my $src_md5 = Digest::MD5->new->add($p->{-text})->hexdigest;
-    my $dst_md5 = Digest::MD5->new->add(slurp_file $p->{-file})->hexdigest;
-    $changed = 0 if $src_md5 eq $dst_md5;
-  }
+	if (-f $p->{-file} and -s _ == length($p->{-text}))
+	{
+		my $src_md5 = Digest::MD5->new->add($p->{-text})->hexdigest;
+		my $dst_md5 = Digest::MD5->new->add(slurp_file $p->{-file})->hexdigest;
+		$changed = 0 if $src_md5 eq $dst_md5;
+	}
 
-  if ($changed)
-  {
-    l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
-    if ($safe_mode)
-    {
-      v $p->{-text};
-    }
-    else
-    {
-      safe_write(-file => $p->{-file}, -text => $p->{-text})
-      or return w "Unable to install $p->{-file}: $!";
-    }
-  }
+	if ($changed)
+	{
+		l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
+		if ($safe_mode)
+		{
+			v $p->{-text};
+		}
+		else
+		{
+			safe_write(-file => $p->{-file}, -text => $p->{-text})
+			or return w "Unable to install $p->{-file}: $!";
+		}
+	}
 
-  $changed += set_attr($p);
-  if ($changed and defined $p->{-cmd} and !$safe_mode)
-  {
-    l "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
-  }
+	$changed += set_attr($p);
+	if ($changed and defined $p->{-cmd} and !$safe_mode)
+	{
+		l "Running $p->{-cmd} to finish install of $p->{-file}";
+		command($p->{-cmd});
+	}
 
-  $changed;
+	$changed;
 }
 
 sub file_install
 {
-  my $p = named_params @_, [ -file => undef, -src => undef, -cmd => undef, -flags => {}, -modify => [] ];
-  my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
-  my $srctext = '';
+	my $p = named_params @_, [ -file => undef, -src => undef, -cmd => undef, -flags => {}, -modify => [] ];
+	my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
+	my $srctext = '';
 
-  $p->{-src} =~ s/^rollout:/$rollout_url/;
-  if ($p->{-src} =~ /^http:\/\//)
-  {
-    local $_;
-    $_ = http_file -url => $p->{-src};
-    return w "Couldn't retrieve $p->{-src}" unless $_;
-    foreach my $e (@expr)
-    {
-      eval $e;
-    }
-    $srctext = $_;
-  }
-  elsif (-s $p->{-src})
-  {
-    if (@expr)
-    {
-      my $fh = IO::File->new($p->{-src}) or fatal "can't open $p->{-src}: $!";
-      local $_;
-      while (<$fh>)
-      {
-        foreach my $e (@expr)
-        {
-          eval $e;
-        }
-        $srctext .= $_;
-      }
+	$p->{-src} =~ s/^rollout:/$rollout_url/;
+	if ($p->{-src} =~ /^http:\/\//)
+	{
+		local $_;
+		$_ = http_file -url => $p->{-src};
+		return w "Couldn't retrieve $p->{-src}" unless $_;
+		foreach my $e (@expr)
+		{
+			eval $e;
+		}
+		$srctext = $_;
+	}
+	elsif (-s $p->{-src})
+	{
+		if (@expr)
+		{
+			my $fh = IO::File->new($p->{-src}) or fatal "can't open $p->{-src}: $!";
+			local $_;
+			while (<$fh>)
+			{
+				foreach my $e (@expr)
+				{
+					eval $e;
+				}
+				$srctext .= $_;
+			}
 
-      $fh->close;
-    }
-    else
-    {
-      $srctext = slurp_file $p->{-src};
-    }
-  }
+			$fh->close;
+		}
+		else
+		{
+			$srctext = slurp_file $p->{-src};
+		}
+	}
 
-  $p->{-flags}{srcfn} ||= $p->{-src};
-  return text_install($p->{-file}, $srctext, $p->{-cmd}, $p->{-flags});
+	$p->{-flags}{srcfn} ||= $p->{-src};
+	return text_install($p->{-file}, $srctext, $p->{-cmd}, $p->{-flags});
 }
 
 sub dir_check
 {
-  my $p = named_params @_, [ -dir => undef, -mode => undef ];
-  my $flags;
-  my $changed;
+	my $p = named_params @_, [ -dir => undef, -mode => undef ];
+	my $flags;
+	my $changed;
 
-  unless (-e $p->{-dir})
-  {
-    # make parent if required
-    (my $parent = $p->{-dir}) =~ s/\/[^\/]+$//;
-    if ($parent && !-e $parent)
-    {
-      my $x = $p;
-      $x->{-dir} = $parent;
-      dir_check($p);
-    }
-    $p->{-mode} ||= 0755;
+	unless (-e $p->{-dir})
+	{
+		# make parent if required
+		(my $parent = $p->{-dir}) =~ s/\/[^\/]+$//;
+		if ($parent && !-e $parent)
+		{
+			my $x = $p;
+			$x->{-dir} = $parent;
+			dir_check($p);
+		}
+		$p->{-mode} ||= 0755;
 
-    l sprintf("Creating directory %s with mode 0%03o", $p->{-dir}, $p->{-mode});
-    return 1 if $safe_mode;
+		l sprintf("Creating directory %s with mode 0%03o", $p->{-dir}, $p->{-mode});
+		return 1 if $safe_mode;
 
-    my $mask = umask 0;
-    mkdir $p->{-dir}, $p->{-mode} or fatal "Can't create directory $p->{-dir}: $!";
-    umask $mask;
+		my $mask = umask 0;
+		mkdir $p->{-dir}, $p->{-mode} or fatal "Can't create directory $p->{-dir}: $!";
+		umask $mask;
 
-    $changed++;
-  }
-  else
-  {
-    fatal "$p->{-dir} is not a directory" unless -d _;
-  }
+		$changed++;
+	}
+	else
+	{
+		fatal "$p->{-dir} is not a directory" unless -d _;
+	}
 
-  return (set_attr($p)) || $changed;
+	return (set_attr($p)) || $changed;
 }
 
 sub symlink_check
 {
-  my $p = named_params @_, [ -src => undef, -dest => undef ];
-  if (-l $p->{-dest})
-  {
-    return 0 if (readlink $p->{-dest}) eq $p->{-src};
-    l "Changing target of symlink $p->{-dest} to $p->{-src}";
-    unless ($safe_mode)
-    {
-      unlink $p->{-dest} or fatal "Can't unlink $p->{-dest}: $!";
-      symlink $p->{-src}, $p->{-dest} or fatal "Can't symlink $p->{-src} to $p->{-dest}: $!";
-    }
+	my $p = named_params @_, [ -src => undef, -dest => undef ];
+	if (-l $p->{-dest})
+	{
+		return 0 if (readlink $p->{-dest}) eq $p->{-src};
+		l "Changing target of symlink $p->{-dest} to $p->{-src}";
+		unless ($safe_mode)
+		{
+			unlink $p->{-dest} or fatal "Can't unlink $p->{-dest}: $!";
+			symlink $p->{-src}, $p->{-dest} or fatal "Can't symlink $p->{-src} to $p->{-dest}: $!";
+		}
 
-    return 1
-  }
+		return 1
+	}
 
-  w "$p->{-dest} is not a symlink" or return 0 if -e _;
-  unless ($safe_mode)
-  {
-    l "Creating symlink from $p->{-src} to $p->{-dest}";
-    symlink $p->{-src}, $p->{-dest} or fatal "Can't symlink $p->{-src} to $p->{-dest}: $!";
-  }
+	w "$p->{-dest} is not a symlink" or return 0 if -e _;
+	unless ($safe_mode)
+	{
+		l "Creating symlink from $p->{-src} to $p->{-dest}";
+		symlink $p->{-src}, $p->{-dest} or fatal "Can't symlink $p->{-src} to $p->{-dest}: $!";
+	}
 
-  return 1
+	return 1
 }
 
 #}}}
@@ -963,103 +962,103 @@ sub symlink_check
 
 sub file_comment_spec
 {
-  my $p = named_params @_, [ -file => undef, -pat => '#', -cmd => undef, -match => [] ];
-  my @regex = ref $p->{-match} eq 'ARRAY' ? @{$p->{-match}} : [ $p->{-match} ];
-  local $_;
+	my $p = named_params @_, [ -file => undef, -pat => '#', -cmd => undef, -match => [] ];
+	my @regex = ref $p->{-match} eq 'ARRAY' ? @{$p->{-match}} : [ $p->{-match} ];
+	local $_;
 
-  return w "$p->{-file} does not exist!" unless -f $p->{-file};
+	return w "$p->{-file} does not exist!" unless -f $p->{-file};
 
-  my $fh = new IO::File $p->{-file}
-    or return w "$p->{-file} unable to be opened: $!";
+	my $fh = new IO::File $p->{-file}
+		or return w "$p->{-file} unable to be opened: $!";
 
-  my($changes, $f, %c);
-  while (<$fh>)
-  {
-    if (! /^$p->{-pat}/)
-    {
-      foreach my $r (@regex)
-      {
-        if (/$r/)
-        {
-          s/^/$p->{-pat}/;
-          $changes++;
-          $c{$r}++;
-          last;
-        }
-      }
-    }
+	my($changes, $f, %c);
+	while (<$fh>)
+	{
+		if (! /^$p->{-pat}/)
+		{
+			foreach my $r (@regex)
+			{
+				if (/$r/)
+				{
+					s/^/$p->{-pat}/;
+					$changes++;
+					$c{$r}++;
+					last;
+				}
+			}
+		}
 
-    $f .= $_;
-  }
+		$f .= $_;
+	}
 
-  $fh->close;
-  return unless $changes;
+	$fh->close;
+	return unless $changes;
 
-  safe_write(-file => $p->{-file}, -text => $f);
+	safe_write(-file => $p->{-file}, -text => $f);
 
-  l "$p->{-file} changed: commented out ". join(', ', keys %c);
+	l "$p->{-file} changed: commented out ". join(', ', keys %c);
 
-  if (defined $p->{-cmd})
-  {
-    v "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
-  }
+	if (defined $p->{-cmd})
+	{
+		v "Running $p->{-cmd} to finish install of $p->{-file}";
+		command($p->{-cmd});
+	}
 
-  return $changes;
+	return $changes;
 }
 
 sub file_comment
 {
-  my $p = named_params @_, [ -file => undef, -cmd => undef, -match => [], -pat => '#' ];
-  return file_comment_spec($p->{-file}, $p->{-pat}, $p->{-cmd}, $p->{-match});
+	my $p = named_params @_, [ -file => undef, -cmd => undef, -match => [], -pat => '#' ];
+	return file_comment_spec($p->{-file}, $p->{-pat}, $p->{-cmd}, $p->{-match});
 }
 
 sub file_uncomment_spec
 {
-  my $p = named_params @_, [ -file => undef, -pat => '#', -cmd => undef, -match => [] ];
-  my @regex = ref $p->{-match} eq 'ARRAY' ? @{$p->{-match}} : [ $p->{-match} ];
+	my $p = named_params @_, [ -file => undef, -pat => '#', -cmd => undef, -match => [] ];
+	my @regex = ref $p->{-match} eq 'ARRAY' ? @{$p->{-match}} : [ $p->{-match} ];
 
-  return w "$p->{-file} does not exist!" unless -f $p->{-file};
+	return w "$p->{-file} does not exist!" unless -f $p->{-file};
 
-  my $fh = new IO::File $p->{-file}
-    or return w "$p->{-file} unable to be opened: $!";
+	my $fh = new IO::File $p->{-file}
+		or return w "$p->{-file} unable to be opened: $!";
 
-  my($changes, $f, %c);
-  while (<$fh>)
-  {
-    foreach my $r (@regex)
-    {
-      if (/$p->{-pat}.*$r/)
-      {
-        s/^$p->{-pat}+//;
-        $changes++;
-        $c{$r}++;
-        last;
-      }
-    }
-    $f .= $_;
-  }
+	my($changes, $f, %c);
+	while (<$fh>)
+	{
+		foreach my $r (@regex)
+		{
+			if (/$p->{-pat}.*$r/)
+			{
+				s/^$p->{-pat}+//;
+				$changes++;
+				$c{$r}++;
+				last;
+			}
+		}
+		$f .= $_;
+	}
 
-  $fh->close;
-  return unless $changes;
+	$fh->close;
+	return unless $changes;
 
-  safe_write(-file => $p->{-file}, -text => $f);
+	safe_write(-file => $p->{-file}, -text => $f);
 
-  l "$p->{-file} changed: uncommented ". join(', ', keys %c);
+	l "$p->{-file} changed: uncommented ". join(', ', keys %c);
 
-  if (defined $p->{-cmd})
-  {
-    v "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
-  }
+	if (defined $p->{-cmd})
+	{
+		v "Running $p->{-cmd} to finish install of $p->{-file}";
+		command($p->{-cmd});
+	}
 
-  return $changes;
+	return $changes;
 }
 
 sub file_uncomment
 {
-  my $p = named_params @_, [ -file => undef, -cmd => undef, -match => [], -pat => '#' ];
-  return file_uncomment_spec($p->{-file}, $p->{-pat}, $p->{-cmd}, $p->{-match});
+	my $p = named_params @_, [ -file => undef, -cmd => undef, -match => [], -pat => '#' ];
+	return file_uncomment_spec($p->{-file}, $p->{-pat}, $p->{-cmd}, $p->{-match});
 }
 #}}}
 # Package Installation {{{
@@ -1067,177 +1066,177 @@ sub file_uncomment
 $ENV{DEBIAN_FRONTEND} = 'noninteractive';
 sub apt
 {
-  my(@packages) = @_;
-  v "Installing ". join(" ", @packages);
-  command("apt-get -qq update") unless $m{$hostname}->{_done_apt_update}++;
-  if (-x "/usr/bin/dpkg")
-  {
-    return command("apt-get", "-qy", "-oStopOnError=false", "-oDPkg::Options={\"--force-confol
-  --force-yes", "--allow-unauthenticated", "install", @packages);
-  }
-  else
-  {
-    return command("apt-get", "-qy", "--force-yes", "install", @packages);
-  }
+	my(@packages) = @_;
+	v "Installing ". join(" ", @packages);
+	command("apt-get -qq update") unless $m{$hostname}->{_done_apt_update}++;
+	if (-x "/usr/bin/dpkg")
+	{
+		return command("apt-get", "-qy", "-oStopOnError=false", "-oDPkg::Options={\"--force-confol
+	--force-yes", "--allow-unauthenticated", "install", @packages);
+	}
+	else
+	{
+		return command("apt-get", "-qy", "--force-yes", "install", @packages);
+	}
 }
 
 sub package_status
 {
-  my($package) = @_;
+	my($package) = @_;
 
-  if (-f "/etc/debian_version")
-  {
-    return package_status_dpkg($package);
-  }
-  elsif (-f "/etc/redhat-release")
-  {
-    return package_status_rpm($package);
-  }
+	if (-f "/etc/debian_version")
+	{
+		return package_status_dpkg($package);
+	}
+	elsif (-f "/etc/redhat-release")
+	{
+		return package_status_rpm($package);
+	}
 }
 
 sub package_status_dpkg
 {
-  my($package) = @_;
-  my $status = $m{$hostname}->{_pkg_status};
-  if (!$status)
-  {
-    $status = {};
-    my $text = slurp_file("/var/lib/dpkg/status");
-    foreach (split(/\n\n/, $text))
-    {
-      if (/^Package: (.*)$/m)
-      {
-        my $pkg = $1;
-        if (/^Status:.* installed.*$/m)
-        {
-          $status->{$pkg} = 1;
-        }
-        else
-        {
-          $status->{$pkg} = 0;
-        }
-      }
-    }
-    $m{$hostname}->{_pkg_status} = $status;
-  }
-  return $status->{$package} || 0;
+	my($package) = @_;
+	my $status = $m{$hostname}->{_pkg_status};
+	if (!$status)
+	{
+		$status = {};
+		my $text = slurp_file("/var/lib/dpkg/status");
+		foreach (split(/\n\n/, $text))
+		{
+			if (/^Package: (.*)$/m)
+			{
+				my $pkg = $1;
+				if (/^Status:.* installed.*$/m)
+				{
+					$status->{$pkg} = 1;
+				}
+				else
+				{
+					$status->{$pkg} = 0;
+				}
+			}
+		}
+		$m{$hostname}->{_pkg_status} = $status;
+	}
+	return $status->{$package} || 0;
 }
 
 sub package_status_rpm
 {
-  my($package) = @_;
-  my $status = $m{$hostname}->{_pkg_status} || {};
-  $m{$hostname}->{_pkg_status} = $status;
+	my($package) = @_;
+	my $status = $m{$hostname}->{_pkg_status} || {};
+	$m{$hostname}->{_pkg_status} = $status;
 
-  if (!defined $status->{$package})
-  {
-    `rpm -q $package 2>/dev/null >/dev/null`;
-    $status->{$package} = ($? == 0);
-  }
+	if (!defined $status->{$package})
+	{
+		`rpm -q $package 2>/dev/null >/dev/null`;
+		$status->{$package} = ($? == 0);
+	}
 
-  return $status->{$package};
+	return $status->{$package};
 }
 
 sub package_check
 {
-  my(@packages) = @_;
+	my(@packages) = @_;
 
-  my $available_packages = $m{$hostname}->{_available_packages};
-  $m{$hostname}->{_done_packages} ||= {};
+	my $available_packages = $m{$hostname}->{_available_packages};
+	$m{$hostname}->{_done_packages} ||= {};
 
-  my @add;
-  foreach my $package (@packages)
-  {
-    next if $m{$hostname}->{_done_packages}{$package}++;
-    next if package_status($package);
-    next if $package =~ /^(http:\/\/|rollout:)/;
-    push @add, $package;
-  }
+	my @add;
+	foreach my $package (@packages)
+	{
+		next if $m{$hostname}->{_done_packages}{$package}++;
+		next if package_status($package);
+		next if $package =~ /^(http:\/\/|rollout:)/;
+		push @add, $package;
+	}
 
-  my $changes = 0;
-  if (@add)
-  {
-    if (!$available_packages)
-    {
-      v "Updating packages list";
-      command("apt-get -q update") unless $m{$hostname}->{_done_apt_update}++;
-    }
+	my $changes = 0;
+	if (@add)
+	{
+		if (!$available_packages)
+		{
+			v "Updating packages list";
+			command("apt-get -q update") unless $m{$hostname}->{_done_apt_update}++;
+		}
 
-    l "Installing packages ". join(" ", @add);
-    apt(@add) && $changes++;
-  }
+		l "Installing packages ". join(" ", @add);
+		apt(@add) && $changes++;
+	}
 
-  foreach my $url (@packages)
-  {
-    $url =~ s/^rollout:/$rollout_url/;
-    next unless $url =~ /^(http:\/\/[^\/]+).*\/([a-z0-9\._\-]+\.(?:deb|rpm))/i;
+	foreach my $url (@packages)
+	{
+		$url =~ s/^rollout:/$rollout_url/;
+		next unless $url =~ /^(http:\/\/[^\/]+).*\/([a-z0-9\._\-]+\.(?:deb|rpm))/i;
 
-    my($package, $filename) = ($2, $2);
-    $package =~ s/[_-]\d+.*//;
+		my($package, $filename) = ($2, $2);
+		$package =~ s/[_-]\d+.*//;
 
-    next if $m{$hostname}->{_done_packages}{$package}++;
-    next if package_status($package);
+		next if $m{$hostname}->{_done_packages}{$package}++;
+		next if package_status($package);
 
-    l "Installing $package from $url";
+		l "Installing $package from $url";
 
-    if ($filename =~ /\.rpm$/)
-    {
-      command("rpm", "-U", $url) && $changes++;
-    }
-    else
-    {
-      my $data = http_file -url => $url;
-      if (!$data)
-      {
-        w "Couldn't retrieve $url";
-        next;
-      }
-      if ((my $fh = new IO::File ">/tmp/$filename"))
-      {
-        print $fh $data;
-        close($fh);
+		if ($filename =~ /\.rpm$/)
+		{
+			command("rpm", "-U", $url) && $changes++;
+		}
+		else
+		{
+			my $data = http_file -url => $url;
+			if (!$data)
+			{
+				w "Couldn't retrieve $url";
+				next;
+			}
+			if ((my $fh = new IO::File ">/tmp/$filename"))
+			{
+				print $fh $data;
+				close($fh);
 
-        if ($filename =~ /\.deb$/)
-        {
-          command("dpkg", "-i", "/tmp/$filename") && $changes++;
-        }
-        else
-        {
-          w "Unknown package type for $url";
-        }
+				if ($filename =~ /\.deb$/)
+				{
+					command("dpkg", "-i", "/tmp/$filename") && $changes++;
+				}
+				else
+				{
+					w "Unknown package type for $url";
+				}
 
-        unlink("/tmp/$filename");
-      }
-      else
-      {
-        w "Couldn't write to /tmp/$filename: $!";
-        next;
-      }
-    }
-  }
+				unlink("/tmp/$filename");
+			}
+			else
+			{
+				w "Couldn't write to /tmp/$filename: $!";
+				next;
+			}
+		}
+	}
 
-  return $changes ? 1 : 0;
+	return $changes ? 1 : 0;
 }
 
 sub package_uncheck
 {
-  my(@packages) = @_;
+	my(@packages) = @_;
 
-  $m{$hostname}->{_done_packages} ||= {};
+	$m{$hostname}->{_done_packages} ||= {};
 
-  my @remove;
-  foreach my $package (@packages)
-  {
-    next if $m{$hostname}->{_done_packages}{$package}++;
-    next unless package_status($package);
-    push @remove, $package;
-  }
+	my @remove;
+	foreach my $package (@packages)
+	{
+		next if $m{$hostname}->{_done_packages}{$package}++;
+		next unless package_status($package);
+		push @remove, $package;
+	}
 
-  if (@remove)
-  {
-    l "Removing packages ". join(" ", @remove);
-    command("apt-get", "-qq", "-y", "remove", @remove);
-  }
+	if (@remove)
+	{
+		l "Removing packages ". join(" ", @remove);
+		command("apt-get", "-qq", "-y", "remove", @remove);
+	}
 }
 #}}}
 
@@ -1247,184 +1246,184 @@ sub package_uncheck
 #   intro   - print this before running the command (and suppress "success")
 sub command
 {
-  my $flags = {};
-  $flags = pop @_ if ref $_[-1] eq 'HASH';
+	my $flags = {};
+	$flags = pop @_ if ref $_[-1] eq 'HASH';
 
-  my $command = join " ", @_;
-  my $printed = 0;
-  $flags->{intro} ||= '';
-  $flags->{failure} ||= "FAILED: '$command' failed.";
-  $flags->{success} ||= "Finished running '$command'.";
-  $flags->{timeout} = undef unless $flags->{timeout};
+	my $command = join " ", @_;
+	my $printed = 0;
+	$flags->{intro} ||= '';
+	$flags->{failure} ||= "FAILED: '$command' failed.";
+	$flags->{success} ||= "Finished running '$command'.";
+	$flags->{timeout} = undef unless $flags->{timeout};
 
-  v "CMD: $command";
-  $printed++ if $verbosity > 1;
+	v "CMD: $command";
+	$printed++ if $verbosity > 1;
 
-  return if $safe_mode;
+	return if $safe_mode;
 
-  print $flags->{intro} if $flags->{intro};
+	print $flags->{intro} if $flags->{intro};
 
-  my $cmd = IO::File->new;
-  my $child = $cmd->open('-|');
-  unless ($child)
-  {
-    fatal "Can't fork in command: $!" unless defined $child;
+	my $cmd = IO::File->new;
+	my $child = $cmd->open('-|');
+	unless ($child)
+	{
+		fatal "Can't fork in command: $!" unless defined $child;
 
-    $SIG{PIPE} = 'IGNORE';
+		$SIG{PIPE} = 'IGNORE';
 
-    # detach from controlling tty
-    setsid;
-    open STDIN, '</dev/null';
-    open(STDERR, '>&STDOUT');
+		# detach from controlling tty
+		setsid;
+		open STDIN, '</dev/null';
+		open(STDERR, '>&STDOUT');
 
-    $|=1;
-    exec @_;
-    die "Can't execute ". join (" ", @_). ": $!";
-    exit;
-  }
+		$|=1;
+		exec @_;
+		die "Can't execute ". join (" ", @_). ": $!";
+		exit;
+	}
 
-  local $_;
-  my $timed_out = 1;
-  my $out = length $flags->{intro};
-  my $nl = $flags->{intro} =~ /\n$/;
+	local $_;
+	my $timed_out = 1;
+	my $out = length $flags->{intro};
+	my $nl = $flags->{intro} =~ /\n$/;
 
-  my $s = IO::Select->new($cmd);
-  while ($s->can_read($flags->{timeout}))
-  {
-    unless ($cmd->sysread($_, 1024))
-    {
-      $timed_out = 0;
-      last;
-    }
+	my $s = IO::Select->new($cmd);
+	while ($s->can_read($flags->{timeout}))
+	{
+		unless ($cmd->sysread($_, 1024))
+		{
+			$timed_out = 0;
+			last;
+		}
 
-    my $t;
-    $t = "  CMD: " if $nl or !$out;
-    s/\n(?=.)/\n  CMD: /g;
-    $t .= $_;
-    if (!$printed)
-    {
-      l "CMD: $command";
-      $printed++;
-    }
-    print $t;
-    $log .= $t;
+		my $t;
+		$t = "  CMD: " if $nl or !$out;
+		s/\n(?=.)/\n  CMD: /g;
+		$t .= $_;
+		if (!$printed)
+		{
+			l "CMD: $command";
+			$printed++;
+		}
+		print $t;
+		$log .= $t;
 
-    $out += length;
-    $nl = /\n$/;
-  }
+		$out += length;
+		$nl = /\n$/;
+	}
 
-  if ($timed_out)
-  {
-    print "[timeout]\n";
-    kill 15, $child;
-  }
-  else
-  {
-    print "\n" if $out and !$nl;
-  }
+	if ($timed_out)
+	{
+		print "[timeout]\n";
+		kill 15, $child;
+	}
+	else
+	{
+		print "\n" if $out and !$nl;
+	}
 
-  $cmd->close;
-  if ($? >> 8)
-  {
-    l $flags->{failure}. "  Exit code: " . ($? >> 8);
-  }
-  elsif ($?)
-  {
-    l $flags->{failure}. "  Signal: " . ($? & 0x7f);
-  }
-  elsif ($out and not exists $flags->{intro})
-  {
-    l $flags->{success};
-  }
+	$cmd->close;
+	if ($? >> 8)
+	{
+		l $flags->{failure}. "  Exit code: " . ($? >> 8);
+	}
+	elsif ($?)
+	{
+		l $flags->{failure}. "  Signal: " . ($? & 0x7f);
+	}
+	elsif ($out and not exists $flags->{intro})
+	{
+		l $flags->{success};
+	}
 
-  # emulate a return of system()
-  return $?;
+	# emulate a return of system()
+	return $?;
 }
 
 sub cvs_checkout
 {
-  my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef, -cmd => undef ];
-  return w "Not enough parameters specified to cvs_checkout" unless $p->{-dest} && $p->{-module} && $p->{repo};
+	my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef, -cmd => undef ];
+	return w "Not enough parameters specified to cvs_checkout" unless $p->{-dest} && $p->{-module} && $p->{repo};
 
-  v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
-  if (-d $p->{-dest} && !-d "$p->{-dest}/CVS")
-  {
-    w "$p->{-dest} exists but is not a CVS checkout";
-    return 0;
-  }
-  if (-d $p->{-dest})
-  {
-    chdir $p->{-dest};
-    command("cvs", "-q", "update", "-dPA",
-      ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
-    command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  }
-  else
-  {
-    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
-    dir_check($base);
-    return w "Checkout to $p->{-dest} failed" unless -d $base;
-    chdir $base;
-    command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
-      ($p->{-rev} ? ("-r", $p->{-rev}) : ()),
-      "-d", $newdir,
-      $p->{-module});
-    chdir $p->{-module} && command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  }
-  return 0;
+	v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
+	if (-d $p->{-dest} && !-d "$p->{-dest}/CVS")
+	{
+		w "$p->{-dest} exists but is not a CVS checkout";
+		return 0;
+	}
+	if (-d $p->{-dest})
+	{
+		chdir $p->{-dest};
+		command("cvs", "-q", "update", "-dPA",
+			($p->{-rev} ? ("-r", $p->{-rev}) : ()));
+		command($p->{-cmd}) if $p->{-cmd};
+		return 1;
+	}
+	else
+	{
+		my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
+		return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
+		dir_check($base);
+		return w "Checkout to $p->{-dest} failed" unless -d $base;
+		chdir $base;
+		command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
+			($p->{-rev} ? ("-r", $p->{-rev}) : ()),
+			"-d", $newdir,
+			$p->{-module});
+		chdir $p->{-module} && command($p->{-cmd}) if $p->{-cmd};
+		return 1;
+	}
+	return 0;
 }
 
 sub svn_checkout
 {
-  my $p = named_params @_, [ -dest => undef, -url => undef, -rev => undef, -cmd => undef ];
-  return w "Not enough parameters specified to svn_checkout" unless $p->{-dest} && $p->{-url};
+	my $p = named_params @_, [ -dest => undef, -url => undef, -rev => undef, -cmd => undef ];
+	return w "Not enough parameters specified to svn_checkout" unless $p->{-dest} && $p->{-url};
 
-  v "svn checkout $p->{-dest}:". ($p->{-rev} || "HEAD");
-  if (-d $p->{-dest} && !-d "$p->{-dest}/.svn")
-  {
-    w "$p->{-dest} exists but is not a svn checkout";
-    return 0;
-  }
-  if (-d $p->{-dest})
-  {
-    chdir $p->{-dest};
-    command("svn", "update", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
-    command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  }
-  else
-  {
-    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
-    dir_check($base);
-    return w "Checkout to $p->{-dest} failed" unless -d $base;
-    chdir $base;
-    command("svn", "checkout", 
-      ($p->{-rev} ? ("-r", $p->{-rev}) : ()),
-      $p->{-url},
-      $newdir);
-    chdir $newdir && command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  }
-  return 0;
+	v "svn checkout $p->{-dest}:". ($p->{-rev} || "HEAD");
+	if (-d $p->{-dest} && !-d "$p->{-dest}/.svn")
+	{
+		w "$p->{-dest} exists but is not a svn checkout";
+		return 0;
+	}
+	if (-d $p->{-dest})
+	{
+		chdir $p->{-dest};
+		command("svn", "update", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
+		command($p->{-cmd}) if $p->{-cmd};
+		return 1;
+	}
+	else
+	{
+		my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
+		return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
+		dir_check($base);
+		return w "Checkout to $p->{-dest} failed" unless -d $base;
+		chdir $base;
+		command("svn", "checkout", 
+			($p->{-rev} ? ("-r", $p->{-rev}) : ()),
+			$p->{-url},
+			$newdir);
+		chdir $newdir && command($p->{-cmd}) if $p->{-cmd};
+		return 1;
+	}
+	return 0;
 }
 
 sub expand_network($)
 {
-  my($network) = @_;
-  return () unless $network;
-  $network =~ s/(^\[|\]$)//g;
-  return ($network) if $network =~ /^\d+\.\d+\.\d+\.\d+/;
-  return @{$networks{$network} || []};
+	my($network) = @_;
+	return () unless $network;
+	$network =~ s/(^\[|\]$)//g;
+	return ($network) if $network =~ /^\d+\.\d+\.\d+\.\d+/;
+	return @{$networks{$network} || []};
 }
 
 if (open(LOCKFILE, ">/var/run/rollout.lock"))
 {
-  die "There is already an instance of rollout running"
-    unless flock(LOCKFILE, LOCK_EX | LOCK_NB);
+	die "There is already an instance of rollout running"
+		unless flock(LOCKFILE, LOCK_EX | LOCK_NB);
 }
 
 my $start_time = time;
@@ -1437,26 +1436,26 @@ v "Only running steps @only_steps" if @only_steps;
 
 while (@steps)
 {
-  $current_step = shift @steps;
-  next if grep { $current_step =~ /^\d*-?$_$/ } @skip_steps;
-  next if @only_steps && !grep { $current_step =~ /^\d*-?$_$/ } @only_steps;
+	$current_step = shift @steps;
+	next if grep { $current_step =~ /^\d*-?$_$/ } @skip_steps;
+	next if @only_steps && !grep { $current_step =~ /^\d*-?$_$/ } @only_steps;
 
-  l $current_step, 0;
-  $steps_code{$current_step} ||= http_file -url => "steps/$current_step";
-  unless ($steps_code{$current_step})
-  {
-    w "Can't retrieve step $current_step";
-    next;
-  }
+	l $current_step, 0;
+	$steps_code{$current_step} ||= http_file -url => "steps/$current_step";
+	unless ($steps_code{$current_step})
+	{
+		w "Can't retrieve step $current_step";
+		next;
+	}
 
-  eval $steps_code{$current_step};
-  exit unless $pid == $$;
-  if ($@)
-  {
-    l "------ FATAL ERROR ------";
-    l "$_" foreach ($@);
-    while (@steps && $steps[0] ne '99-complete') { shift @steps };
-  }
+	eval $steps_code{$current_step};
+	exit unless $pid == $$;
+	if ($@)
+	{
+		l "------ FATAL ERROR ------";
+		l "$_" foreach ($@);
+		while (@steps && $steps[0] ne '99-complete') { shift @steps };
+	}
 }
 
 close(LOCKFILE);

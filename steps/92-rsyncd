@@ -6,11 +6,11 @@ package_check("rsync");
 
 if (-f '/etc/xinetd.d/rsync')
 {
-  file_modify('/etc/xinetd.d/rsync', '/etc/init.d/xinetd reload', 's/disable\s*=\s*yes/disable = no/');
+	file_modify('/etc/xinetd.d/rsync', '/etc/init.d/xinetd reload', 's/disable\s*=\s*yes/disable = no/');
 }
 elsif (-f '/etc/default/rsync')
 {
-  file_modify('/etc/default/rsync', '/etc/init.d/rsync restart', 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/');
+	file_modify('/etc/default/rsync', '/etc/init.d/rsync restart', 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/');
 }
 
 my %users;
@@ -18,28 +18,28 @@ my $config = "";
 
 foreach (i_isa_fetchall("rsync"))
 {
-  while (my($name, $r) = each %$_)
-  {
-    next unless $r->{path};
-    $r->{uid} ||= 'root';
-    $r->{user} = 'backup' unless defined $r->{user};
-    $config .= "[$name]\n";
-    $config .= "  comment = $r->{comment}\n" if $r->{comment};
-    $config .= "  path = $r->{path}\n";
-    $config .= "  auth users = $r->{user}\n" if $r->{user};
-    $config .= "  hosts allow = $r->{allow}\n" if $r->{allow};
-    $config .= "  secrets file = /etc/rsync.secrets\n" if $r->{user};
-    $config .= "  uid = $r->{uid}\n" if $r->{uid};
-    $config .= "  gid = $r->{gid}\n" if $r->{gid};
-    $config .= "  use chroot = $r->{chroot}\n" if $r->{chroot};
-    $config .= "  read only = yes\n" unless $r->{readonly};
-    $config .= "\n";
+	while (my($name, $r) = each %$_)
+	{
+		next unless $r->{path};
+		$r->{uid} ||= 'root';
+		$r->{user} = 'backup' unless defined $r->{user};
+		$config .= "[$name]\n";
+		$config .= "	comment = $r->{comment}\n" if $r->{comment};
+		$config .= "	path = $r->{path}\n";
+		$config .= "	auth users = $r->{user}\n" if $r->{user};
+		$config .= "	hosts allow = $r->{allow}\n" if $r->{allow};
+		$config .= "	secrets file = /etc/rsync.secrets\n" if $r->{user};
+		$config .= "	uid = $r->{uid}\n" if $r->{uid};
+		$config .= "	gid = $r->{gid}\n" if $r->{gid};
+		$config .= "	use chroot = $r->{chroot}\n" if $r->{chroot};
+		$config .= "	read only = yes\n" unless $r->{readonly};
+		$config .= "\n";
 
-    if ($r->{user} && $r->{password})
-    {
-      $users{$r->{user}} = $r->{password};
-    }
-  }
+		if ($r->{user} && $r->{password})
+		{
+			$users{$r->{user}} = $r->{password};
+		}
+	}
 }
 
 my $restart = 0;

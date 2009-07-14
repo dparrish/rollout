@@ -4,62 +4,62 @@
 return unless i_has("snmp");
 
 my @options = (
-  '# SNMPD Configuration file',
-  '',
-  '# WARNING',
-  '# This file is built automatically by rollout - any changes you make here will be overwritten',
-  '',
-  "master agentx",
-  "view  all    included .1            80",
+	'# SNMPD Configuration file',
+	'',
+	'# WARNING',
+	'# This file is built automatically by rollout - any changes you make here will be overwritten',
+	'',
+	"master agentx",
+	"view	all	  included .1            80",
 );
 
 my $community_counter = 0;
 
 foreach (i_isa_fetchall("snmp"))
 {
-  for (my $i = 0; $i < @$_; $i += 2)
-  {
-    my($key, $value) = ($_->[$i], $_->[$i + 1]);
-    next unless $key && defined $value;
+	for (my $i = 0; $i < @$_; $i += 2)
+	{
+		my($key, $value) = ($_->[$i], $_->[$i + 1]);
+		next unless $key && defined $value;
 
-    if ($key eq 'community')
-    {
-      push @options,
-        "com2sec readonly default $value",
-        "group com_$community_counter v1 readonly",
-        "group com_$community_counter v2c readonly",
-        "group com_$community_counter usm readonly",
-        "access com_$community_counter \"\" any noauth exact all none none";
-      push @options, "trapcommunity $value";
-    }
-    elsif ($key eq 'trap')
-    {
-      # host community [port]
-      push @options, "trapsink $value";
-      push @options, "trap2sink $value";
-      push @options, "informsink $value";
-    }
-    elsif ($key eq 'disk')
-    {
-      next unless $value =~ /^\/\S*\s+([0-9]+)$/;
-      next unless $1 <= 100;
-      push @options, "disk $value";
-    }
-    else
-    {
-      push @options, "$key $value";
-    }
-  }
+		if ($key eq 'community')
+		{
+			push @options,
+				"com2sec readonly default $value",
+				"group com_$community_counter v1 readonly",
+				"group com_$community_counter v2c readonly",
+				"group com_$community_counter usm readonly",
+				"access com_$community_counter \"\" any noauth exact all none none";
+			push @options, "trapcommunity $value";
+		}
+		elsif ($key eq 'trap')
+		{
+			# host community [port]
+			push @options, "trapsink $value";
+			push @options, "trap2sink $value";
+			push @options, "informsink $value";
+		}
+		elsif ($key eq 'disk')
+		{
+			next unless $value =~ /^\/\S*\s+([0-9]+)$/;
+			next unless $1 <= 100;
+			push @options, "disk $value";
+		}
+		else
+		{
+			push @options, "$key $value";
+		}
+	}
 }
 
 if (-f "/etc/default/snmpd")
 {
-  file_modify(-file => "/etc/default/snmpd",
-    -modify => [ 's/^SNMPDOPTS=\'(.*) 127.0.0.1\'/SNMPDOPTS=\'$1\'/' ]);
+	file_modify(-file => "/etc/default/snmpd",
+		-modify => [ 's/^SNMPDOPTS=\'(.*) 127.0.0.1\'/SNMPDOPTS=\'$1\'/' ]);
 }
 
 if (-f "/etc/init.d/snmpd" && -d "/etc/snmp")
 {
-  text_install(-file => "/etc/snmp/snmpd.conf", -text => join("\n", @options). "\n", -cmd => "/etc/init.d/snmpd restart", -owner => 'root', -mode => 0600);
+	text_install(-file => "/etc/snmp/snmpd.conf", -text => join("\n", @options). "\n", -cmd => "/etc/init.d/snmpd restart", -owner => 'root', -mode => 0600);
 }
 

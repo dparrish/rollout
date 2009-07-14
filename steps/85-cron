@@ -2,17 +2,17 @@
 
 foreach (i_isa_fetchall("crontab_include"))
 {
-  while(my($line, $match) = each(%$_))
-  {
-    file_append("/etc/crontab", $line, $match);
-  }
+	while(my($line, $match) = each(%$_))
+	{
+		file_append("/etc/crontab", $line, $match);
+	}
 }
 
 foreach (i_isa_fetchall("crontab"))
 {
-  while(my($name, $lines) = each(%$_))
-  {
-    text_install("/etc/cron.d/$name", join("\n", @$lines). "\n");
-  }
-  
+	while(my($name, $lines) = each(%$_))
+	{
+		text_install("/etc/cron.d/$name", join("\n", @$lines). "\n");
+	}
+	
 }
