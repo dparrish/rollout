@@ -4,75 +4,75 @@
 
 # Define the first machine 'testserver'
 $m{testserver} = {
-	ISA => {
-		RHEL4_i386 => 1,	# It's RHEL4, on i386
-		Production => 1,	# It's a production machine
-		Netbackup_Client => 1,	# It's a netbackup client. This isn't required because
-					# 'Production' also inherits this class, but it makes it
-					# more obvious
-		Web_Server => 1,	# It's also a web server, although not configured by rollout
-	},
-	# Define the network interfaces. These aren't applied unless '-f network'
-	# is specified on the command line
-	interfaces => {
-		eth0 => {
-			# Primary interface
-			primary => 1,
-			ip => '192.168.1.7',
-			netmask => '255.255.255.0',
-			network => '192.168.1.0',
-			broadcast => '192.168.1.255',
-			gateway => '192.168.1.1', # This is the default route
-		},
-		eth1 => {
-			# This is a secondary interface, on the backup LAN
-			ip => '192.168.4.7',
-			netmask => '255.255.255.0',
-			network => '192.168.4.0',
-			broadcast => '192.168.4.255',
-		},
-	},
+  ISA => {
+    RHEL4_i386 => 1,  # It's RHEL4, on i386
+    Production => 1,  # It's a production machine
+    Netbackup_Client => 1,  # It's a netbackup client. This isn't required because
+          # 'Production' also inherits this class, but it makes it
+          # more obvious
+    Web_Server => 1,  # It's also a web server, although not configured by rollout
+  },
+  # Define the network interfaces. These aren't applied unless '-f network'
+  # is specified on the command line
+  interfaces => {
+    eth0 => {
+      # Primary interface
+      primary => 1,
+      ip => '192.168.1.7',
+      netmask => '255.255.255.0',
+      network => '192.168.1.0',
+      broadcast => '192.168.1.255',
+      gateway => '192.168.1.1', # This is the default route
+    },
+    eth1 => {
+      # This is a secondary interface, on the backup LAN
+      ip => '192.168.4.7',
+      netmask => '255.255.255.0',
+      network => '192.168.4.0',
+      broadcast => '192.168.4.255',
+    },
+  },
 };
 
 # Define the backup server.
 $m{backupserver} = {
-	ISA => { Debian => 1, Production => 1 },
-	interfaces => {
-		# Create 2 interfaces, one in the admin lan and one in the backup lan
-		eth0 => {
-			primary => 1,
-			ip => '192.168.1.254',
-			netmask => '255.255.255.0',
-			network => '192.168.1.0',
-			broadcast => '192.168.1.255',
-			mac => '00:11:11:B0:56:CE',
-			gateway => '192.168.1.1',
-		},
-		eth1 => {
-			ip => '192.168.4.254',
-			netmask => '255.255.255.0',
-			network => '192.168.4.0',
-			broadcast => '192.168.4.255',
-		},
-	},
+  ISA => { Debian => 1, Production => 1 },
+  interfaces => {
+    # Create 2 interfaces, one in the admin lan and one in the backup lan
+    eth0 => {
+      primary => 1,
+      ip => '192.168.1.254',
+      netmask => '255.255.255.0',
+      network => '192.168.1.0',
+      broadcast => '192.168.1.255',
+      mac => '00:11:11:B0:56:CE',
+      gateway => '192.168.1.1',
+    },
+    eth1 => {
+      ip => '192.168.4.254',
+      netmask => '255.255.255.0',
+      network => '192.168.4.0',
+      broadcast => '192.168.4.255',
+    },
+  },
 
-	# This device is part of the backup lan. This can be used in firewall rules.
-	network => [ 'backup_lan' ],
+  # This device is part of the backup lan. This can be used in firewall rules.
+  network => [ 'backup_lan' ],
 
-	sudo => {
-		# Allow the 'admin' group to restart netbackup
-		'%admin' => [
-			'/opt/openv/netbackup/server.sh',
-		],
-	},
-	ulimit => {
-		# Allow the 'admin' group to have 5000 open files and a 4k stack size
-		'@admin' => {
-			nofile => 5000,
-			-s => 4096,
-		},
-	},
-	# Add this line to the message-of-the-day, displayed on login
-	motd => 'Run /opt/openv/netbackup/server.sh to work with NetBackup',
+  sudo => {
+    # Allow the 'admin' group to restart netbackup
+    '%admin' => [
+      '/opt/openv/netbackup/server.sh',
+    ],
+  },
+  ulimit => {
+    # Allow the 'admin' group to have 5000 open files and a 4k stack size
+    '@admin' => {
+      nofile => 5000,
+      -s => 4096,
+    },
+  },
+  # Add this line to the message-of-the-day, displayed on login
+  motd => 'Run /opt/openv/netbackup/server.sh to work with NetBackup',
 };
 

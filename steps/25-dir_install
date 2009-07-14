@@ -2,11 +2,11 @@
 
 foreach (i_isa_fetchall("dir_install"))
 {
-	while (my($dest, $src) = each(%$_))
-	{
-		$src = { -src => $src } if ref $src ne 'HASH';
-		map { "-$_" unless /^-/ } keys %$src;
-		dir_install(-src => $src->{-src}, -dest => $dest, -cmd => $src->{command}, $src);
-	}
+  while (my($dest, $src) = each(%$_))
+  {
+    $src = { -src => $src } if ref $src ne 'HASH';
+    map { "-$_" unless /^-/ } keys %$src;
+    dir_install(-src => $src->{-src}, -dest => $dest, -cmd => $src->{command}, $src);
+  }
 }
 

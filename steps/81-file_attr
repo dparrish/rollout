@@ -2,9 +2,9 @@
 
 foreach (i_isa_fetchall("file_attr"))
 {
-	while(my($file, $attr) = each(%$_))
-	{
-		set_attr($file, $attr);
-	}
+  while(my($file, $attr) = each(%$_))
+  {
+    set_attr($file, $attr);
+  }
 }
 

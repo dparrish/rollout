@@ -4,10 +4,10 @@
 my $changed = 0;
 foreach (i_isa_fetchall("sysctl"))
 {
-	while (my($item, $value) = each(%$_))
-	{
-		file_append(-file => "/etc/sysctl.conf", -add => "$item = $value", -match => qr/^$item/) and $changed++;
-	}
+  while (my($item, $value) = each(%$_))
+  {
+    file_append(-file => "/etc/sysctl.conf", -add => "$item = $value", -match => qr/^$item/) and $changed++;
+  }
 }
 
 command("sysctl", "-p", "/etc/sysctl.conf") if $changed;

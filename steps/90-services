@@ -4,83 +4,83 @@ use IO::Dir;
 
 foreach (i_isa_fetchall("service"))
 {
-	while (my($service, $s) = each(%$_))
-	{
-		v "Checking service $service";
-		my $processname;
-		my $status = $s;
-		my $running = 0;
-		my $check = undef;
+  while (my($service, $s) = each(%$_))
+  {
+    v "Checking service $service";
+    my $processname;
+    my $status = $s;
+    my $running = 0;
+    my $check = undef;
 
-		if (ref $s eq 'HASH')
-		{
-			$processname = $s->{proc} || undef;
-			$status = $s->{status} || 0;
-			$check = $s->{check} || undef;
-		}
+    if (ref $s eq 'HASH')
+    {
+      $processname = $s->{proc} || undef;
+      $status = $s->{status} || 0;
+      $check = $s->{check} || undef;
+    }
 
-		if ($check)
-		{
-			v "Running check $check";
-			system("$check >/dev/null 2>/dev/null");
-			$running = !$?;
-		}
-		elsif ($processname)
-		{
-			my %dir;
-			tie %dir, 'IO::Dir', "/proc";
-			foreach (grep /^\d+$/, keys %dir) {
-				my $exe = readlink("/proc/$_/exe") || "";
-				if ($exe =~ /\/$processname$/)
-				{
-					$running = 1;
-				}
-			}
-			untie %dir;
-		}
-		else
-		{
-			if (-f "/etc/init.d/$service")
-			{
-				system("/etc/init.d/$service status >/dev/null 2>/dev/null");
-				$running = ($? == 0);
-			}
-		}
+    if ($check)
+    {
+      v "Running check $check";
+      system("$check >/dev/null 2>/dev/null");
+      $running = !$?;
+    }
+    elsif ($processname)
+    {
+      my %dir;
+      tie %dir, 'IO::Dir', "/proc";
+      foreach (grep /^\d+$/, keys %dir) {
+        my $exe = readlink("/proc/$_/exe") || "";
+        if ($exe =~ /\/$processname$/)
+        {
+          $running = 1;
+        }
+      }
+      untie %dir;
+    }
+    else
+    {
+      if (-f "/etc/init.d/$service")
+      {
+        system("/etc/init.d/$service status >/dev/null 2>/dev/null");
+        $running = ($? == 0);
+      }
+    }
 
-		v "Status is $running, should be $status";
-		if (-f "/sbin/chkconfig")
-		{
-			if ($status)
-			{
-				# Make sure service is running
-				command("chkconfig", $service, "on") unless $running;
-				command("service", $service, "start") unless $running;
-			}
-			else
-			{
-				# Make sure service is stopped
-				command("chkconfig", $service, "off") unless $running;
-				command("service", $service, "stop") if $running;
-			}
-		}
-		elsif (-f "/usr/sbin/update-rc.d")
-		{
-			if ($status)
-			{
-				# Make sure service is running
-				command("update-rc.d", $service, "defaults") unless $running;
-				command("/etc/init.d/$service", "start") unless $running;
-			}
-			else
-			{
-				# Make sure service is stopped
-				command("update-rc.d", $service, "remove") if $running;
-				command("/etc/init.d/$service", "stop") if $running;
-			}
-		}
-		else
-		{
-			w "Don't know how to control services";
-		}
-	}
+    v "Status is $running, should be $status";
+    if (-f "/sbin/chkconfig")
+    {
+      if ($status)
+      {
+        # Make sure service is running
+        command("chkconfig", $service, "on") unless $running;
+        command("service", $service, "start") unless $running;
+      }
+      else
+      {
+        # Make sure service is stopped
+        command("chkconfig", $service, "off") unless $running;
+        command("service", $service, "stop") if $running;
+      }
+    }
+    elsif (-f "/usr/sbin/update-rc.d")
+    {
+      if ($status)
+      {
+        # Make sure service is running
+        command("update-rc.d", $service, "defaults") unless $running;
+        command("/etc/init.d/$service", "start") unless $running;
+      }
+      else
+      {
+        # Make sure service is stopped
+        command("update-rc.d", $service, "remove") if $running;
+        command("/etc/init.d/$service", "stop") if $running;
+      }
+    }
+    else
+    {
+      w "Don't know how to control services";
+    }
+  }
 }

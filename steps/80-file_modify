@@ -3,10 +3,10 @@
 
 foreach (i_isa_fetchall("file_modify"))
 {
-	for (my $i = 0; $i < @$_; $i += 2)
-	{
-		my($filename, $changes) = ($_->[$i], $_->[$i+1]);
-		next unless ref $changes eq 'ARRAY';
-		file_modify($filename, undef, @$changes);
-	}
+  for (my $i = 0; $i < @$_; $i += 2)
+  {
+    my($filename, $changes) = ($_->[$i], $_->[$i+1]);
+    next unless ref $changes eq 'ARRAY';
+    file_modify($filename, undef, @$changes);
+  }
 }

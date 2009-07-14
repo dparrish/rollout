@@ -3,25 +3,25 @@
 my $text;
 foreach (i_isa_fetchall("logrotate"))
 {
-	while (my($file, $l) = each(%$_))
-	{
-		$text .= "$file {\n";
-		$text .= "	weekly\n" if !$l->{daily} && !$l->{weekly} && !$l->{monthly}; # Default frequency
-		$text .= "	daily\n" if $l->{daily};
-		$text .= "	weekly\n" if $l->{weekly};
-		$text .= "	monthly\n" if $l->{monthly};
-		$text .= "	yearly\n" if $l->{yearly};
-		$text .= "	missingok\n" unless defined $l->{missingok} && !$l->{missingok};
-		$text .= "	compress\n" unless defined $l->{compress} && !$l->{compress};
-		$text .= "	delaycompress\n" if $l->{delaycompress};
-		$text .= "	sharedscripts\n" if $l->{sharedscripts};
-		$text .= "	rotate ". ($l->{rotate} || 7). "\n";
-		$text .= "	notifempty\n" if $l->{notifempty};
-		$text .= "	create $l->{create}\n" if $l->{create};
-		$text .= "	prerotate\n$l->{prerotate}\nendscript\n" if $l->{prerotate};
-		$text .= "	postrotate\n$l->{postrotate}\nendscript\n" if $l->{postrotate};
-		$text .= "}\n\n";
-	}
+  while (my($file, $l) = each(%$_))
+  {
+    $text .= "$file {\n";
+    $text .= "  weekly\n" if !$l->{daily} && !$l->{weekly} && !$l->{monthly}; # Default frequency
+    $text .= "  daily\n" if $l->{daily};
+    $text .= "  weekly\n" if $l->{weekly};
+    $text .= "  monthly\n" if $l->{monthly};
+    $text .= "  yearly\n" if $l->{yearly};
+    $text .= "  missingok\n" unless defined $l->{missingok} && !$l->{missingok};
+    $text .= "  compress\n" unless defined $l->{compress} && !$l->{compress};
+    $text .= "  delaycompress\n" if $l->{delaycompress};
+    $text .= "  sharedscripts\n" if $l->{sharedscripts};
+    $text .= "  rotate ". ($l->{rotate} || 7). "\n";
+    $text .= "  notifempty\n" if $l->{notifempty};
+    $text .= "  create $l->{create}\n" if $l->{create};
+    $text .= "  prerotate\n$l->{prerotate}\nendscript\n" if $l->{prerotate};
+    $text .= "  postrotate\n$l->{postrotate}\nendscript\n" if $l->{postrotate};
+    $text .= "}\n\n";
+  }
 }
 
 text_install("/etc/logrotate.d/rollout", $text) if $text;

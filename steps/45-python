@@ -4,9 +4,9 @@ package_check("python-setuptools") if i_has("python");
 
 foreach my $a (i_isa_fetchall("python"))
 {
-	foreach my $module (@$a)
-	{
-		command("easy_install", "-q", $module);
-	}
+  foreach my $module (@$a)
+  {
+    command("easy_install", "-q", $module);
+  }
 }
 

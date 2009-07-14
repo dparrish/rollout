@@ -10,59 +10,59 @@ package_check("open-iscsi") && $restart++;;
 
 foreach my $i (i_isa_fetchall("iscsi"))
 {
-	$auto = $i->{startup} if $i->{startup};
+  $auto = $i->{startup} if $i->{startup};
 
-	if ($i->{initiator})
-	{
-		# Force ISCSI initiator
-		if (file_modify("/etc/initiatorname.iscsi", undef, "s/^InitiatorName=\\S+\$/InitiatorName=$i->{initiator}/"))
-		{
-			w "Forced ISCSI initiator name to be \"$i->{initiator}\" - check initiator security";
-			command("/etc/init.d/open-iscsi", "restart");
-		}
-	}
+  if ($i->{initiator})
+  {
+    # Force ISCSI initiator
+    if (file_modify("/etc/initiatorname.iscsi", undef, "s/^InitiatorName=\\S+\$/InitiatorName=$i->{initiator}/"))
+    {
+      w "Forced ISCSI initiator name to be \"$i->{initiator}\" - check initiator security";
+      command("/etc/init.d/open-iscsi", "restart");
+    }
+  }
 
-	if ($i->{targets})
-	{
-		while (my($target, $ip) = each(%{$i->{targets}}))
-		{
-			$ip .= ":3260" unless $ip =~ /:\d+$/;
+  if ($i->{targets})
+  {
+    while (my($target, $ip) = each(%{$i->{targets}}))
+    {
+      $ip .= ":3260" unless $ip =~ /:\d+$/;
 
-			my $filename = "/etc/iscsi/send_targets/$ip";
-			$filename =~ s/:(\d+)$/,$1/;
+      my $filename = "/etc/iscsi/send_targets/$ip";
+      $filename =~ s/:(\d+)$/,$1/;
 
-			if (!-f $filename)
-			{
-				v "Discovering targets on $ip ($filename missing)";
-				command("iscsiadm", "-m", "discovery", "-t", "sendtargets", "-p", $ip);
-			}
+      if (!-f $filename)
+      {
+        v "Discovering targets on $ip ($filename missing)";
+        command("iscsiadm", "-m", "discovery", "-t", "sendtargets", "-p", $ip);
+      }
 
-			if (!-d "/etc/iscsi/nodes/$target")
-			{
-				v "Connecting to node $target";
-				command("iscsiadm", "-m", "node", "-T", $target, "-p", $ip, "--op", "update", "-n", "node.conn[0].startup", "-v", "automatic");
-			}
+      if (!-d "/etc/iscsi/nodes/$target")
+      {
+        v "Connecting to node $target";
+        command("iscsiadm", "-m", "node", "-T", $target, "-p", $ip, "--op", "update", "-n", "node.conn[0].startup", "-v", "automatic");
+      }
 
-			$filename = "/etc/iscsi/nodes/$target/$ip";
-			$filename =~ s/:(\d+)$/,$1/;
+      $filename = "/etc/iscsi/nodes/$target/$ip";
+      $filename =~ s/:(\d+)$/,$1/;
 
-			file_modify($filename, undef, 
-				's/^node.startup\s*=.*/node.startup = automatic/',
-				's/^node.conn\[\d+\].startup\s*=.*/node.conn[0].startup = automatic/',
-			) && $restart++;
-		}
-	}
+      file_modify($filename, undef, 
+        's/^node.startup\s*=.*/node.startup = automatic/',
+        's/^node.conn\[\d+\].startup\s*=.*/node.conn[0].startup = automatic/',
+      ) && $restart++;
+    }
+  }
 }
 
 if ($auto)
 {
-	# Configure whether to connect to nodes on startup
-	file_modify("/etc/iscsid.conf", undef, 's/^node.startup\s*=\s*(automatic|manual)/node.startup = '. $auto. '/') && $restart++;
+  # Configure whether to connect to nodes on startup
+  file_modify("/etc/iscsid.conf", undef, 's/^node.startup\s*=\s*(automatic|manual)/node.startup = '. $auto. '/') && $restart++;
 }
 
 if ($restart)
 {
-	v "Restarting ISCSI services";
-	command("/etc/init.d/open-iscsi", "restart");
+  v "Restarting ISCSI services";
+  command("/etc/init.d/open-iscsi", "restart");
 }
 

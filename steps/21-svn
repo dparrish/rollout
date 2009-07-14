@@ -39,11 +39,11 @@ EOF
 
 foreach (@svn)
 {
-	while (my($dir, $x) = each(%$_))
-	{
-		w "No module specified for $dir" or next unless $x->{url};
+  while (my($dir, $x) = each(%$_))
+  {
+    w "No module specified for $dir" or next unless $x->{url};
 
-		svn_checkout($dir, $x->{url}, $x->{rev}, $x->{post_cmd});
-	}
+    svn_checkout($dir, $x->{url}, $x->{rev}, $x->{post_cmd});
+  }
 } 
 

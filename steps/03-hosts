@@ -4,54 +4,54 @@
 my $domain = "localdomain";
 foreach (i_isa_fetchall("domain_name"))
 {
-	$domain = $_;
-	last;
+  $domain = $_;
+  last;
 }
 
 file_append(-file => "/etc/hosts",
-	-add => "127.0.0.1	localhost.localdomain localhost $hostname.$domain $hostname",
-	-match => qr/(?:^127\.0\.0\.1\s.*|.+\s$hostname.*)/);
+  -add => "127.0.0.1  localhost.localdomain localhost $hostname.$domain $hostname",
+  -match => qr/(?:^127\.0\.0\.1\s.*|.+\s$hostname.*)/);
 
 if ($m{$hostname}->{network})
 {
-	v "My networks: ". join(" ", @{$m{$hostname}->{network}});
+  v "My networks: ". join(" ", @{$m{$hostname}->{network}});
 
-	foreach my $d (keys %m)
-	{
-		next if $d eq $hostname;
-		next unless $m{$d}->{network};
-		next unless $m{$d}->{interfaces};
+  foreach my $d (keys %m)
+  {
+    next if $d eq $hostname;
+    next unless $m{$d}->{network};
+    next unless $m{$d}->{interfaces};
 
-		my $in_my_network = 0;
-		foreach my $n (@{$m{$d}->{network}})
-		{
-			$in_my_network = $n if grep { $_ eq $n } @{$m{$hostname}->{network}};
-		}
+    my $in_my_network = 0;
+    foreach my $n (@{$m{$d}->{network}})
+    {
+      $in_my_network = $n if grep { $_ eq $n } @{$m{$hostname}->{network}};
+    }
 
-		next unless $in_my_network;
-		my $ip;
-		foreach (values %{$m{$d}->{interfaces}})
-		{
-			$ip = $_->{ip} if $_->{primary} && $_->{ip};
-		}
-		if ($ip)
-		{
-			v "Adding $ip $d to /etc/hosts (in $in_my_network network)";
-			file_append(-file => "/etc/hosts",
-				-add => "$ip	$d",
-				-match => qr/(?:^\Q$ip\E\s|\s\Q$d\E)/);
-		}
-	}
+    next unless $in_my_network;
+    my $ip;
+    foreach (values %{$m{$d}->{interfaces}})
+    {
+      $ip = $_->{ip} if $_->{primary} && $_->{ip};
+    }
+    if ($ip)
+    {
+      v "Adding $ip $d to /etc/hosts (in $in_my_network network)";
+      file_append(-file => "/etc/hosts",
+        -add => "$ip  $d",
+        -match => qr/(?:^\Q$ip\E\s|\s\Q$d\E)/);
+    }
+  }
 }
 
 foreach (i_isa_fetchall("hosts_append"))
 {
-	while (my($ip, $alias) = each %$_)
-	{
-		v "Adding $ip $alias to /etc/hosts";
-		file_append(-file => "/etc/hosts",
-			-add => "$ip	$alias",
-			-match => qr/(?:^\b\Q$ip\E\b\s|\s\b\Q$alias\b\E)/);
-	}
+  while (my($ip, $alias) = each %$_)
+  {
+    v "Adding $ip $alias to /etc/hosts";
+    file_append(-file => "/etc/hosts",
+      -add => "$ip  $alias",
+      -match => qr/(?:^\b\Q$ip\E\b\s|\s\b\Q$alias\b\E)/);
+  }
 }
 

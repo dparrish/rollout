@@ -3,20 +3,20 @@
 
 foreach (i_isa_fetchall("queue_command"))
 {
-	$_ = [ $_ ] unless ref $_ eq 'ARRAY';
-	while (@$_)
-	{
-		command(shift @$_);
-	}
+  $_ = [ $_ ] unless ref $_ eq 'ARRAY';
+  while (@$_)
+  {
+    command(shift @$_);
+  }
 }
 
 foreach (i_isa_fetchall("queue_code"))
 {
-	$_ = [ $_ ] unless ref $_ eq 'ARRAY';
-	while (@$_)
-	{
-		my $sub = shift @$_;
-		$sub->();
-	}
+  $_ = [ $_ ] unless ref $_ eq 'ARRAY';
+  while (@$_)
+  {
+    my $sub = shift @$_;
+    $sub->();
+  }
 }
 
