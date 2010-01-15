@@ -31,11 +31,18 @@ use POSIX qw( setsid );
 use File::Temp qw/ tempfile tempdir /;
 use Fcntl ':flock';
 use English;
+use Socket;
 
-use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps );
+use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous
+	     %networks @only_steps $server_mode $server_allow $server_base
+	     $server_listen );
 $rollout_url = "http://rollout.domain";
 $verbosity = 1;
 $safe_mode = 0;
+$server_mode = 0;
+$server_base = undef;
+$server_allow = "127.0.0.0/8";
+$server_listen = "0.0.0.0:80";
 my $hostname = hostname;
 my @original_argv = @ARGV;
 
@@ -49,6 +56,10 @@ GetOptions(
 	"only|o=s"	=> \@only_steps,
 	"help|?"	=> \&usage,
 	"force|f=s"	=> \@force_dangerous,
+        "server"        => \$server_mode,
+        "server_allow=s"=> \$server_allow,
+        "server_base=s" => \$server_base,
+        "server_listen=s" => \$server_listen,
 ) or usage();
 
 sub usage
@@ -62,6 +73,10 @@ sub usage
 	print " hostname|h=s   Rollout configuration for a different host. If -f network is provided, the hostname will be changed\n";
 	print " only|o=s       Only run a specific step (can be specified multiple times)\n";
 	print " force|f=s      Force a dangerous step to be run\n";
+	print " server_mode    Enable server mode. Specify --server_allow and --server_base\n";
+	print " server_allow   A comma-separated list of netmasks to allow access\n";
+	print " server_base    The base of the directory tree served by rollout server\n";
+	print " server_listen  The ip:port combo to listen on.\n";
 	print "\n";
 	print "Steps which are considered dangerous are always run in safe mode, unless the -f parameter is specified with a step name as argument.\n";
 	print "\n";
@@ -1434,6 +1449,22 @@ sub expand_network($)
 	return ($network) if $network =~ /^\d+\.\d+\.\d+\.\d+/;
 	return @{$networks{$network} || []};
 }
+
+if ($server_mode)
+{
+	if (!$server_base)
+	{
+		print STDERR "You must specify --server_base and --server_allow\n";
+		exit 1;
+	}
+	require RolloutServer;
+	import RolloutServer;
+
+	my $server = new RolloutServer($server_listen, $server_allow, $server_base);
+	$server->run();
+	exit 0;
+}
+
 
 if (open(LOCKFILE, ">/var/run/rollout.lock"))
 {
