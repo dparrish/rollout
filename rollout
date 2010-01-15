@@ -410,6 +410,29 @@ sub i_isa
 	return 0;
 }
 
+sub i_iterate
+{
+	my($key, $func, $m) = @_;
+	$m ||= $hostname;
+	my $found = 0;
+	return 0 unless $m{$m};
+	$found += $func->($m, $m{$m}->{$key}) if $m{$m}->{$key};
+	$found += i_iterate($key, $func, $_) foreach (keys %{$m{$m}->{ISA} || {}});
+	return $found;
+}
+
+sub i_should
+{
+	my($item, $m) = @_;
+	my $step_name = ($current_step =~ /^\d+-(.*)$/)[0];
+	my $should_not = 0;
+	i_iterate("skip_steps", sub {
+		$should_not += 1 if grep { $_ eq "$current_step:$item" } @{$_[1]};
+		$should_not += 1 if grep { $_ eq "$step_name:$item" } @{$_[1]};
+	});
+	return !$should_not;
+}
+
 sub add_isa
 {
 	my($class, $m) = @_;
@@ -1485,6 +1508,7 @@ while (@steps)
 	$current_step = shift @steps;
 	next if grep { $current_step =~ /^\d*-?$_$/ } @skip_steps;
 	next if @only_steps && !grep { $current_step =~ /^\d*-?$_$/ } @only_steps;
+	next if !i_should('*');
 
 	l $current_step, 0;
 	$steps_code{$current_step} ||= http_file -url => "steps/$current_step";
