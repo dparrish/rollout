@@ -325,73 +325,64 @@ sub dir_install
 #}}}
 # i_* functions {{{
 
+sub i_iterate
+{
+	my($key, $func, $m, $donecache) = @_;
+	$m ||= $hostname;
+	$donecache ||= {};
+	my $found = 0;
+	return 0 unless $m{$m};
+	return 0 if $donecache->{$m}++;
+	if ($m{$m}->{$key})
+	{
+		my $x = $func->($m, $m{$m}->{$key});
+		return $found unless (defined $x);
+		$found += $x;
+	}
+	$found += i_iterate($key, $func, $_, $donecache) foreach (keys %{$m{$m}->{ISA} || {}});
+	return $found;
+}
+
 sub i_has
 {
 	my($class, $m) = @_;
+	# Return only the first element, which is likely to be the most specific
+	my $ret = undef;
+	i_iterate($class, sub { $ret = $_[1]; return undef });
+	return $ret;
+}
 
-	$m ||= $hostname;
-	return 0 unless $m{$m};
-
-	return $m{$m}->{$class} if defined $m{$m}->{$class};
-	return $m{$m}->{ISA}{$class} if $m{$m}->{ISA} && $m{$m}->{ISA}{$class};
-
-	foreach (keys %{$m{$m}->{ISA} || {}})
-	{
-		my $ret = i_has($class, $_);
-		return $ret if $ret;
-	}
-	return 0;
+sub _i_in
+{
+	my($grep) = @_;
+	return sub { return scalar(grep { $_ eq $grep } @{$_[1]}) }
 }
 
 sub i_immutable_file
 {
-	my($file, $m) = @_;
-
-	$m ||= $hostname;
-	return 0 unless $m{$m};
-
-	return 1 if $m{$m}->{immutable_file} && grep { $_ eq $file } @{$m{$m}->{immutable_file}};
-
-	foreach (keys %{$m{$m}->{ISA} || {}})
-	{
-		my $ret = i_immutable_file($file, $_);
-		return $ret if $ret;
-	}
-	return 0;
+	return i_iterate("immutable_file", _i_in($_[0]), $_[1]);
 }
 
 sub i_unsafe_file
 {
-	my($file, $m) = @_;
-
-	$m ||= $hostname;
-	return 0 unless $m{$m};
-
-	return 1 if $m{$m}->{unsafe_file} && grep { $_ eq $file } @{$m{$m}->{unsafe_file}};
-
-	foreach (keys %{$m{$m}->{ISA} || {}})
-	{
-		my $ret = i_unsafe_file($file, $_);
-		return $ret if $ret;
-	}
-	return 0;
+	return i_iterate("unsafe_file", _i_in($_[0]), $_[1]);
 }
 
 sub i_unsafe_dir
 {
-	my($file, $m) = @_;
+	return i_iterate("unsafe_dir", _i_in($_[0]), $_[1]);
+}
 
-	$m ||= $hostname;
-	return 0 unless $m{$m};
-
-	return 1 if $m{$m}->{unsafe_dir} && grep { $_ eq $file } @{$m{$m}->{unsafe_dir}};
-
-	foreach (keys %{$m{$m}->{ISA} || {}})
-	{
-		my $ret = i_unsafe_dir($file, $_);
-		return $ret if $ret;
-	}
-	return 0;
+sub i_should
+{
+	my($item, $m) = @_;
+	my $step_name = ($current_step =~ /^\d+-(.*)$/)[0];
+	my $should_not = 0;
+	i_iterate("skip_steps", sub {
+		$should_not += 1 if grep { $_ eq "$current_step:$item" } @{$_[1]};
+		$should_not += 1 if grep { $_ eq "$step_name:$item" } @{$_[1]};
+	});
+	return !$should_not;
 }
 
 sub i_isa
@@ -410,27 +401,15 @@ sub i_isa
 	return 0;
 }
 
-sub i_iterate
+sub i_isa_fetchall
 {
-	my($key, $func, $m) = @_;
+	my($class, $m) = @_;
 	$m ||= $hostname;
-	my $found = 0;
-	return 0 unless $m{$m};
-	$found += $func->($m, $m{$m}->{$key}) if $m{$m}->{$key};
-	$found += i_iterate($key, $func, $_) foreach (keys %{$m{$m}->{ISA} || {}});
-	return $found;
-}
-
-sub i_should
-{
-	my($item, $m) = @_;
-	my $step_name = ($current_step =~ /^\d+-(.*)$/)[0];
-	my $should_not = 0;
-	i_iterate("skip_steps", sub {
-		$should_not += 1 if grep { $_ eq "$current_step:$item" } @{$_[1]};
-		$should_not += 1 if grep { $_ eq "$step_name:$item" } @{$_[1]};
-	});
-	return !$should_not;
+	my @list;
+	i_iterate($class, sub { push @list, $_[1] }, $m);
+	return ($m eq $hostname)
+		? wantarray ? @list : \@list
+	 	: @list;
 }
 
 sub add_isa
@@ -441,29 +420,6 @@ sub add_isa
 	return 0 unless $m{$m};
 	$m{$m}->{ISA} ||= {};
 	$m{$m}->{ISA}{$class} ||= 1;
-}
-
-sub i_isa_fetchall
-{
-	my($class, $m, $donecache) = @_;
-
-	$m ||= $hostname;
-	$donecache ||= {};
-
-	my @list;
-	return () unless $m{$m};
-	return () if $donecache->{$m}++;
-
-	push @list, $m{$m}->{$class} if $m{$m}->{$class};
-
-	foreach (keys %{$m{$m}->{ISA} || {}})
-	{
-		push @list, i_isa_fetchall($class, $_, $donecache);
-	}
-
-	return ($m eq $hostname)
-		? wantarray ? @list : \@list
-	 	: @list;
 }
 
 sub i_isa_classes
