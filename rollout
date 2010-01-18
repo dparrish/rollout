@@ -404,12 +404,9 @@ sub i_isa
 sub i_isa_fetchall
 {
 	my($class, $m) = @_;
-	$m ||= $hostname;
 	my @list;
 	i_iterate($class, sub { push @list, $_[1] }, $m);
-	return ($m eq $hostname)
-		? wantarray ? @list : \@list
-	 	: @list;
+	return @list;
 }
 
 sub add_isa
@@ -457,6 +454,19 @@ sub i_ip
 		}
 	}
        return undef;
+}
+
+sub flatten
+{
+	my(@items) = @_;
+	my @ret;
+	foreach (@items)
+	{
+		push @ret, ref $_ eq 'HASH' ? %$_
+			: ref $_ eq 'ARRAY' ? @$_
+			: $_;
+	}
+	return @ret;
 }
 
 # }}}
@@ -1142,13 +1152,6 @@ sub package_status_rpm
 sub package_check
 {
 	my(@packages) = @_;
-
-	my $apt;
-	foreach my $base (i_isa_fetchall("apt_base")) {
-		$base = [ $base ] unless ref $base eq 'ARRAY';
-		$apt .= "$_\n" foreach @$base;
-	}
-	text_install("/etc/apt/sources.list", $apt) if $apt;
 
 	my $available_packages = $m{$hostname}->{_available_packages};
 	$m{$hostname}->{_done_packages} ||= {};
