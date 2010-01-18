@@ -1,6 +1,11 @@
 #!/usr/bin/perl -w
 # Update the /etc/hosts file with all hosts in this machine's network
 
+# Available skip_steps items:
+#       localhost - Add a localhost entry including the full host name
+#       network - Add entries for every machine in the local network
+#       hosts_append - Add custom hosts_append entries
+
 my $domain = "localdomain";
 foreach (i_isa_fetchall("domain_name"))
 {
