@@ -5,6 +5,7 @@ foreach (i_isa_fetchall("logrotate"))
 {
 	while (my($file, $l) = each(%$_))
 	{
+		next unless i_should($file);
 		$text .= "$file {\n";
 		$text .= "	weekly\n" if !$l->{daily} && !$l->{weekly} && !$l->{monthly}; # Default frequency
 		$text .= "	daily\n" if $l->{daily};

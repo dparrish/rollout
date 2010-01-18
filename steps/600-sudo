@@ -11,18 +11,25 @@ my $text = <<EOF;
 # Root can run anything as any other user
 root   ALL=(ALL) ALL
 
-# Allow people in group wheel to run all commands, but still require password
-\%wheel ALL=(ALL) ALL
-
 Defaults syslog=auth
 
 EOF
+
+if (i_should("wheel_all"))
+{
+	$text .= <<EOF;
+# Allow people in group wheel to run all commands, but still require password
+\%wheel ALL=(ALL) ALL
+
+EOF
+}
 
 my %sudo;
 foreach (i_isa_fetchall("sudo"))
 {
 	while(my($username, $commands) = each(%$_))
 	{
+		next unless i_should($username);
 		$sudo{$username} ||= {};
 		foreach (@$commands)
 		{

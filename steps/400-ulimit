@@ -39,6 +39,7 @@ foreach (i_isa_fetchall("ulimit"))
 {
 	while (my($name, $l) = each(%$_))
 	{
+		next unless i_should($name);
 		while (my($limit, $value) = each(%$l))
 		{
 			$limit = $all_limits{$limit} if $all_limits{$limit};

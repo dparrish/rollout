@@ -9,6 +9,7 @@ foreach (i_isa_fetchall("file_install"))
 	{
                 next if $done_files{$dest}++;
 		next if i_immutable_file($dest);
+		next unless i_should($dest);
 		if ($f->{source})
 		{
 			file_install(-file => $dest, -src => $f->{source}, -cmd => $f->{command} || undef, -flags => $f);

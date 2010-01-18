@@ -12,6 +12,7 @@ foreach (i_isa_fetchall("port_check"))
 			$port = $port->{port};
 		}
 		next unless $name && $port;
+		next unless i_should($name) && i_should($port);
 
 		$comment ||= "";
 		$port = "$port/tcp" unless $port =~ /\//;

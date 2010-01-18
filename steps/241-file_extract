@@ -5,6 +5,7 @@ foreach (i_isa_fetchall("file_extract"))
 {
 	while (my($source, $f) = each(%$_))
 	{
+		next unless i_should($source);
 		$f->{dest} ||= "/";
 		if ($f->{check} && -e $f->{check})
 		{
