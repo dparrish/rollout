@@ -1,6 +1,10 @@
 #!/usr/bin/perl -w
 # Install SSH keys into root and user's authorized_keys
 
+# Available skip_steps items:
+#	root_keys - Update root's ssh authorized_keys
+#	user_keys - Update individual users's ssh authorized_keys
+
 return unless i_has("user") || i_has("ssh_keys_add");
 
 my %keys;
@@ -15,23 +19,29 @@ foreach (split(/[\r\n]+/, $text))
 	$all_keys{$name} .= "$_\n";
 }
 
-foreach my $u (i_isa_fetchall("user"))
+if (i_should("user_keys"))
 {
-	foreach my $username (keys %$u)
+	foreach my $u (i_isa_fetchall("user"))
 	{
-		$keys{$username} ||= { $username => 1 };
-		if ($u->{$username}{ssh_keys})
+		foreach my $username (keys %$u)
 		{
-			$keys{$username} ||= {};
-			$keys{$username}->{$_}++ foreach (@{$u->{$username}{ssh_keys}});
+			$keys{$username} ||= { $username => 1 };
+			if ($u->{$username}{ssh_keys})
+			{
+				$keys{$username} ||= {};
+				$keys{$username}->{$_}++ foreach (@{$u->{$username}{ssh_keys}});
+			}
 		}
 	}
 }
 
-foreach my $x (i_isa_fetchall("ssh_keys_add"))
+if (i_should("root_keys"))
 {
-	$x = [$x] unless ref $x eq 'ARRAY';
-	$keys{root}->{$_}++ foreach (@$x);
+	foreach my $x (i_isa_fetchall("ssh_keys_add"))
+	{
+		$x = [$x] unless ref $x eq 'ARRAY';
+		$keys{root}->{$_}++ foreach (@$x);
+	}
 }
 
 foreach (keys %keys)
