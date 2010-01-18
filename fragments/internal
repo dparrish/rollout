@@ -2,15 +2,15 @@
 # You can create as many files as you like in fragments/
 # Each one is loaded and run as part of the config retrieval step
 
-# Define the first machine 'testserver'
-$m{testserver} = {
+# Define the first machine 'demo_testserver'
+$m{demo_testserver} = {
 	ISA => {
-		RHEL4_i386 => 1,	# It's RHEL4, on i386
-		Production => 1,	# It's a production machine
-		Netbackup_Client => 1,	# It's a netbackup client. This isn't required because
+		Demo_RHEL4_i386 => 1,	# It's RHEL4, on i386
+		Demo_Production => 1,	# It's a production machine
+		Demo_Netbackup_Client => 1,	# It's a netbackup client. This isn't required because
 					# 'Production' also inherits this class, but it makes it
 					# more obvious
-		Web_Server => 1,	# It's also a web server, although not configured by rollout
+		Demo_Web_Server => 1,	# It's also a web server, although not configured by rollout
 	},
 	# Define the network interfaces. These aren't applied unless '-f network'
 	# is specified on the command line
@@ -35,8 +35,8 @@ $m{testserver} = {
 };
 
 # Define the backup server.
-$m{backupserver} = {
-	ISA => { Debian => 1, Production => 1 },
+$m{demo_backupserver} = {
+	ISA => { Demo_Debian => 1, Demo_Production => 1 },
 	interfaces => {
 		# Create 2 interfaces, one in the admin lan and one in the backup lan
 		eth0 => {
@@ -57,7 +57,7 @@ $m{backupserver} = {
 	},
 
 	# This device is part of the backup lan. This can be used in firewall rules.
-	network => [ 'backup_lan' ],
+	network => [ 'demo_backup_lan' ],
 
 	sudo => {
 		# Allow the 'admin' group to restart netbackup
