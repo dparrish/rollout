@@ -42,8 +42,11 @@ if (i_should("install"))
 	my @install;
 	foreach (i_isa_fetchall("packages"))
 	{
-		s/\.32bit$// foreach @$_;
-		push @install, @$_;
+		foreach (@$_)
+		{
+			s/\.32bit$//;
+			push @install, $_ if i_should("add-$_");
+		}
 	}
 	package_check(@install);
 }
@@ -52,7 +55,10 @@ if (i_should("remove"))
 {
 	foreach (i_isa_fetchall("packages_remove"))
 	{
-		s/\.32bit$// foreach @$_;
-		package_uncheck(@$_);
+		foreach (@$_)
+		{
+			s/\.32bit$//;
+			package_uncheck($_) if i_should("remove-$_");
+		}
 	}
 }
