@@ -48,7 +48,7 @@ sub handle_request {
 	}
 	if (!$found || $path eq '/')
 	{
-		print "HTTP/1.0 403 Not Allowed\r\n";
+		print "HTTP/1.0 403 Not Allowed\n\n";
 		print "Not allowed to access $path\n";
 	}
 
@@ -71,7 +71,7 @@ sub handle_request {
 
 	if (!$self->serve_static($cgi, $self->{base}))
 	{
-		print "HTTP/1.0 404 Not Found\r\n";
+		print "HTTP/1.0 404 Not Found\n\n";
 		print "The file you requested was not found\n";
 	}
 }
