@@ -28,6 +28,10 @@ sub get_fragments
 		{
 			v "fragment: $location/$fragment";
 			my $text = http_file "$location/$fragment";
+			if (!defined($text)) {
+				w "Empty config fragment \"$location/$fragment\"";
+				next;
+			}
 			eval $text;
 			if ($@)
 			{
