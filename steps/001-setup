@@ -11,17 +11,29 @@ carp "Can't retrieve rollout configuration rollout.cfg: $@" unless $machines_dat
 eval $machines_data;
 die "Can't parse rollout configuration rollout.cfg: $@" unless keys %m;
 
-my @fragments = http_index "fragments";
-foreach (sort @fragments)
+get_fragments ("fragments");
+sub get_fragments
 {
-	my $_class = $_;
-	my $text = http_file "fragments/$_";
-	eval $text if $text;
-	if ($@)
+	my ($location) =@_;
+	my @fragments = http_index $location;
+	foreach my $fragment (sort @fragments)
 	{
-		fatal "Config fragment \"$_\" failed: $@";
+		if ($fragment =~ /\/$/) {
+      # making the output look pretty in verbose
+      $fragment =~ s/\/$//;
+			get_fragments("$location/$fragment");
+		} else {
+			v "fragment:  $location/$fragment";
+			my $text = http_file "$location/$fragment";
+			eval $text;
+			if ($@)
+			{
+				fatal "Config fragment \"$location/$fragment\" failed: $@";
+			}
+		}
 	}
 }
+
 
 push @skip_steps, flatten(i_isa_fetchall("skip_steps"));
 v "Evaluated Rollout config: ". scalar(grep /^[a-z]/, keys %m). " devices, ". scalar(grep /^[A-Z]/, keys %m). " classes";

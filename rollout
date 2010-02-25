@@ -35,7 +35,7 @@ use Socket;
 
 use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous
 	     %networks @only_steps $server_mode $server_allow $server_base
-	     $server_listen );
+	     $server_listen $fragments_location );
 $rollout_url = "http://rollout.domain";
 $verbosity = 1;
 $safe_mode = 0;
@@ -43,6 +43,7 @@ $server_mode = 0;
 $server_base = undef;
 $server_allow = "127.0.0.0/8";
 $server_listen = "0.0.0.0:80";
+$fragments_location = "fragments";
 my $hostname = hostname;
 my @original_argv = @ARGV;
 
