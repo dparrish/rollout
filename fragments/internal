@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
-# You can create as many files as you like in fragments/
-# Each one is loaded and run as part of the config retrieval step
+# You can create as many files and directories as you like in
+# fragments/ Each one is loaded and run as part of the config
+# retrieval step
 
 # Define the first machine 'demo_testserver'
 $m{demo_testserver} = {

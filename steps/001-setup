@@ -14,7 +14,7 @@ die "Can't parse rollout configuration rollout.cfg: $@" unless keys %m;
 get_fragments("fragments");
 sub get_fragments
 {
-	my($location) = @_;
+	my ($location) = @_;
 	my @fragments = http_index $location;
 	foreach my $fragment (sort @fragments)
 	{
@@ -40,6 +40,7 @@ sub get_fragments
 		}
 	}
 }
+
 
 push @skip_steps, flatten(i_isa_fetchall("skip_steps"));
 v "Evaluated Rollout config: ". scalar(grep /^[a-z]/, keys %m). " devices, ". scalar(grep /^[A-Z]/, keys %m). " classes";

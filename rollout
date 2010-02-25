@@ -902,7 +902,7 @@ sub file_install
 
 sub dir_check
 {
-	my $p = named_params @_, [ -dir => undef, -mode => undef ];
+	my $p = named_params @_, [ -dir => undef, -mode => undef, -owner => undef, -group => undef, ];
 	my $flags;
 	my $changed;
 
@@ -1460,7 +1460,7 @@ fatal "Can't find any steps to execute" unless @all_steps;
 @steps = sort grep(/^\d+-.*/, @all_steps);
 unshift @only_steps, "setup" if @only_steps;
 push @only_steps, "complete" if @only_steps;
-v "Only running steps @only_steps" if @only_steps;
+v "Only running steps: " . join(", ", @only_steps) if @only_steps;
 
 while (@steps)
 {
