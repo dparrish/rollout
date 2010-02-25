@@ -44,13 +44,21 @@ if (i_should("network"))
 			{
 				$ip = $_->{ip} if $_->{primary} && $_->{ip};
 			}
-			my $h = $d;
-			$h = "$m{$d}->{full_hostname} $d" if $m{$d}->{full_hostname};
-			if ($ip)
+			my @hostnames = ($d);
+			foreach my $dom (i_isa_fetchall("domain_name", $d)) {
+				next if grep { $_ eq "$d.$dom" } @hostnames;
+				unshift @hostnames, "$d.$dom";
+			}
+			if ($m{$d}->{full_hostname} && !grep { $_ eq $m{$d}->{full_hostname} } @hostnames)
 			{
-				v "Adding $ip $h to /etc/hosts (in $in_my_network network)";
+				unshift @hostnames, "$m{$d}->{full_hostname}";
+			}
+			if ($ip && @hostnames)
+			{
+				my $h = "$ip\t". join(" ", @hostnames);
+				v "Adding $h to /etc/hosts (in $in_my_network network)";
 				file_append(-file => "/etc/hosts",
-					-add => "$ip	$h",
+					-add => $h,
 					-match => qr/(?:^\Q$ip\E\s|\s\Q$d\E)/);
 			}
 		}
