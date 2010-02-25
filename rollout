@@ -210,7 +210,7 @@ sub http_file(@)
 		}
 	}
 
-	my $res;
+	my $res = "";
 	while (1)
 	{
 		my $buf;
