@@ -1,12 +1,13 @@
 #!/usr/bin/perl -w
 # CVS checkout
+# vim:tw=100 sw=2 expandtab ft=perl
 
 # Example:
 # cvspass => {
 #   # This gets installed to /root/.cvspass
 #   ':pserver:rollout@cvs.domain:2401/home/cvs' => 'Ahohlasd=',
 # },
-# 
+#
 # cvs => {
 #   '/tmp/checkout_dir' => {
 #     module => 'cvs_module',
@@ -19,10 +20,9 @@
 return unless i_has('cvs');
 
 my %cvspass = flatten_hash(c("cvspass"));
-while (my($user, $pass) = each %cvspass)
-{
-	file_append(-file => "/root/.cvspass", -add => "/1 $user $pass", -match => qr/ $user /,
-		-uid => 0, -gid => 0, -mode => 0600, -create => 1);
+while (my($user, $pass) = each %cvspass) {
+  file_append(-file => "/root/.cvspass", -add => "/1 $user $pass", -match => qr/ $user /,
+              -uid => 0, -gid => 0, -mode => 0600, -create => 1);
 }
 
 file_append(-file => "/root/.cvsrc", -add => "cvs -z3 -q", -match => qr/^cvs/, -create => 1);
@@ -32,9 +32,9 @@ file_append(-file => "/root/.cvsrc", -add => "diff -u -b -B", -match => qr/^diff
 
 my %cvs = flatten_hash(c("cvs"));
 package_check("cvs") if keys %cvs;
-while (my($dir, $x) = each(%cvs))
-{
-	w "No module specified for $dir" or next unless $x->{module};
+while (my($dir, $x) = each(%cvs)) {
+  w "No module specified for $dir" or next unless $x->{module};
 
-	cvs_checkout(-dest => $dir, -module => $x->{module}, -rev => $x->{rev}, -repo => $x->{repository}, -cmd => $x->{post_cmd});
+  cvs_checkout(-dest => $dir, -module => $x->{module}, -rev => $x->{rev}, -repo => $x->{repository},
+               -cmd => $x->{post_cmd});
 }

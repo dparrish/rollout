@@ -1,21 +1,18 @@
 #!/usr/bin/perl -w
 # Update /etc/motd
+# vim:tw=100 sw=2 expandtab ft=perl
 
 my $text = `uname -a`;
 
 my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
-if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/)
-{
-	$host = $1 || "127.0.0.1";
-	$port = $2 || 0;
-	my $x = `host $host` || "";
-	if ($x =~ /domain name pointer (.*)\./)
-	{
-		$host = $1;
-	}
+if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
+  $host = $1 || "127.0.0.1";
+  $port = $2 || 0;
+  my $x = `host $host` || "";
+  $host = $1 if $x =~ /domain name pointer (.*)\./;
 }
 
 $text .= "\nUpdated by rollout at ". localtime(time). " from $host\n\n".
-	 join("\n", flatten_list(c("motd")));
+   join("\n", flatten_list(c("motd")));
 
 text_install("/etc/motd", $text);

@@ -1,8 +1,9 @@
 #!/usr/bin/perl -w
-# Example: 
+# vim:tw=100 sw=2 expandtab ft=perl
+# Example:
 # dir_check => [
-#	[ '/tmp/foobar', 0750 ],
-#	[ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],
+#  [ '/tmp/foobar', 0750 ],
+#  [ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],
 # ],
 
 dir_check(@$_) foreach flatten_list(c("dir_check"));

@@ -1,34 +1,32 @@
 #!/usr/bin/perl -w
 # Install all required packages
-# vim: sw=8 noexpandtab
+# vim:tw=100 sw=2 expandtab ft=perl
 #
 # Available skip_steps items:
-#	apt_sources - Configure apt repositories
-#	deb_options - Preconfigure .deb options before installation
-#	install - Install packages
-#	remove - Remove packages
+#  apt_sources - Configure apt repositories
+#  deb_options - Preconfigure .deb options before installation
+#  install - Install packages
+#  remove - Remove packages
 #
 # Example:
 # packages => [ 'package1', 'package2' ],
 
 return unless -d "/etc/apt" && -f "/usr/bin/apt-get";
 
-if (i_should("deb_options") && i_has("deb_options") && -f "/usr/bin/debconf-set-selections")
-{
-	my $text = join("\n", uniq(flatten_list(c("deb_options")))). "\n";
-	if ($text && open(DEBCONF, "|debconf-set-selections"))
-	{
-		print DEBCONF $text;
-		close(DEBCONF);
-	}
+if (i_should("deb_options") && i_has("deb_options") && -f "/usr/bin/debconf-set-selections") {
+  my $text = join("\n", uniq(flatten_list(c("deb_options")))). "\n";
+  if ($text && open(DEBCONF, "|debconf-set-selections")) {
+    print DEBCONF $text;
+    close(DEBCONF);
+  }
 }
 
 my $apt = join("\n", uniq(flatten_list(c("apt_base")))). "\n";
 text_install(-file => "/etc/apt/sources.list.d/rollout.list", -text => $apt, -mode => 0644,
-	-uid => 0, -gid => 0) if $apt && i_should("apt_sources");
+             -uid => 0, -gid => 0) if $apt && i_should("apt_sources");
 
 package_check(map { s/\.32bit$//; $_ } grep { i_should("add-$_") }
-	uniq(flatten_list(c("packages")))) if i_should("install");
+              uniq(flatten_list(c("packages")))) if i_should("install");
 
 package_check(map { s/\.32bit$//; $_ } grep { i_should("add-$_") }
-	uniq(flatten_list(c("packages_remove")))) if i_should("remove");
+              uniq(flatten_list(c("packages_remove")))) if i_should("remove");

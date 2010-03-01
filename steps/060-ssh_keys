@@ -1,10 +1,10 @@
 #!/usr/bin/perl -w
 # Install SSH keys into root and user's authorized_keys
-# vim:sw=8 noexpandtab
+# vim:tw=100 sw=2 expandtab ft=perl
 
 # Available skip_steps items:
-#	root_keys - Update root's ssh authorized_keys
-#	user_keys - Update individual users's ssh authorized_keys
+#  root_keys - Update root's ssh authorized_keys
+#  user_keys - Update individual users's ssh authorized_keys
 
 return unless i_has("user") || i_has("ssh_keys_add");
 
@@ -12,60 +12,35 @@ my %keys;
 my %all_keys;
 
 return l "Can't get authorized_keys file"
-	unless my $text = http_file "conf/authorized_keys";
-foreach (split(/[\r\n]+/, $text))
-{
-	my($key, $name) = $_ =~ /(.*) ([\w\@\-_]+)$/;
-	$all_keys{$name} ||= "";
-	$all_keys{$name} .= "$_\n";
+  unless my $text = http_file "conf/authorized_keys";
+foreach (split(/[\r\n]+/, $text)) {
+  my($key, $name) = $_ =~ /(.*) ([\w\@\-_]+)$/;
+  $all_keys{$name} ||= "";
+  $all_keys{$name} .= "$_\n";
 }
 
-if (i_should("user_keys"))
-{
-	my %users = flatten_hash(c("users"));
-	while (my($username, $user) = each(%users))
-	{
-		$keys{$username} ||= { $username => 1 };
-		$keys{$username}->{$_}++ foreach (@{$user->{ssh_keys} || []});
-	}
+if (i_should("user_keys")) {
+  my %users = flatten_hash(c("users"));
+  while (my($username, $user) = each(%users)) {
+    $keys{$username} ||= { $username => 1 };
+    $keys{$username}->{$_}++ foreach (@{$user->{ssh_keys} || []});
+  }
 }
 
-if (i_should("root_keys"))
-{
-	$keys{root} ||= {};
-	$keys{root}->{$_}++ foreach uniq(flatten_list(c("ssh_keys_add")));
+if (i_should("root_keys")) {
+  $keys{root} ||= {};
+  $keys{root}->{$_}++ foreach uniq(flatten_list(c("ssh_keys_add")));
 }
 
-foreach (keys %keys)
-{
-	my($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell,$expire) = getpwnam($_);
-	if (!$name)
-	{
-		v "User $_ doesn't exist";
-		next;
-	}
-	if (! -d $dir)
-	{
-		v "User ${name}'s homedir doesn't exist";
-		next;
-	}
-	my @k;
-	push @k, $all_keys{$_} || undef foreach keys %{$keys{$_}};
-	v "Checking keys for $_ -> ". join(", ", keys %{$keys{$_}});
-	my $text = join("", grep { defined $_ } @k);
-	if (!$text)
-	{
-		if ($_ eq 'root')
-		{
-			v "No keys found for $_";
-		}
-		else
-		{
-			v "No keys found for $_";
-		}
-		next;
-	}
-	dir_check(-dir => "$dir/.ssh", -mode => 0700, -owner => $name, -group => $gid);
-	text_install(-file => "$dir/.ssh/authorized_keys", -text => $text, -mode => 0644);
+foreach (keys %keys) {
+  my($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell,$expire) = getpwnam($_);
+  w "User $_ doesn't exist" and next unless $name;
+  w "User ${name}'s homedir doesn't exist" and next unless -d $dir;
+  v "Checking keys for $_ -> ". join(", ", keys %{$keys{$_}});
+  v "No keys found for $_" and next unless
+    my $text = join("", grep defined, map { $all_keys{$_} } keys %{$keys{$_}});
+  dir_check(-dir => "$dir/.ssh", -mode => 0700, -uid => $uid, -gid => $gid);
+  text_install(-file => "$dir/.ssh/authorized_keys", -text => $text, -mode => 0644, -uid => $uid,
+               -gid => $gid);
 }
 

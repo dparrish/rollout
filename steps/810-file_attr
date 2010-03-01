@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+# vim:tw=100 sw=2 expandtab ft=perl
 
 # Example:
 #
@@ -8,11 +9,10 @@
 # },
 
 my %attr = flatten_hash(c("file_attr"));
-while (my($file, $attr) = each %attr)
-{
-	$attr = { -mode => $attr } unless ref $attr eq 'HASH';
-	$attr->{-file} = $file;
-	$attr = { map { (/^-/ ? $_ : "-$_") => $attr->{$_} } keys %$attr };
-	set_attr(%$attr);
+while (my($file, $attr) = each %attr) {
+  $attr = { -mode => $attr } unless ref $attr eq 'HASH';
+  $attr->{-file} = $file;
+  $attr = { map { (/^-/ ? $_ : "-$_") => $attr->{$_} } keys %$attr };
+  set_attr(%$attr);
 }
 

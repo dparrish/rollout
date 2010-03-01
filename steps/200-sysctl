@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 # Add entries to /etc/sysctl.conf
+# vim:tw=100 sw=2 expandtab ft=perl
 
 my $changed = 0;
 my %sysctl = flatten_hash(c("sysctl"));
-while (my($item, $value) = each(%sysctl))
-{
-	file_append(-file => "/etc/sysctl.conf", -add => "$item = $value", -match => qr/$item/,
-		    -uid => 0, -gid => 0) and $changed++;
+while (my($item, $value) = each(%sysctl)) {
+  file_append(-file => "/etc/sysctl.conf", -add => "$item = $value", -match => qr/$item/,
+              -uid => 0, -gid => 0) and $changed++;
 }
 
 command("sysctl", "-p", "/etc/sysctl.conf") if $changed;

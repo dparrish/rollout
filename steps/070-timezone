@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# vim:sw=8 noexpandtab
+# vim:tw=100 sw=2 expandtab ft=perl
 
 return unless i_has("timezone") && i_should("timezone");
 my $zone = (flatten_list(c("timezone")))[0];
@@ -7,14 +7,12 @@ return unless $zone;
 
 text_install("/etc/timezone", "$zone\n");
 
-if (-f "/etc/sysconfig/clock")
-{
-	# RedHat specific
-	file_append("/etc/sysconfig/clock", "ZONE=\"$zone\"", qr/^ZONE=/);
+if (-f "/etc/sysconfig/clock") {
+  # RedHat specific
+  file_append("/etc/sysconfig/clock", "ZONE=\"$zone\"", qr/^ZONE=/);
 }
 
-if (-e "/etc/localtime" && -f "/usr/share/zoneinfo/$zone" && !$safe_mode)
-{
-	unlink("/etc/localtime") unless -l "/etc/localtime";
-	symlink_check("/usr/share/zoneinfo/$zone", "/etc/localtime");
+if (-e "/etc/localtime" && -f "/usr/share/zoneinfo/$zone" && !$safe_mode) {
+  unlink("/etc/localtime") unless -l "/etc/localtime";
+  symlink_check("/usr/share/zoneinfo/$zone", "/etc/localtime");
 }

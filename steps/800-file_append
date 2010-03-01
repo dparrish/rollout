@@ -1,16 +1,17 @@
 #!/usr/bin/perl -w
 # Modify files according to the file_append section
+# vim:tw=100 sw=2 expandtab ft=perl
 #
 # Example:
 #
-# 
+#
 # file_append => [
 #   [
-#     "/etc/aliases",			# The file to change
-#     "root: root\@yourdomain.com",	# The line to add
-#     qr/^root/,			# Replace any lines matching this regex
-#     "newaliases",			# Run this if the file is changed
-#     1,				# Create the file if it doesn't already exist
+#     "/etc/aliases",                # The file to change
+#     "root: root\@yourdomain.com",  # The line to add
+#     qr/^root/,                     # Replace any lines matching this regex
+#     "newaliases",                  # Run this if the file is changed
+#     1,                             # Create the file if it doesn't already exist
 #   ],
 # ],
 

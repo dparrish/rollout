@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 # svn checkout
+# vim:tw=100 sw=2 expandtab ft=perl
 
 return unless my %svn = flatten_hash(c("svn"));
 package_check("subversion");
@@ -35,8 +36,7 @@ EOF
 #END
 #EOF
 
-while (my($dir, $x) = each(%svn))
-{
-	w "No module specified for $dir" or next unless $x->{url};
-	svn_checkout($dir, $x->{url}, $x->{rev}, $x->{post_cmd});
+while (my($dir, $x) = each(%svn)) {
+  w "No module specified for $dir" or next unless $x->{url};
+  svn_checkout($dir, $x->{url}, $x->{rev}, $x->{post_cmd});
 }
