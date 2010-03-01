@@ -1,18 +1,16 @@
 #!/usr/bin/perl -w
+#
+# Example:
+#
+# crontab => {
+#   test_file => [
+#     '* * * * * root ps fax >/dev/null',
+#   ],
+# },
 
-foreach (i_isa_fetchall("crontab_include"))
-{
-	while(my($line, $match) = each(%$_))
-	{
-		file_append("/etc/crontab", $line, $match);
-	}
-}
+my %crontab = flatten_hash(c("crontab"));
+map { text_install("/etc/cron.d/$_", join("\n", @{$crontab{$_}}). "\n") } keys %crontab;
 
-foreach (i_isa_fetchall("crontab"))
-{
-	while(my($name, $lines) = each(%$_))
-	{
-		text_install("/etc/cron.d/$name", join("\n", @$lines). "\n");
-	}
-	
-}
+my %crontab_include = flatten_hash(c("crontab_include"));
+map { file_append("/etc/crontab", $_, $crontab_include{$_}) } keys %crontab_include;
+

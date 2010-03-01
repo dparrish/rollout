@@ -5,7 +5,7 @@
 if (!$safe_mode)
 {
 	my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
-	if ($ENV{SSH_CLIENT} =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/)
+	if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/)
 	{
 		$host = $1 || "127.0.0.1";
 		$port = $2 || 0;

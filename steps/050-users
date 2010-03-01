@@ -1,40 +1,33 @@
 #!/usr/bin/perl -w
 # This step creates system users and groups
+# vim:sw=8 noexpandtab
 
 # Available skip_steps items:
 #	users - Create and update user entries
 #	groups - Create and update group entries
 #	force_password - Reset user's passwords if they have changed them
 
-my(%users, %groups);
-
 if (i_should("groups"))
 {
 	# Deal with groups first
-	foreach (i_isa_fetchall("group"))
+	my %groups = flatten_hash(c("group"));
+	v "Checking groups: ". join(" ", keys %groups);
+	while (my($name, $group) = each(%groups))
 	{
-		foreach my $group (keys %{$_})
-		{
-			$groups{$group} ||= $_->{$group};
-		}
-	}
-
-	foreach (keys %groups)
-	{
-		my($gid) = getgrnam($_);
+		my($gid) = getgrnam($name);
 		if (!$gid)
 		{
 			# Create Group
-			l("Create group $_");
-			command("groupadd", ($groups{$_}->{gid} ? ("-g", $groups{$_}->{gid}, "-f") : ()), $_);
+			l("Create group $name");
+			command("groupadd", ($group->{gid} ? ("-g", $group->{gid}, "-f") : ()), $_);
 		}
 		else
 		{
 			# Group exists
-			if ($groups{$_}->{gid} && $groups{$_}->{gid} != $gid)
+			if ($group->{gid} && $group->{gid} != $gid)
 			{
-				l("Update gid for $_");
-				command("groupmod", "-g", $groups{$_}->{gid}, "-o", , $_);
+				l("Update gid for $name");
+				command("groupmod", "-g", $group->{gid}, "-o", $name);
 			}
 		}
 	}
@@ -44,35 +37,7 @@ if (i_should("groups"))
 # Now all the users
 if (i_should("users"))
 {
-	foreach (i_isa_fetchall("user"))
-	{
-		foreach my $username (keys %{$_})
-		{
-			$users{$username} ||= $_->{$username};
-			while (my($key, $value) = each %{$_->{$username}})
-			{
-				if (!defined $users{$username}{$key})
-				{
-					$users{$username}{$key} = $value;
-				}
-				elsif (ref $value eq 'ARRAY')
-				{
-					$users{$username}{$key} ||= [];
-					local $_;
-					foreach my $v (@$value)
-					{
-						push @{$users{$username}{$key}}, @$value
-							unless grep { $_ eq $v } @{$users{$username}{$key}};
-					}
-				}
-				elsif (ref $value eq 'HASH')
-				{
-					$users{$username}{$key} ||= {};
-					push @{$users{$username}{$key}}, @$value;
-				}
-			}
-		}
-	}
+	my %users = flatten_hash(c("users"));
 
 	foreach my $username (keys %users)
 	{

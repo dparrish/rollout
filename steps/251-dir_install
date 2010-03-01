@@ -1,13 +1,13 @@
 #!/usr/bin/perl -w
 
-foreach (i_isa_fetchall("dir_install"))
+my %dir_install = flatten_hash(c("dir_install"));
+while (my($dest, $src) = each(%dir_install))
 {
-	while (my($dest, $src) = each(%$_))
-	{
-		next unless i_should($dest);
-		$src = { -src => $src } if ref $src ne 'HASH';
-		map { "-$_" unless /^-/ } keys %$src;
-		dir_install(-src => $src->{-src}, -dest => $dest, -cmd => $src->{command}, $src);
-	}
+	next unless i_should($dest);
+	$src = { -src => $src, -dest => $dest } if ref $src ne 'HASH';
+	$src = { map { (/^-/ ? $_ : "-$_") => $src->{$_} } keys %$src };
+	$src->{-src} = $src->{-source};
+	$src->{-dest} = $dest;
+	delete $src->{-source};
+	dir_install(%$src);
 }
-

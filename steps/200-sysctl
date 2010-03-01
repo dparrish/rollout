@@ -2,12 +2,11 @@
 # Add entries to /etc/sysctl.conf
 
 my $changed = 0;
-foreach (i_isa_fetchall("sysctl"))
+my %sysctl = flatten_hash(c("sysctl"));
+while (my($item, $value) = each(%sysctl))
 {
-	while (my($item, $value) = each(%$_))
-	{
-		file_append(-file => "/etc/sysctl.conf", -add => "$item = $value", -match => qr/^$item/) and $changed++;
-	}
+	file_append(-file => "/etc/sysctl.conf", -add => "$item = $value", -match => qr/$item/,
+		    -uid => 0, -gid => 0) and $changed++;
 }
 
 command("sysctl", "-p", "/etc/sysctl.conf") if $changed;

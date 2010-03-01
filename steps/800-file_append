@@ -1,10 +1,17 @@
 #!/usr/bin/perl -w
 # Modify files according to the file_append section
+#
+# Example:
+#
+# 
+# file_append => [
+#   [
+#     "/etc/aliases",			# The file to change
+#     "root: root\@yourdomain.com",	# The line to add
+#     qr/^root/,			# Replace any lines matching this regex
+#     "newaliases",			# Run this if the file is changed
+#     1,				# Create the file if it doesn't already exist
+#   ],
+# ],
 
-foreach my $x (i_isa_fetchall("file_append"))
-{
-	foreach (@$x)
-	{
-		file_append(@$_)
-	}
-}
+file_append(@$_) foreach flatten_list(c("file_append"));

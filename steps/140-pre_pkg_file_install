@@ -1,32 +1,43 @@
 #!/usr/bin/perl -w
 # Install files before packages
+# vim: sw=8 noexpandtab
+#
+# Example:
+# 
+# pre_pkg_file_install => {
+#   '/tmp/dest_file' => {
+#     source => 'rollout:/conf/source_file',
+#     command => 'ls -l /tmp/dest_file',
+#     mode => 0640,
+#     uid => 1000,
+#     gid => 1000,
+#   },
+#   '/tmp/dest_file' => { text => 'This is some text\n' },
+# },
 
 my %done_files;
-
-foreach (i_isa_fetchall("pre_pkg_file_install"))
+my %files = flatten_hash(c("pre_pkg_file_install"));
+while (my($dest, $f) = each(%files))
 {
-	while (my($dest, $f) = each(%$_))
+	next if $done_files{$dest}++;
+	next if i_immutable_file($dest);
+	next unless i_should($dest);
+	if ($f->{source})
 	{
-		next if $done_files{$dest}++;
-		next if i_immutable_file($dest);
-		if ($f->{source})
+		file_install(-file => $dest, -src => $f->{source}, -cmd => $f->{command} || undef,
+			-mode => $f->{mode}, -uid => $f->{uid}, -gid => $f->{gid});
+	}
+	elsif ($f->{text})
+	{
+		if ($f->{text} =~ /^\n?(\s+)/m)
 		{
-			file_install($dest, $f->{source}, $f->{command} || undef, $f);
+			my $strip = $1;
+			v "Stripping \"$strip\" from the start of text";
+			my @text = split(/\n/, $f->{text});
+			$f->{text} = "";
+			foreach (@text) { s/^$strip//; $f->{text} .= "$_\n"; };
 		}
-		elsif ($f->{text})
-		{
-			if ($f->{text} =~ /^\n?(\s+)/m)
-			{
-				my $strip = $1;
-				v "Stripping \"$strip\" from the start of text";
-				my @text = split(/\n/, $f->{text});
-				$f->{text} = "";
-				foreach (@text)
-				{
-					s/^$strip//; $f->{text} .= "$_\n";
-				};
-			}
-			text_install($dest, $f->{text}, $f->{command} || undef, $f);
-		}
+		text_install(-file => $dest, -text => $f->{text}, -cmd => $f->{command} || undef,
+			-mode => $f->{mode}, -uid => $f->{uid}, -gid => $f->{gid});
 	}
 }

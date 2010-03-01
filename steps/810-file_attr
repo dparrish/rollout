@@ -1,10 +1,18 @@
 #!/usr/bin/perl -w
 
-foreach (i_isa_fetchall("file_attr"))
+# Example:
+#
+# file_attr => {
+#   '/tmp/foobar' => 0644,
+#   '/tmp/foobar2' => { mode => 0644, uid => 0, gid => 0 },
+# },
+
+my %attr = flatten_hash(c("file_attr"));
+while (my($file, $attr) = each %attr)
 {
-	while(my($file, $attr) = each(%$_))
-	{
-		set_attr($file, $attr);
-	}
+	$attr = { -mode => $attr } unless ref $attr eq 'HASH';
+	$attr->{-file} = $file;
+	$attr = { map { (/^-/ ? $_ : "-$_") => $attr->{$_} } keys %$attr };
+	set_attr(%$attr);
 }
 

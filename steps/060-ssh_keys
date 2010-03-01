@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 # Install SSH keys into root and user's authorized_keys
+# vim:sw=8 noexpandtab
 
 # Available skip_steps items:
 #	root_keys - Update root's ssh authorized_keys
@@ -21,27 +22,18 @@ foreach (split(/[\r\n]+/, $text))
 
 if (i_should("user_keys"))
 {
-	foreach my $u (i_isa_fetchall("user"))
+	my %users = flatten_hash(c("users"));
+	while (my($username, $user) = each(%users))
 	{
-		foreach my $username (keys %$u)
-		{
-			$keys{$username} ||= { $username => 1 };
-			if ($u->{$username}{ssh_keys})
-			{
-				$keys{$username} ||= {};
-				$keys{$username}->{$_}++ foreach (@{$u->{$username}{ssh_keys}});
-			}
-		}
+		$keys{$username} ||= { $username => 1 };
+		$keys{$username}->{$_}++ foreach (@{$user->{ssh_keys} || []});
 	}
 }
 
 if (i_should("root_keys"))
 {
-	foreach my $x (i_isa_fetchall("ssh_keys_add"))
-	{
-		$x = [$x] unless ref $x eq 'ARRAY';
-		$keys{root}->{$_}++ foreach (@$x);
-	}
+	$keys{root} ||= {};
+	$keys{root}->{$_}++ foreach uniq(flatten_list(c("ssh_keys_add")));
 }
 
 foreach (keys %keys)
@@ -65,7 +57,7 @@ foreach (keys %keys)
 	{
 		if ($_ eq 'root')
 		{
-			l "No keys found for $_";
+			v "No keys found for $_";
 		}
 		else
 		{

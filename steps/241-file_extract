@@ -1,61 +1,59 @@
 #!/usr/bin/perl -w
 # Extract tarballs
 
-foreach (i_isa_fetchall("file_extract"))
+my %file_extract = flatten_hash(c("file_extract"));
+while (my($source, $f) = each(%file_extract))
 {
-	while (my($source, $f) = each(%$_))
+	next unless i_should($source);
+	$f->{dest} ||= "/";
+	if ($f->{check} && -e $f->{check})
 	{
-		next unless i_should($source);
-		$f->{dest} ||= "/";
-		if ($f->{check} && -e $f->{check})
-		{
-			v "Skipping $source, $f->{check} exists";
-			next;
-		}
-
-		$source =~ s/^rollout:/$rollout_url/;
-
-		l "Extracting $source to $f->{dest}";
-		my $fn = $source;
-		$fn =~ s/.*\///;
-		if (!$fn)
-		{
-			w "Unknown filename $source";
-			next;
-		}
-
-		if (-f "/tmp/$fn")
-		{
-			w "/tmp/$fn already exists, refusing to overwrite";
-			next;
-		}
-
-		if (-x "/usr/bin/wget")
-		{
-			system("wget", $source, "-O", "/tmp/$fn") unless $safe_mode;
-		}
-		else
-		{
-			http_file -url => $source, -dest => "/tmp/$fn" unless $safe_mode;
-		}
-
-		dir_check($f->{dest}) unless $f->{dest} eq '/';
-		chdir($f->{dest});
-
-		if ($fn =~ /\.tar$/)
-		{
-			command("tar", "xf", "/tmp/$fn");
-		}
-		elsif ($fn =~ /\.tar\.gz$/)
-		{
-			command("tar", "zxf", "/tmp/$fn");
-		}
-		elsif ($fn =~ /\.tar\.bz2$/)
-		{
-			command("tar", "jxf", "/tmp/$fn");
-		}
-
-		unlink("/tmp/$fn");
+		v "Skipping $source, $f->{check} exists";
+		next;
 	}
+
+	$source =~ s/^rollout:/$rollout_url/;
+
+	l "Extracting $source to $f->{dest}";
+	my $fn = $source;
+	$fn =~ s/.*\///;
+	if (!$fn)
+	{
+		w "Unknown filename $source";
+		next;
+	}
+
+	if (-f "/tmp/$fn")
+	{
+		w "/tmp/$fn already exists, refusing to overwrite";
+		next;
+	}
+
+	if (-x "/usr/bin/wget")
+	{
+		system("wget", $source, "-O", "/tmp/$fn") unless $safe_mode;
+	}
+	else
+	{
+		http_file -url => $source, -dest => "/tmp/$fn" unless $safe_mode;
+	}
+
+	dir_check($f->{dest}) unless $f->{dest} eq '/';
+	chdir($f->{dest});
+
+	if ($fn =~ /\.tar$/)
+	{
+		command("tar", "xf", "/tmp/$fn");
+	}
+	elsif ($fn =~ /\.tar\.gz$/)
+	{
+		command("tar", "zxf", "/tmp/$fn");
+	}
+	elsif ($fn =~ /\.tar\.bz2$/)
+	{
+		command("tar", "jxf", "/tmp/$fn");
+	}
+
+	unlink("/tmp/$fn");
 }
 

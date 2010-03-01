@@ -1,9 +1,7 @@
 #!/usr/bin/perl -w
 # svn checkout
 
-my @svn = i_isa_fetchall("svn");
-return unless @svn;
-
+return unless my %svn = flatten_hash(c("svn"));
 package_check("subversion");
 
 dir_check("/root/.subversion/auth/svn.simple");
@@ -37,13 +35,8 @@ EOF
 #END
 #EOF
 
-foreach (@svn)
+while (my($dir, $x) = each(%svn))
 {
-	while (my($dir, $x) = each(%$_))
-	{
-		w "No module specified for $dir" or next unless $x->{url};
-
-		svn_checkout($dir, $x->{url}, $x->{rev}, $x->{post_cmd});
-	}
-} 
-
+	w "No module specified for $dir" or next unless $x->{url};
+	svn_checkout($dir, $x->{url}, $x->{rev}, $x->{post_cmd});
+}

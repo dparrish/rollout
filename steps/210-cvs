@@ -1,29 +1,40 @@
 #!/usr/bin/perl -w
 # CVS checkout
 
-return unless i_has("cvs");
+# Example:
+# cvspass => {
+#   # This gets installed to /root/.cvspass
+#   ':pserver:rollout@cvs.domain:2401/home/cvs' => 'Ahohlasd=',
+# },
+# 
+# cvs => {
+#   '/tmp/checkout_dir' => {
+#     module => 'cvs_module',
+#     rev => 'HEAD',
+#     repository => ':pserver:rollout@cvs.domain:2401/home/cvs',
+#     cmd => 'ls -l /tmp/checkout_dir',
+#   },
+# },
 
-my @cvs = i_isa_fetchall("cvs");
-package_check("cvs") if @cvs;
+return unless i_has('cvs');
 
-text_install("/root/.cvspass", <<EOF);
-/1 :pserver:rollout\@cvs.domain:2401/home/cvs Ahohlasd=
-EOF
-
-text_install("/root/.cvsrc", <<EOF);
-cvs -z3 -q
-update -d -P
-checkout -P
-diff -u -b -B
-EOF
-
-foreach (@cvs)
+my %cvspass = flatten_hash(c("cvspass"));
+while (my($user, $pass) = each %cvspass)
 {
-	while (my($dir, $x) = each(%$_))
-	{
-		w "No module specified for $dir" or next unless $x->{module};
-
-		cvs_checkout(-dest => $dir, -module => $x->{module}, -rev => $x->{rev}, -repo => $x->{repository}, -cmd => $x->{post_cmd});
-	}
+	file_append(-file => "/root/.cvspass", -add => "/1 $user $pass", -match => qr/ $user /,
+		-uid => 0, -gid => 0, -mode => 0600, -create => 1);
 }
 
+file_append(-file => "/root/.cvsrc", -add => "cvs -z3 -q", -match => qr/^cvs/, -create => 1);
+file_append(-file => "/root/.cvsrc", -add => "update -d -P", -match => qr/^update/);
+file_append(-file => "/root/.cvsrc", -add => "checkout -P", -match => qr/^checkout/);
+file_append(-file => "/root/.cvsrc", -add => "diff -u -b -B", -match => qr/^diff/);
+
+my %cvs = flatten_hash(c("cvs"));
+package_check("cvs") if keys %cvs;
+while (my($dir, $x) = each(%cvs))
+{
+	w "No module specified for $dir" or next unless $x->{module};
+
+	cvs_checkout(-dest => $dir, -module => $x->{module}, -rev => $x->{rev}, -repo => $x->{repository}, -cmd => $x->{post_cmd});
+}

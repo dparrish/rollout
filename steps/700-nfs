@@ -1,18 +1,35 @@
 #!/usr/bin/perl -w
+# vim:sw=8 noexpandtab
 # Set up both NFS shares and NFS mounts
 
-foreach (i_isa_fetchall("nfs_share"))
+# Example:
+# nfs_share => {
+#   '/home' => { hostname => 'rw,root_squash,no_subtree_check,async,fsid=0,crossmnt' },
+#   '/r1' => { Class_Name => 'ro,root_squash,no_subtree_check,async,fsid=1,crossmnt' },
+#   '/r2' => { network => 'ro,root_squash,no_subtree_check,async,fsid=2,crossmnt' },
+# },
+# nfs_mount => {
+#   '/r1' => 'fileserver:/r1',
+#   '/r2' => { path => 'fileserver:/r2', options => [ 'sync' ] },
+# },
+
+if (i_has("nfs_mount"))
 {
-	# Make sure the NFS server gets installed
-	add_isa("Nfs_Server") unless i_isa("Nfs_Server");
+}
+
+my %shares = flatten_hash(c("nfs_share"));
+if (%shares)
+{
+	# Install NFS server packages
 	package_check("nfs-common", "nfs-kernel-server") if i_isa("Debian");
 	package_check("nfs-utils") if i_isa("RHEL4");
 
 	my $restart = 0;
-	foreach my $dir (keys %$_)
+	my $re_export = 0;
+	while (my($dir, $x) = each(%shares))
 	{
 		my %clients;
-		while (my($client, $opts) = each(%{$_->{$dir}}))
+		while (my($client, $opts) = each(%$x))
 		{
 			my @c = expand_network($client);
 			if (@c)
@@ -29,19 +46,19 @@ foreach (i_isa_fetchall("nfs_share"))
 			next;
 		}
 
-		file_append("/etc/exports",
-			"$dir ". join(" ", map { "$_($clients{$_})" } keys %clients),
-			$dir) && $restart++;
+		file_append(-file => "/etc/exports",
+			-add => "$dir ". join(" ", map { "$_($clients{$_})" } keys %clients),
+			-match => qr/^\Q$dir/) && $re_export++;
 	}
 
 	if (-f "/etc/default/nfs-common")
 	{
 		# Debian / Ubuntu
-		file_modify("/etc/default/nfs-common", "/etc/init.d/nfs-common restart",
-			's/^#?STATDOPTS=.*/STATDOPTS="--port 4000"/',
-			's/^#?NEED_LOCKD=.*/NEED_LOCKD=/') && $restart++;
-		file_modify("/etc/default/nfs-kernel-server", "/etc/init.d/nfs-kernel-server restart",
-			's/^#?RPCMOUNTDOPTS=.*/RPCMOUNTDOPTS="--port 4002"/') && $restart++;
+		file_append(-file => "/etc/default/nfs-common", -add => "STATDOPTS=\"--port 4000\"",
+			-match => qr/STATDOPTS=/) && $restart++;
+		file_comment(-file => "/etc/default/nfs-common", -match => qr/NEED_LOCKD=/) && $restart++;
+		file_modify(-file => "/etc/default/nfs-kernel-server", -cmd => "/etc/init.d/nfs-kernel-server restart",
+			-modify => [ 's/^#?RPCMOUNTDOPTS=.*/RPCMOUNTDOPTS="--manage-gids --port 4002"/' ]) && $restart++;
 	}
 	else
 	{
@@ -67,25 +84,28 @@ EOF
 		elsif (-f "/etc/init.d/nfs-common")
 		{
 			# Debian / Ubuntu
+			print "Restart: $restart\n";
 			command("/etc/init.d/portmap restart");
 			command("/etc/init.d/nfs-common restart");
 			command("/etc/init.d/nfs-kernel-server restart");
 		}
 	}
+
+	if ($re_export)
+	{
+		command("exportfs -a");
+	}
 }
 
-foreach (i_isa_fetchall("nfs_mount"))
+my %mounts = flatten_hash(c("nfs_mount"));
+if (%mounts)
 {
-	# Make sure the NFS server gets installed
-	add_isa("Nfs_Client") unless i_isa("Nfs_Client");
 	package_check("nfs-common") if i_isa("Debian");
 
-	foreach my $dir (keys %$_)
+	while (my($dir, $x) = each(%mounts))
 	{
 		dir_check($dir);
- 		my $o = (ref $_->{$dir} eq 'HASH')
- 			? $_->{$dir}
- 			: { path => $_->{$dir} };
+ 		my $o = (ref $x eq 'HASH') ? $x : { path => $x };
  		if (!$o->{path})
  		{
  			w "No path specified for $dir";

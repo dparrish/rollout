@@ -1,80 +1,57 @@
 #!/usr/bin/perl -w
 # Update the /etc/hosts file with all hosts in this machine's network
+# vim:sw=8 noexpandtab
 
 # Available skip_steps items:
 #       localhost - Add a localhost entry including the full host name
 #       network - Add entries for every machine in the local network
 #       hosts_append - Add custom hosts_append entries
 
-my $domain = "localdomain";
-foreach (i_isa_fetchall("domain_name"))
-{
-	$domain = $_;
-	last;
-}
-
 if (i_should("localhost"))
 {
+	my $domain = (flatten_list(c("domain_name")))[0] || "localdomain";
 	file_append(-file => "/etc/hosts",
 		-add => "127.0.0.1	localhost.localdomain localhost $hostname.$domain $hostname",
 		-match => qr/(?:^127\.0\.0\.1\s.*|.+\s$hostname.*)/);
 }
 
-if (i_should("network"))
+my @networks = flatten_list(c("network"));
+if (i_should("network") && @networks)
 {
-	if ($m{$hostname}->{network})
+	v "Looking for other machines in my networks (". join(" ", @networks). ")";
+
+	foreach my $d (keys %m)
 	{
-		v "My networks: ". join(" ", @{$m{$hostname}->{network}});
+		next if $d eq $hostname || $d =~ /^[A-Z]/;
+		next unless my $ip = i_ip($d);
 
-		foreach my $d (keys %m)
+		my $in_my_network = 0;
+		foreach my $n (@networks)
 		{
-			next if $d eq $hostname;
-			next unless $m{$d}->{network};
-			next unless $m{$d}->{interfaces};
+			$in_my_network += grep { $_ eq $n } flatten_list(c("$d/network"));
+		}
+		next unless $in_my_network;
 
-			my $in_my_network = 0;
-			foreach my $n (@{$m{$d}->{network}})
-			{
-				$in_my_network = $n if grep { $_ eq $n } @{$m{$hostname}->{network}};
-			}
-
-			next unless $in_my_network;
-			my $ip;
-			foreach (values %{$m{$d}->{interfaces}})
-			{
-				$ip = $_->{ip} if $_->{primary} && $_->{ip};
-			}
-			my @hostnames = ($d);
-			foreach my $dom (i_isa_fetchall("domain_name", $d)) {
-				next if grep { $_ eq "$d.$dom" } @hostnames;
-				unshift @hostnames, "$d.$dom";
-			}
-			if ($m{$d}->{full_hostname} && !grep { $_ eq $m{$d}->{full_hostname} } @hostnames)
-			{
-				unshift @hostnames, "$m{$d}->{full_hostname}";
-			}
-			if ($ip && @hostnames)
-			{
-				my $h = "$ip\t". join(" ", @hostnames);
-				v "Adding $h to /etc/hosts (in $in_my_network network)";
-				file_append(-file => "/etc/hosts",
-					-add => $h,
-					-match => qr/(?:^\Q$ip\E\s|\s\Q$d\E)/);
-			}
+		my @hostnames = uniq(c("$d/full_hostname"), map({ "$d.$_" } c("$d/domain_name")), $d);
+		if (@hostnames)
+		{
+			my $h = "$ip\t". join(" ", @hostnames);
+			v "Adding $d:$ip to /etc/hosts (in $in_my_network network)";
+			file_append(-file => "/etc/hosts",
+				-add => $h,
+				-match => qr/(?:^\Q$ip\E\s|\s\Q$d\E)/);
 		}
 	}
 }
 
 if (i_should("hosts_append"))
 {
-	foreach (i_isa_fetchall("hosts_append"))
+	my %append = flatten_hash(c("hosts_append"));
+	while (my($ip, $alias) = each %append)
 	{
-		while (my($ip, $alias) = each %$_)
-		{
-			v "Adding $ip $alias to /etc/hosts";
-			file_append(-file => "/etc/hosts",
-				-add => "$ip	$alias",
-				-match => qr/(?:^\b\Q$ip\E\b\s|\s\b\Q$alias\b\E)/);
-		}
+		v "Adding $ip $alias to /etc/hosts";
+		file_append(-file => "/etc/hosts",
+			-add => "$ip	$alias",
+			-match => qr/(?:^\b\Q$ip\E\b\s|\s\b\Q$alias\b\E)/);
 	}
 }

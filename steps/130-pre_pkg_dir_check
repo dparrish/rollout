@@ -1,12 +1,9 @@
 #!/usr/bin/perl -w
+# Example: 
+# pre_pkg_dir_check => [
+#	[ '/tmp/foobar', 0750 ],
+#	[ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],
+# ],
 
-foreach (i_isa_fetchall("pre_pkg_dir_check"))
-{
-	foreach my $x (@$_)
-	{
-		$x = [ $x ] unless ref $x eq 'ARRAY';
-		v "Checking for dir $x->[0]";
-		dir_check(@$x);
-	}
-}
+dir_check(@$_) foreach flatten_list(c("pre_pkg_dir_check"));
 

@@ -1,10 +1,12 @@
 #!/usr/bin/perl -w
 # Configure the network interfaces
+# vim:sw=8 noexpandtab
 
 # This is considered a dangerous operation and will always be run in safe mode
 # unless "-f network" is specified
 
 # Available skip_steps items:
+#	interface - Configure any interfaces
 #	bond - Configure bonding interfaces
 #	routes - Add static routes
 #	resolvconf - Add name servers and resolv options
@@ -16,75 +18,74 @@ local $safe_mode = grep(/^network$/, @force_dangerous) ? 0 : 1;
 
 my $changes = 0;
 
-if (-d "/etc/sysconfig/network-scripts")
+my %ints = flatten_hash(c("interfaces"));
+
+if (i_should("interface") && -d "/etc/sysconfig/network-scripts")
 {
 	# RedHat style
 	my %interface_files;
-	foreach my $x (i_isa_fetchall("interfaces"))
+	while (my($device, $d) = each %ints)
 	{
-		foreach my $device (keys %$x)
+		next if $d->{disabled};
+		my @c = (
+			"DEVICE=$device",
+			"TYPE=Ethernet",
+			"IPV6INIT=". ($d->{ipv6} ? "yes" : "no"),
+			"USERCTL=no",
+			"ONBOOT=". ($d->{inactive} ? "no" : "yes"),
+		);
+		push @c, "GATEWAY=$d->{gateway}" if $d->{gateway};
+		if (i_should("iftab"))
 		{
-			my $d = $x->{$device};
-			my @c = (
-				"DEVICE=$device",
-				"TYPE=Ethernet",
-				"IPV6INIT=". ($d->{ipv6} ? "yes" : "no"),
-				"USERCTL=no",
-				"ONBOOT=". ($d->{inactive} ? "no" : "yes"),
-			);
-			push @c, "GATEWAY=$d->{gateway}" if $d->{gateway};
-			if (i_should("iftab"))
-			{
-				push @c, "HWADDR=$d->{mac}" if $d->{mac};
-			}
+			push @c, "HWADDR=$d->{mac}" if $d->{mac};
+		}
 
-			if ($d->{ip})
-			{
-				push @c, "IPADDR=$d->{ip}",
-					 "NETMASK=". ($d->{netmask} || "255.255.255.0");
-			}
-			elsif ($d->{dhcp})
-			{
-				push @c, "BOOTPROTO=dhcp",
-					 "DHCP_HOSTNAME=". ($d->{dhcp} !~ /^1$/ ? $d->{dhcp} : $hostname),
-					 "PEERDNS=yes";
-			}
+		if ($d->{ip})
+		{
+			push @c, "IPADDR=$d->{ip}",
+				 "NETMASK=". ($d->{netmask} || "255.255.255.0");
+		}
+		elsif ($d->{dhcp})
+		{
+			push @c, "BOOTPROTO=dhcp",
+				 "DHCP_HOSTNAME=". ($d->{dhcp} !~ /^1$/ ? $d->{dhcp} : $hostname),
+				 "PEERDNS=yes";
+		}
 
-			if (i_should("bond"))
+		if (i_should("bond"))
+		{
+			if ($device =~ /^bond(\d+)/)
 			{
-				if ($device =~ /^bond(\d+)/)
+				foreach (@{$d->{slaves} || []})
 				{
-					foreach (@{$d->{slaves} || []})
-					{
-						# Create a device entry for each slave interface
-						my @c = (
-							"DEVICE=$_",
-							"ONBOOT=no",
-							"TYPE=Ethernet",
-							"MASTER=$device",
-							"SLAVE=yes",
-							"PEERDNS=yes",
-							"USERCTL=no",
-							"IPV6INIT=no",
-						);
-						push @c, "HWADDR=$m{$hostname}->{interfaces}{$_}{mac}"
-							if $m{$hostname}->{interfaces}{$_}{mac};
-						$interface_files{$_} = \@c;
-					}
+					# Create a device entry for each slave interface
+					my @c = (
+						"DEVICE=$_",
+						"ONBOOT=no",
+						"TYPE=Ethernet",
+						"MASTER=$device",
+						"SLAVE=yes",
+						"PEERDNS=yes",
+						"USERCTL=no",
+						"IPV6INIT=no",
+					);
+					push @c, "HWADDR=$m{$hostname}->{interfaces}{$_}{mac}"
+						if $m{$hostname}->{interfaces}{$_}{mac};
+					$interface_files{$_} = \@c;
 				}
 			}
-			$interface_files{$device} ||= \@c;
+		}
+		$interface_files{$device} ||= \@c;
 
-			if (i_should("routes"))
+		if (i_should("routes"))
+		{
+			my $routes = join("", map { "$_ via $d->{routes}->{$_} dev $device\n" } keys %{$d->{routes} || {}});
+			if ($routes && text_install("/etc/sysconfig/network-scripts/route-$device", $routes, undef, { mode => 0644 }))
 			{
-				my $routes = join("", map { "$_ via $d->{routes}->{$_} dev $device\n" } keys %{$d->{routes} || {}});
-				if ($routes && text_install("/etc/sysconfig/network-scripts/route-$device", $routes, undef, { mode => 0644 }))
+				$changes++;
+				if (!$safe_mode)
 				{
-					$changes++;
-					if (!$safe_mode)
-					{
-						w "Network configuration has been changed for $device, you must restart the interface manually to apply the changes.";
-					}       
+					w "Network configuration has been changed for $device, you must restart the interface manually to apply the changes.";
 				}
 			}
 		}
@@ -114,75 +115,72 @@ if (-d "/etc/sysconfig/network-scripts")
 		}
 	}
 }
-elsif (-f "/etc/network/interfaces")
+elsif (i_should("interface") && -f "/etc/network/interfaces")
 {
 	# Debian style
 	my %interfaces;
 	my %macs;
-	foreach my $x (i_isa_fetchall("interfaces"))
+	while (my($device, $d) = each %ints)
 	{
-		foreach my $device (keys %$x)
+		next if $d->{disabled};
+		my @c;
+		push @c, "auto $device" unless $d->{inactive};
+		push @c, "iface $device inet ". ($d->{dhcp} ? "dhcp" : "static");
+
+		if ($d->{ip})
 		{
-			my $d = $x->{$device};
-			my @c;
-			push @c, "auto $device" unless $d->{inactive};
-			push @c, "iface $device inet ". ($d->{dhcp} ? "dhcp" : "static");
+			push @c, "	address $d->{ip}";
+			push @c, "	netmask ". ($d->{netmask} || "255.255.255.0");
+			push @c, "	network $d->{network}" if $d->{network};
+			push @c, "	broadcast $d->{broadcast}" if $d->{broadcast};
+		}
+		push @c, "	gateway $d->{gateway}" if $d->{gateway};
+		if ($d->{'pre-up'})
+		{
+			$d->{'pre-up'} = [$d->{'pre-up'}] unless ref $d->{'pre-up'} eq 'ARRAY';
+			push @c, map { "	pre-up $_" } @{$d->{'pre-up'}};
+		}
+		if ($d->{'up'})
+		{
+			$d->{'up'} = [$d->{'up'}] unless ref $d->{'up'} eq 'ARRAY';
+			push @c, map { "	up $_" } @{$d->{'up'}};
+		}
+		if ($d->{bridge})
+		{
+			# Bridging Interface
+			$m{$hostname}->{packages} ||= [];
+			push @{$m{$hostname}->{packages}}, "bridge-utils";
+			push @c, "      bridge_ports ". join(" ", @{$d->{bridge}});
+			push @c, "      bridge_fd 9";
+			push @c, "      bridge_hello 2";
+			push @c, "      bridge_maxage 12";
+			push @c, "      bridge_stp off ";
+		}
 
-			if ($d->{ip})
+		if (i_should("routes"))
+		{
+			while (my($dest, $gw) = each(%{$d->{routes} || {}}))
 			{
-				push @c, "	address $d->{ip}";
-				push @c, "	netmask ". ($d->{netmask} || "255.255.255.0");
-				push @c, "	network $d->{network}" if $d->{network};
-				push @c, "	broadcast $d->{broadcast}" if $d->{broadcast};
-			}
-			push @c, "	gateway $d->{gateway}" if $d->{gateway};
-			if ($d->{'pre-up'})
-			{
-				$d->{'pre-up'} = [$d->{'pre-up'}] unless ref $d->{'pre-up'} eq 'ARRAY';
-				push @c, map { "	pre-up $_" } @{$d->{'pre-up'}};
-			}
-			if ($d->{'up'})
-			{
-				$d->{'up'} = [$d->{'up'}] unless ref $d->{'up'} eq 'ARRAY';
-				push @c, map { "	up $_" } @{$d->{'up'}};
-			}
-			if ($d->{bridge})
-			{
-				# Bridging Interface
-				$m{$hostname}->{packages} ||= [];
-				push @{$m{$hostname}->{packages}}, "bridge-utils";
-				push @c, "      bridge_ports ". join(" ", @{$d->{bridge}});
-				push @c, "      bridge_fd 9";
-				push @c, "      bridge_hello 2";
-				push @c, "      bridge_maxage 12";
-				push @c, "      bridge_stp off ";
-			}
-
-			if (i_should("routes"))
-			{
-				while (my($dest, $gw) = each(%{$d->{routes} || {}}))
+				if ($dest =~ /\//)
 				{
-					if ($dest =~ /\//)
-					{
-						$dest = "-net $dest";
-					}
-					else
-					{
-						$dest = "-host $dest";
-					}
-					if ($gw)
-					{
-						push @c, "	up route add -net $dest gw $gw";
-					}
-					else
-					{
-						push @c, "	up route add -net $dest dev $device";
-					}
+					$dest = "-net $dest";
+				}
+				else
+				{
+					$dest = "-host $dest";
+				}
+				if ($gw)
+				{
+					push @c, "	up route add -net $dest gw $gw";
+				}
+				else
+				{
+					push @c, "	up route add -net $dest dev $device";
 				}
 			}
-
-			$interfaces{$device} ||= \@c;
 		}
+
+		$interfaces{$device} ||= \@c;
 	}
 
 	if (keys %interfaces)
@@ -252,18 +250,14 @@ if (i_should("resolvconf"))
 {
 	file_append(-file => "/etc/resolv.conf", -add => "options timeout:5 attempts:2",
 		    -match => qr/^options/) && $changes++;
-	foreach my $x (i_isa_fetchall("nameservers"))
-	{
-		file_append(-file => "/etc/resolv.conf", -add => "nameserver $_",
-			    -match => qr/^nameserver $_/) foreach @$x;
-	}
+	file_append(-file => "/etc/resolv.conf", -add => "nameserver $_",
+		    -match => qr/^nameserver $_/) foreach uniq(flatten_list(c("nameservers")));
 }
 
 if (i_should("domain_name"))
 {
-	foreach (i_isa_fetchall("domain_name"))
+	foreach (c("domain_name"))
 	{
-		v "Setting domain name to $_";
 		file_append("/etc/resolv.conf", "search $_", qr/^search /);
 		last;
 	}

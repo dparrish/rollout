@@ -25,23 +25,16 @@ EOF
 }
 
 my %sudo;
-foreach (i_isa_fetchall("sudo"))
+my %input = flatten_hash(c("sudo"));
+while(my($username, $commands) = each(%input))
 {
-	while(my($username, $commands) = each(%$_))
-	{
-		next unless i_should($username);
-		$sudo{$username} ||= {};
-		foreach (@$commands)
-		{
-			$sudo{$username}->{$_}++ foreach (@$commands);
-		}
-	}
+	next unless i_should($username);
+	map { $sudo{$username}->{$_}++ } @$commands;
 }
 
-foreach (keys %sudo)
-{
-	$text .= "$_ ALL = ". join(", ", keys %{$sudo{$_}}). "\n";
-}
+$text .= "$_ ALL = ". join(", ", keys %{$sudo{$_}}). "\n"
+	foreach keys %sudo;
 
-text_install(-file => "/etc/sudoers", -text => $text, -cmd => "visudo -c", -mode => 0440, -owner => 'root');
+text_install(-file => "/etc/sudoers", -text => $text, -cmd => "visudo -c",
+	-mode => 0440, -uid => 0, -gid => 0);
 

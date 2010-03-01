@@ -15,11 +15,7 @@ if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/)
 	}
 }
 
-$text .= "\nUpdated by rollout at ". localtime(time). " from $host\n\n";
-
-foreach (i_isa_fetchall("motd"))
-{
-	$text .= "$_\n";
-}
+$text .= "\nUpdated by rollout at ". localtime(time). " from $host\n\n".
+	 join("\n", flatten_list(c("motd")));
 
 text_install("/etc/motd", $text);

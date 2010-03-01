@@ -1,20 +1,26 @@
 #!/usr/bin/perl -w
+#
+# Example:
+#
+# file_comment => {
+#   '/etc/sysctl.conf' => [ qr/net.ipv6/ ],
+# },
+# file_uncomment => {
+#   '/etc/sysctl.conf' => [ qr/net.ipv4/ ],
+# },
+#
 
-foreach (i_isa_fetchall("file_comment"))
+
+my %comment = flatten_hash(c("file_comment"));
+while (my($file, $regex) = each(%comment))
 {
-	while (my($file, $regex) = each(%$_))
-	{
-		$regex = [ $regex ] unless ref $regex eq 'ARRAY';
-		file_comment($file, undef, @$regex)
-	}
+	$regex = [ $regex ] unless ref $regex eq 'ARRAY';
+	file_comment(-file => $file, -match => $regex)
 }
 
-foreach (i_isa_fetchall("file_uncomment"))
+my %uncomment = flatten_hash(c("file_uncomment"));
+while (my($file, $regex) = each(%uncomment))
 {
-	while (my($file, $regex) = each(%$_))
-	{
-		$regex = [ $regex ] unless ref $regex eq 'ARRAY';
-		file_uncomment($file, undef, @$regex)
-	}
+	$regex = [ $regex ] unless ref $regex eq 'ARRAY';
+	file_uncomment(-file => $file, -match => $regex)
 }
-

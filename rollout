@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+# vim:sw=8 noexpandtab
 #
 #    Rollout
 #    Copyright (C) 2007 David Parrish
@@ -275,11 +276,11 @@ sub http_index(@)
 # Install a whole directory's files
 sub dir_install
 {
-	my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => undef ];
+	my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => {},
+                                   -dir_flags => {} ];
 
-	my $dir_flags = { %{$p->{-flags}} };
-	$dir_flags->{mode} = $dir_flags->{dir_mode} || 0755;
-	dir_check($p->{-dest}, $dir_flags);
+	$p->{-dir_flags}->{-dir} = $p->{-dest};
+	dir_check(%{$p->{-dir_flags}});
 
 	return w "No source specified" unless $p->{-src};
 	return w "No destination specified" unless $p->{-dest};
@@ -299,14 +300,16 @@ sub dir_install
 				if (!$p->{-flags}->{no_recurse})
 				{
 					v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
-					dir_install(-src => "$p->{-src}/$filename", -dest => "$p->{-dest}/$filename", -flags => $p->{-flags}) && $restart++;
+					dir_install(-src => "$p->{-src}/$filename",
+						-dest => "$p->{-dest}/$filename",
+						-flags => $p->{-flags}) && $restart++;
 				}
 			}
 			else
 			{
 				v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
 				my $file = http_file -url => "$p->{-src}/$filename";
-				if ($file)
+				if (defined($file))
 				{
 					text_install("$p->{-dest}/$filename", $file, undef, $p->{-flags}) && $restart++;
 				}
@@ -456,19 +459,94 @@ sub i_ip
        return undef;
 }
 
-sub flatten
+# }}}
+# Configuration lookup functions {{{ 
+sub c
 {
-	my(@items) = @_;
-	my @ret;
-	foreach (@items)
+	my($key, $donecache) = @_;
+	return wantarray ? () : undef unless $key;
+	$donecache ||= {};
+	my(@key) = split(/\//, $key);
+	if (!$m{$key[0]})
 	{
-		push @ret, ref $_ eq 'HASH' ? %$_
-			: ref $_ eq 'ARRAY' ? @$_
-			: $_;
+		return wantarray ? () : undef unless $m{$hostname};
+		unshift @key, $hostname;
 	}
-	return @ret;
+	my $base = shift @key;
+	return wantarray ? () : undef if $donecache->{$base}++;
+
+	my @ret;
+	my $x = $m{$base};
+	for (my $i = 0; $i <= $#key; $i++)
+	{
+		last unless ref $x eq 'HASH';
+		$x = $x->{$key[$i]};
+		last unless $x;
+		push @ret, $x if $i == $#key;
+	}
+	if ($m{$base}->{ISA}) {
+		foreach (keys %{$m{$base}->{ISA}}) {
+			push @ret, c(join("/", $_, @key), $donecache);
+		}
+	}
+	return wantarray ? @ret : $ret[0];
 }
 
+sub uniq
+{
+	my(@input) = @_;
+	my @output;
+	my %done;
+	foreach (@input)
+	{
+		next if $done{$_}++;
+		push @output, $_;
+	}
+	return @output;
+}
+
+sub merge_hashes
+{
+	my($x, $y) = @_;
+	return [uniq(@$x, @$y)] if ref $x eq 'ARRAY';
+	return [uniq($x, $y)] unless ref $x;
+	$x->{$_} = defined $x->{$_}
+		? merge_hashes($x->{$_}, $y->{$_})
+		: $y->{$_} foreach keys %$y;
+	return $x;
+}
+
+sub flatten_hash
+{
+	my(@input) = @_;
+	my $output = {};
+	$output = merge_hashes($output, $_) foreach @input;
+	return %$output;
+}
+
+sub flatten_list
+{
+	my(@input) = @_;
+	my @output = ();
+	foreach (@input)
+	{
+		push @output, $_ and next unless ref $_ eq 'ARRAY';
+		push @output, @$_;
+	}
+	return @output;
+}
+
+sub flatten_list_all
+{
+	my(@input) = @_;
+	my @output = ();
+	foreach (@input)
+	{
+		push @output, $_ and next unless ref $_ eq 'ARRAY';
+		push @output, flatten_all(@$_);
+	}
+	return @output;
+}
 # }}}
 
 sub queue_step
@@ -521,7 +599,8 @@ sub slurp_file($)
 
 sub file_append
 {
-	my $p = named_params @_, [ -file => undef, -add => undef, -match => undef, -cmd => undef, -create => 0 ];
+	my $p = named_params @_, [ -file => undef, -add => undef, -match => undef, -cmd => undef,
+	                           -create => 0 ];
 	local $_;
 
 	if (defined $p->{-match} and $p->{-add} !~ /$p->{-match}/)
@@ -541,6 +620,7 @@ sub file_append
 	}
 
 	my $t = '';
+	my $added = 0;
 	my $fh = IO::File->new($p->{-file}) or return w "$p->{-file} unable to be opened: $!";
 
 	while (<$fh>)
@@ -552,6 +632,12 @@ sub file_append
 				$fh->close;
 				return 0;
 			}
+			if (!$added)
+			{
+				$t .= $p->{-add};
+				$t .= "\n" unless $p->{-add} =~ /\n$/;
+				$added = 1;
+			}
 		}
 		else
 		{
@@ -561,8 +647,11 @@ sub file_append
 
 	$fh->close;
 
-	$t .= $p->{-add};
-	$t .= "\n" unless $p->{-add} =~ /\n$/;
+	if (!$added)
+	{
+		$t .= $p->{-add};
+		$t .= "\n" unless $p->{-add} =~ /\n$/;
+	}
 
 	l "Modified $p->{-file} by appending $p->{-add}";
 	safe_write(-file => $p->{-file}, -text => $t);
@@ -691,9 +780,7 @@ sub set_attr
 	$p->{-file} ||= $p->{-dir};
 	return w "No filename given to set_attr" unless $p->{-file};
 
-	my $mode;
-	my $uid;
-	my $gid;
+	my($mode, $uid, $gid);
 
 	for ($p->{-mode})
 	{
@@ -897,12 +984,13 @@ sub file_install
 	}
 
 	$p->{-flags}{srcfn} ||= $p->{-src};
-	return text_install($p->{-file}, $srctext, $p->{-cmd}, $p->{-flags});
+	$p->{-text} = $srctext;
+	return text_install($p);
 }
 
 sub dir_check
 {
-	my $p = named_params @_, [ -dir => undef, -mode => undef, -owner => undef, -group => undef, ];
+	my $p = named_params @_, [ -dir => undef, -mode => undef, -uid => undef, -gid => undef ];
 	my $flags;
 	my $changed;
 
