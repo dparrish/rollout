@@ -2,8 +2,7 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 
 return unless i_has("iscsi");
-
-return w "Only works on Debian / Ubuntu currently" unless -e "/etc/debian_version";
+return w "Only works on Debian / Ubuntu currently" unless i_os("debian", "ubuntu");
 
 my $restart = 0;
 my $auto = "automatic";

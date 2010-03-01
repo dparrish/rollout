@@ -16,8 +16,8 @@
 my %shares = flatten_hash(c("nfs_share"));
 if (%shares) {
   # Install NFS server packages
-  package_check("nfs-common", "nfs-kernel-server") if i_isa("Debian");
-  package_check("nfs-utils") if i_isa("RHEL4");
+  package_check("nfs-common", "nfs-kernel-server") if i_distro("debian", "ubuntu");
+  package_check("nfs-utils") if i_distro("redhat");
 
   my $restart = 0;
   my $re_export = 0;
@@ -80,7 +80,7 @@ EOF
 
 my %mounts = flatten_hash(c("nfs_mount"));
 if (%mounts) {
-  package_check("nfs-common") if i_isa("Debian");
+  package_check("nfs-common") if i_os("debian", "ubuntu");
 
   while (my($dir, $x) = each(%mounts)) {
     dir_check($dir);

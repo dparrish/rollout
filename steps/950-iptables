@@ -6,13 +6,13 @@ return if i_has("skip_firewall");
 return unless i_has("firewall_accept") || i_has("firewall_drop") || i_has("firewall_append");
 
 # Make sure iptables is installed
-if (-f "/etc/debian_version") {
+if (i_distro("debian", "ubuntu")) {
   dir_check("/var/lib/iptables");
   file_modify("/etc/default/iptables", undef,
               's/enable_autosave=true/enable_autosave=false/',
               's/enable_save_counters=true/enable_save_counters=false/')
     if -f "/etc/default/iptables";
-} elsif (-f "/etc/redhat-release") {
+} elsif (i_distro("redhat")) {
   package_check("iptables");
 }
 
@@ -109,10 +109,10 @@ if (i_has("firewall_mangle_append")) {
   push @rules, "COMMIT";
 }
 
-if (-f "/etc/redhat-release") {
+if (i_distro("redhat")) {
   text_install("/etc/sysconfig/iptables", join("", map { "$_\n" } @rules),
                "iptables-restore /etc/sysconfig/iptables");
-} elsif (-f "/etc/debian_version") {
+} elsif (i_distro("debian", "ubuntu")) {
   dir_check("/var/lib/iptables");
   text_install("/var/lib/iptables/active", join("", map { "$_\n" } @rules),
                "iptables-restore /var/lib/iptables/active");

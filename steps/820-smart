@@ -18,10 +18,10 @@ return unless $text;
 
 $m{$hostname}{_smart_configured_} = 1;
 
-if (-f '/etc/debian_version') {
+if (i_distro("debian", "ubuntu")) {
   package_check("smartmontools");
   text_install("/etc/smartd.conf", $text, "/etc/init.d/smartmontools restart");
-} elsif (-f '/etc/redhat-release') {
+} elsif (i_distro("redhat")) {
   package_check("kernel-utils");
   text_install("/etc/smartd.conf", $text, "/etc/init.d/smartd restart");
   command("chkconfig smartd on");

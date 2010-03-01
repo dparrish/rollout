@@ -1316,7 +1316,7 @@ my $start_time = time;
 @all_steps = http_index "steps";
 fatal "Can't find any steps to execute" unless @all_steps;
 @steps = sort grep(/^\d+-.*/, @all_steps);
-unshift @only_steps, "setup" if @only_steps;
+unshift @only_steps, "setup", "os-detection" if @only_steps;
 push @only_steps, "complete" if @only_steps;
 v "Only running steps: " . join(", ", @only_steps) if @only_steps;
 
@@ -1335,7 +1335,7 @@ while (@steps) {
   if ($@) {
     l "------ FATAL ERROR ------";
     l "$_" foreach ($@);
-    while (@steps && $steps[0] ne '99-complete') { shift @steps };
+    while (@steps && $steps[0] ne '999-complete') { shift @steps };
   }
 }
 
