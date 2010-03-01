@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+# vim:tw=100 sw=2 expandtab ft=perl
+
+use POSIX;
+
+$m{$hostname}{_os_detection} = {
+  type => 'unknown',
+  os => 'unknown',
+  distro => 'unknown',
+  version => 'unknown',
+  hardware => 'unknown',
+};
+my $o = $m{$hostname}{_os_detection};
+my($sysname, $nodename, $release, $version, $machine) = POSIX::uname();
+
+if ($sysname =~ /Linux/i) {
+  $o->{type} = 'unix';
+  $o->{os} = 'linux';
+  $o->{version} = "$release $version";
+  $o->{hardware} = $machine;
+
+  chomp($o->{distro} = lc `lsb_release -sd` || 'unknown');
+  chomp($o->{version} = lc `lsb_release -sr` || 'unknown');
+
+  # Specific distribution hacks
+  $o->{distro} = 'ubuntu' if $o->{distro} =~ /^ubuntu/;
+  $o->{distro} = 'centos' if $o->{distro} =~ /^centos/;
+  $o->{distro} = 'redhat' if $o->{distro} =~ /^redhat/;
+  $o->{distro} = 'redhat' if $o->{distro} =~ /^(?:enterprise)?enterprise[ae]s/;
+
+} elsif ($sysname =~ /SunOS/i) {
+  $o->{type} = 'unix';
+  $o->{os} = 'solaris';
+  $o->{version} = $release;
+  $o->{hardware} = $machine;
+
+} elsif ($sysname =~ /AIX/i) {
+  $o->{type} = 'unix';
+  $o->{os} = 'aix';
+  $o->{version} = $release;
+  $o->{hardware} = $machine;
+
+} else {
+  w "Unknown sysname \"$sysname\", OS detection won't work";
+  return;
+}
+
+v "OS detection: type=$o->{type} os=$o->{os} distro=$o->{distro} version=$o->{version}\n";
+
+sub i_unix { return $m{$hostname}{_os_detection}{type} eq 'unix' ? 1 : 0 }
+sub i_os {
+  return $m{$hostname}{_os_detection}{os} =~ /$_[0]/i ? 1 : 0 if @_;
+  return $m{$hostname}{_os_detection}{os};
+}
+sub i_distro {
+  return $m{$hostname}{_os_detection}{distro} =~ /$_[0]/i ? 1 : 0 if @_;
+  return $m{$hostname}{_os_detection}{distro};
+}
+sub i_os_version { return $m{$hostname}{_os_detection}{version} }
