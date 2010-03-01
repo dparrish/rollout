@@ -2,7 +2,7 @@
 # Build and activate firewall rules
 
 return if i_has("skip_firewall");
-return unless i_has("firewall_allow") || i_has("firewall_deny") || i_has("firewall_append");
+return unless i_has("firewall_accept") || i_has("firewall_drop") || i_has("firewall_append");
 
 # Make sure iptables is installed
 if (-f "/etc/debian_version")
@@ -79,8 +79,8 @@ sub add_rules
 	}
 }
 
-add_rules('DROP', i_isa_fetchall("firewall_deny"));
-add_rules('ACCEPT', i_isa_fetchall("firewall_allow"));
+add_rules('DROP', i_isa_fetchall("firewall_drop"));
+add_rules('ACCEPT', i_isa_fetchall("firewall_accept"));
 
 foreach (i_isa_fetchall("firewall_append"))
 {

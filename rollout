@@ -804,7 +804,7 @@ sub set_attr
 		}
 		else
 		{
-			fatal "Invalid mode $_";
+			fatal "Invalid mode for $p->{-file}: $_";
 		}
 	}
 
@@ -920,7 +920,14 @@ sub text_install
 
 	if ($changed)
 	{
-		l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
+		my $ref = ref $p->{-flags}->{srcfn};
+		if ($ref eq "ARRAY") {
+			fatal "Multiple sources for \"$p->{-file}\":\n" . join("\n", @{$p->{-flags}->{srcfn}}) . "\n";
+		}
+		else
+		{
+			l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
+		}
 		if ($safe_mode)
 		{
 			v $p->{-text};

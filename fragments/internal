@@ -2,6 +2,14 @@
 # You can create as many files and directories as you like in
 # fragments/ Each one is loaded and run as part of the config
 # retrieval step
+# eg:
+# fragments/file1
+# fragments/file2
+# fragments/file3
+# fragments/dir1/file1
+# fragments/dir1/file2
+# fragments/dir1/file3
+# fragments/dir1/dir2/file1
 
 # Define the first machine 'demo_testserver'
 $m{demo_testserver} = {
@@ -32,6 +40,11 @@ $m{demo_testserver} = {
 			network => '192.168.4.0',
 			broadcast => '192.168.4.255',
 		},
+		dir_check => [
+		# args:
+		# filename, permissions, owner, group
+			[ '/etc/resolv.conf', 0644, 'root', 'root' ],
+		],
 	},
 };
 
