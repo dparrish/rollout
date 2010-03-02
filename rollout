@@ -405,16 +405,16 @@ sub i_ip {
 # }}}
 # Configuration lookup functions {{{
 sub c {
-  my($key, $donecache) = @_;
+  my($key, $default, $donecache) = @_;
   return wantarray ? () : undef unless $key;
   $donecache ||= {};
   my(@key) = split(/\//, $key);
   if (!$m{$key[0]}) {
-    return wantarray ? () : undef unless $m{$hostname};
+    return wantarray ? () : $default unless $m{$hostname};
     unshift @key, $hostname;
   }
   my $base = shift @key;
-  return wantarray ? () : undef if $donecache->{$base}++;
+  return wantarray ? () : $default if $donecache->{$base}++;
 
   my @ret;
   my $x = $m{$base};
@@ -426,10 +426,10 @@ sub c {
   }
   if ($m{$base}->{ISA}) {
     foreach (keys %{$m{$base}->{ISA}}) {
-      push @ret, c(join("/", $_, @key), $donecache);
+      push @ret, c(join("/", $_, @key), $default, $donecache);
     }
   }
-  return wantarray ? @ret : $ret[0];
+  return wantarray ? @ret : ($ret[0] || $default);
 }
 
 sub uniq {
