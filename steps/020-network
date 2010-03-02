@@ -1,13 +1,49 @@
 #!/usr/bin/perl -w
 # Configure the network interfaces
 # vim:tw=100 sw=2 expandtab ft=perl
-
+#
 # This is considered a dangerous operation and will always be run in safe mode
 # unless "-f network" is specified
-
+#
+# Example:
+# interfaces => {
+#   eth0 => {
+#     primary => 1,
+#     ip => '192.168.1.5',
+#     netmask => '255.255.255.0',
+#     gateway => '192.168.1.1',
+#     mac => '00:50:8d:6d:c6:0c', # If not specified, the OS will choose which int is eth0
+#     routes => {
+#       '10.0.0.1/24' => '192.168.1.1', # Route via a gateway
+#       '10.0.0.0/24' => undef,         # Route directly out this interface
+#     },
+#   },
+#   'eth0:1' => {
+#     family => 'inet6',
+#     method => 'static',
+#     ip => '2002:389:d010:7d00:251:9dff:fe6d:c60c',
+#     netmask => 64,
+#     gateway => '2002:389:d010:7d00',
+#   },
+#   eth1 => {
+#     disabled => 1, # This interface will be added but not enabled
+#     mac => '00:50:8d:6d:c6:0d',
+#   },
+#   ppp0 => {
+#     method => 'ppp',
+#     provider => 'dsl-provider', # A filename in /etc/ppp/peers
+#   },
+#   eth2 =>{
+#     dhcp => 1,
+#     mac => '00:50:8d:6d:c6:0e',
+#     hostname => 'test-client',
+#   },
+# },
+#
 # Available skip_steps items:
 #  interface - Configure any interfaces
 #  bond - Configure bonding interfaces
+#  bridge - Configure bridging interfaces
 #  routes - Add static routes
 #  resolvconf - Add name servers and resolv options
 #  hostname - Set local hostname
@@ -101,38 +137,46 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
   }
 } elsif (i_should("interface") && -f "/etc/network/interfaces") {
   # Debian style
-  my %interfaces;
+  my %interfaces = (
+    lo => {
+      _auto => 1,
+      _addrfam => 'inet',
+      _method => 'loopback',
+    },
+  );
   my %macs;
   while (my($device, $d) = each %ints) {
-    next if $d->{disabled};
-    my @c;
-    push @c, "auto $device" unless $d->{inactive};
-    push @c, "iface $device inet ". ($d->{dhcp} ? "dhcp" : "static");
+    my %x = (
+      _auto => $d->{disabled} ? 0 : 1,
+      _addrfam => $d->{family} || 'inet',
+      _method => $d->{dhcp} ? 'dhcp' : ($d->{method} || "static"),
+      _mac => $d->{mac},
+      address => $d->{ip},
+      netmask => $d->{netmask} || ($d->{ip} ? "255.255.255.0" : undef),
+      'pre-up' => [],
+      up => [],
+      'post-up' => [],
+      'pre-down' => [],
+      down => [],
+      'post-down' => [],
+    );
+    # This is a list of all the options that can be specified, according to interfaces(5)
+    $x{$_} = $d->{$_}
+      foreach qw( bootfile broadcast client gateway hostname hwaddress leasehours leasetime media
+                  metric mtu network pointopoint provider server vendor frame netnum endpoint local
+                  gateway ttl );
+    push @{$x{$_}}, ref $d->{$_} ? @{$d->{$_}} : $d->{$_}
+      foreach qw( pre-up up post-up pre-down down post-down );
 
-    if ($d->{ip}) {
-      push @c, "  address $d->{ip}";
-      push @c, "  netmask ". ($d->{netmask} || "255.255.255.0");
-      push @c, "  network $d->{network}" if $d->{network};
-      push @c, "  broadcast $d->{broadcast}" if $d->{broadcast};
-    }
-    push @c, "  gateway $d->{gateway}" if $d->{gateway};
-    if ($d->{'pre-up'}) {
-      $d->{'pre-up'} = [$d->{'pre-up'}] unless ref $d->{'pre-up'} eq 'ARRAY';
-      push @c, map { "  pre-up $_" } @{$d->{'pre-up'}};
-    }
-    if ($d->{'up'}) {
-      $d->{'up'} = [$d->{'up'}] unless ref $d->{'up'} eq 'ARRAY';
-      push @c, map { "  up $_" } @{$d->{'up'}};
-    }
-    if ($d->{bridge}) {
+    if (i_should("bridge") && $d->{bridge}) {
       # Bridging Interface
       $m{$hostname}->{packages} ||= [];
       push @{$m{$hostname}->{packages}}, "bridge-utils";
-      push @c, "      bridge_ports ". join(" ", @{$d->{bridge}});
-      push @c, "      bridge_fd 9";
-      push @c, "      bridge_hello 2";
-      push @c, "      bridge_maxage 12";
-      push @c, "      bridge_stp off ";
+      $x{bridge_ports} = join(" ", @{$d->{bridge}});
+      $x{bridge_fd} = $d->{bridge_fd} || 9;
+      $x{bridge_hello} = $d->{bridge_hello} || 2;
+      $x{bridge_maxage} = $d->{bridge_maxage} || 12;
+      $x{bridge_stp} = $d->{bridge_stp} || "off";
     }
 
     if (i_should("routes")) {
@@ -143,30 +187,45 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
           $dest = "-host $dest";
         }
         if ($gw) {
-          push @c, "  up route add -net $dest gw $gw";
+          push @{$x{up}}, "route add $dest gw $gw";
         } else {
-          push @c, "  up route add -net $dest dev $device";
+          push @{$x{up}}, "route add $dest dev $device";
         }
       }
     }
-
-    $interfaces{$device} ||= \@c;
+    $interfaces{$device} = \%x;
   }
 
   if (keys %interfaces) {
-    my $text = <<EOF;
-# This file describes the network interfaces available on your system
-# and how to activate them. For more information, see interfaces(5).
+    my $text = "# This file describes the network interfaces available on your system\n".
+               "# and how to activate them. For more information, see interfaces(5).\n";
+    while (my($name, $int) = each %interfaces) {
+      next if $int->{_disabled};
+      $text .= "\n";
+      $text .= "auto $name\n" if $int->{_auto};
+      $text .= "iface $name $int->{_addrfam} $int->{_method}\n";
+      foreach my $k (grep { defined $int->{$_} } sort keys %$int) {
+        next if $k =~ /^_/;
+        if (ref $int->{$k} eq 'ARRAY') {
+          $text .= "\t$k $_\n" foreach grep { defined $_ } @{$int->{$k}};
+        } else {
+          $text .= "\t$k $int->{$k}\n" unless ref $int->{$k};
+        }
+      }
 
-# The loopback network interface
-auto lo
-iface lo inet loopback
-
-EOF
-
-    my $alerted = 0;
-    foreach (sort keys %interfaces) {
-      $text .= join("\n", @{$interfaces{$_}}). "\n\n";
+      if ($int->{_mac} && i_should("iftab")) {
+        if (-f "/etc/udev/rules.d/70-persistent-net.rules") {
+          file_append(-file => "/etc/udev/rules.d/70-persistent-net.rules",
+                      -add => "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"?*\", ".
+                              "ATTR{address}==\"$int->{_mac}\", ATTR{dev_id}==\"0x0\", ".
+                              "ATTR{type}==\"1\", KERNEL==\"eth*\", NAME=\"$name\"",
+                      -match => qr/NAME=['"]$name['"]/) && $changes++;
+        } elsif (-f "/etc/iftab") {
+          file_append(-file => "/etc/iftab",
+                      -add => "$name mac $int->{_mac} arp 1",
+                      -match => qr/^$name/) && $changes++;
+        }
+      }
     }
 
     if (text_install("/etc/network/interfaces", $text)) {
@@ -174,19 +233,6 @@ EOF
       if (!$safe_mode) {
         w "Network configuration has been changed, you must restart the interfaces manually to ".
           "apply the changes.";
-      }
-    }
-
-    if (i_should("iftab")) {
-      if (-f "/etc/etc/udev/rules.d/70-persistent-net.rules") {
-        my $text = "";
-        $text .= "SUBSYSTEM==\"net\", DRIVERS==\"?*\", ATTRS{address}==\"$macs{$_}\", ATTRS{type}==\"1\", NAME=\"_\"\n"
-          foreach (keys %macs);
-        text_install("/etc/etc/udev/rules.d/70-persistent-net.rules", $text) && $changes++;
-      } elsif (-f "/etc/iftab") {
-        my $text = "";
-        $text .= "$_ mac $macs{$_} arp 1\n" foreach (keys %macs);
-        text_install("/etc/iftab", $text) && $changes++;
       }
     }
   }
