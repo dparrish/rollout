@@ -8,16 +8,16 @@ $m{$hostname}{_os_detection} = {
   os => 'unknown',
   distro => 'unknown',
   version => 'unknown',
-  hardware => 'unknown',
+  arch => 'unknown',
 };
 my $o = $m{$hostname}{_os_detection};
-my($sysname, $nodename, $release, $version, $machine) = POSIX::uname();
+my($sysname, $nodename, $version, $release, $arch) = POSIX::uname();
+$o->{version} = $version;
+$o->{arch} = $arch;
 
-if ($sysname =~ /Linux/i) {
+if ($^O eq 'linux') {
   $o->{type} = 'unix';
   $o->{os} = 'linux';
-  $o->{version} = "$release $version";
-  $o->{hardware} = $machine;
 
   chomp($o->{distro} = lc `lsb_release -sd` || 'unknown');
   chomp($o->{version} = lc `lsb_release -sr` || 'unknown');
@@ -28,20 +28,44 @@ if ($sysname =~ /Linux/i) {
   $o->{distro} = 'redhat' if $o->{distro} =~ /^redhat/;
   $o->{distro} = 'redhat' if $o->{distro} =~ /^(?:enterprise)?enterprise[ae]s/;
 
-} elsif ($sysname =~ /SunOS/i) {
+} elsif ($^O eq 'freebsd') {
   $o->{type} = 'unix';
-  $o->{os} = 'solaris';
-  $o->{version} = $release;
-  $o->{hardware} = $machine;
+  $o->{os} = $o->{distro} = 'freebsd';
 
-} elsif ($sysname =~ /AIX/i) {
+} elsif ($^O eq 'openbsd') {
   $o->{type} = 'unix';
-  $o->{os} = 'aix';
-  $o->{version} = $release;
-  $o->{hardware} = $machine;
+  $o->{os} = $o->{distro} = 'openbsd';
+
+} elsif ($^O eq 'sunos' || $^O eq 'solaris') {
+  $o->{type} = 'unix';
+  $o->{os} = $o->{distro} = 'solaris';
+
+} elsif ($^O eq 'aix') {
+  $o->{type} = 'unix';
+  $o->{os} = $o->{distro} = 'aix';
+
+} elsif ($^O eq 'hpux') {
+  $o->{type} = 'unix';
+  $o->{os} = $o->{distro} = 'hpux';
+
+} elsif ($^O eq 'irix') {
+  $o->{type} = 'unix';
+  $o->{os} = $o->{distro} = 'irix';
+
+} elsif ($^O eq 'darwin') {
+  $o->{type} = 'unix';
+  $o->{os} = $o->{distro} = 'macos';
+
+} elsif (lc $^O eq 'mswin32' || $^O eq 'cygwin') {
+  $o->{type} = 'windows';
+  $o->{os} = 'windows';
+  $o->{distro} = lc $^O;
+
+} elsif ($^O eq 'amigaos' || $^O eq 'beos' || $^O eq 'dos' || $^O eq 'os2') {
+  fatal "$^O! Go away!";
 
 } else {
-  w "Unknown sysname \"$sysname\", OS detection won't work";
+  w "Unknown sysname \"$^O\", OS detection won't work";
   return;
 }
 
