@@ -43,4 +43,14 @@ while (my($dest, $f) = each(%files)) {
 }
 
 my %symlinks = flatten_hash(c("symlink_check"));
-symlink_check($symlinks{$_}, $_) foreach keys %symlinks;
+while (my($dest, $src) = each %symlinks)
+{
+  if (ref $src eq 'ARRAY')
+  {
+    my @list = uniq(@$src);
+    fatal "You have multiple symlink_check definitions for $dest, you must only have one."
+      if @list > 1;
+    $src = $list[0];
+  }
+  symlink_check($src, $dest);
+}
