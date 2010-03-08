@@ -247,10 +247,16 @@ sub http_index(@) {
 # Install a whole directory's files
 sub dir_install {
   my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => {},
-                             -dir_flags => {} ];
+                             -dir_flags => {}, -mode => undef, -uid => undef, -owner => undef,
+                             -gid => undef, -group => undef, -dir_mode => undef ];
 
-  $p->{-dir_flags}->{-dir} = $p->{-dest};
-  dir_check(%{$p->{-dir_flags}});
+  $p->{-dir_flags}{-mode} ||= $p->{-dir_mode} if $p->{-dir_mode};
+  $p->{-flags}{-mode} ||= $p->{-mode} if $p->{-mode};
+  foreach (qw( uid gid owner group )) {
+    $p->{-dir_flags}{-$_} ||= $p->{-$_} if $p->{-$_};
+    $p->{-flags}{-$_} ||= $p->{-$_} if $p->{-$_};
+  }
+  dir_check(-dir => $p->{-dest}, %{$p->{-dir_flags}});
 
   return w "No source specified" unless $p->{-src};
   return w "No destination specified" unless $p->{-dest};
@@ -268,13 +274,16 @@ sub dir_install {
           v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
           dir_install(-src => "$p->{-src}/$filename",
                       -dest => "$p->{-dest}/$filename",
-                      -flags => $p->{-flags}) && $restart++;
+                      -flags => $p->{-flags},
+                      -dir_flags => $p->{-dir_flags}) && $restart++;
         }
       } else {
         v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
         my $file = http_file -url => "$p->{-src}/$filename";
         if (defined($file)) {
-          text_install("$p->{-dest}/$filename", $file, undef, $p->{-flags}) && $restart++;
+          text_install(-file => "$p->{-dest}/$filename", -text => $file, -flags => $p->{-flags})
+            && $restart++;
+          set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}}) && $restart++;
         } else {
           w "Error retrieving $p->{-src}/$filename";
         }
@@ -680,7 +689,8 @@ sub safe_write_file {
 }
 
 sub set_attr {
-  my $p = named_params @_, [ -file => undef, -mode => undef, -uid => undef, -gid => undef ];
+  my $p = named_params @_, [ -file => undef, -mode => undef, -uid => undef, -gid => undef,
+                             -owner => undef, -group => undef];
   $p->{-file} ||= $p->{-dir};
   return w "No filename given to set_attr" unless $p->{-file};
 
