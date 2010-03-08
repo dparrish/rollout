@@ -7,6 +7,7 @@
 #    nofile => 2048,
 #    maxlogins => 3,
 #    -c => 5000,    # ulimit style parameters supported
+#    stack => { soft => 8192, hard => 16384 }, # different soft and hard limits
 #  },
 #   '@group1' => {
 #    maxlogins => 15,
@@ -39,10 +40,24 @@ my %all_limits = (
 my %ulimits = flatten_hash(c("ulimit"));
 while (my($name, $l) = each(%ulimits)) {
   next unless i_should($name);
+  if ($name =~ /^[@%](.*)/) {
+    w "Setting ulimits for non-existent group $1" unless getgrnam($1);
+  } elsif ($name !~ /^[\*\%]$/) {
+    w "Setting ulimits for non-existent user $name" unless getpwnam($name);
+  }
   while (my($limit, $value) = each(%$l)) {
     $limit = $all_limits{$limit} if $all_limits{$limit};
-
-    file_append("/etc/security/limits.conf", "$name - $limit $value", qr/^$name.*\b$limit\b/);
+    if (ref $value eq 'HASH') {
+      # Hard and/or soft limits specified
+      foreach (keys %$value) {
+        file_append(-file => "/etc/security/limits.conf", -add => "$name $_ $limit $value->{$_}",
+                    -match => qr/^\Q$name\E\s+(?:$_|-)\s+\Q$limit\E\s/, -create => 1);
+      }
+    } else {
+      # Single limit specified, assume it's both
+      file_append(-file => "/etc/security/limits.conf", -add => "$name - $limit $value",
+                  -match => qr/^\Q$name\E.*\b\Q$limit\E\s/, -create => 1);
+    }
   }
 }
 
