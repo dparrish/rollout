@@ -1,5 +1,15 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+# Retrieve the configuration and install rollout locally.
+#
+# Example global configuration:
+# rollout => {
+#   require_reason => 1,               # A reason for running rollout must be given on the command line
+#   logfile => "/var/log/rollout.log", # Log each run to this file
+# },
+#
+# Available skip_steps items:
+#  local_install - Install rollout locally (in /usr/local/sbin)
 
 use vars qw( %networks );
 
@@ -62,6 +72,12 @@ if (i_should("local_install")) {
 }
 
 push @skip_steps, flatten_list(c("skip_steps"));
+if (c("rollout/require_reason") &&
+    (!$rollout_comment || $rollout_comment eq 'No comment specified')) {
+  # A comment is required, fail if none was provided
+  fatal "You must enter a reason for this rollout run on the command line."
+}
+
 sub _expand_network {
   my($network) = @_;
   return () unless $network;

@@ -36,7 +36,7 @@ use Socket;
 
 use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous
              %networks @only_steps $server_mode $server_allow $server_base
-             $server_listen );
+             $server_listen $rollout_comment );
 $rollout_url = "http://rollout.domain";
 $verbosity = 1;
 $safe_mode = 0;
@@ -48,18 +48,18 @@ my $hostname = hostname;
 my @original_argv = @ARGV;
 
 GetOptions(
-  "verbose|v"  => sub { $verbosity++ },
-  "quiet|q"  => sub { $verbosity = 0 },
-  "safe_mode|s"  => \$safe_mode,
-  "url|u=s"  => \$rollout_url,
-  "skip_step|k=s"  => \@skip_steps,
-  "hostname|h=s"  => \$hostname,
-  "only|o=s"  => \@only_steps,
-  "help|?"  => \&usage,
-  "force|f=s"  => \@force_dangerous,
-  "server"        => \$server_mode,
-  "server_allow=s"=> \$server_allow,
-  "server_base=s" => \$server_base,
+  "verbose|v"       => sub { $verbosity++ },
+  "quiet|q"         => sub { $verbosity = 0 },
+  "safe_mode|s"     => \$safe_mode,
+  "url|u=s"         => \$rollout_url,
+  "skip_step|k=s"   => \@skip_steps,
+  "hostname|h=s"    => \$hostname,
+  "only|o=s"        => \@only_steps,
+  "help|?"          => \&usage,
+  "force|f=s"       => \@force_dangerous,
+  "server"          => \$server_mode,
+  "server_allow=s"  => \$server_allow,
+  "server_base=s"   => \$server_base,
   "server_listen=s" => \$server_listen,
 ) or usage();
 
@@ -81,6 +81,9 @@ sub usage {
   print "\n";
   print "Steps which are considered dangerous are always run in safe mode, unless the -f ".
         "parameter is specified with a step name as argument.\n";
+  print "Any additional arguments will be combined to form the 'comment' which will be logged. ".
+        "This should be used to describe the reason for running rollout, ".
+        "i.e. a change tracking number or authorization\n";
   print "\n";
   exit;
 }
@@ -90,7 +93,8 @@ $hostname =~ s/\..*//;
 my(@all_steps, @steps, %steps_code, $current_step);
 use vars qw( %m );
 my $log = "";
-my $rollout_comment = join(" ", @ARGV) || "No comment specified";
+$rollout_comment = join(" ", @ARGV) || "No comment specified";
+$rollout_comment =~ s/(^['"]|['"]$)//g;
 my $pid = $$;
 
 # Logging wrappers {{{
@@ -430,7 +434,7 @@ sub c {
   for (my $i = 0; $i <= $#key; $i++) {
     last unless ref $x eq 'HASH';
     $x = $x->{$key[$i]};
-    last unless $x;
+    last unless defined($x);
     push @ret, $x if $i == $#key;
   }
   if ($m{$base}->{ISA}) {

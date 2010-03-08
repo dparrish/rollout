@@ -15,6 +15,20 @@ if (!$safe_mode) {
   my $end_time = time;
   my $duration = abs($end_time - $start_time);
 
+  # Record a log file of each rollout run
+  my $fn = c("rollout/logfile");
+  if ($fn && (my $fh = new IO::File ">>$fn"))
+  {
+    print $fh "-------------------------------------------------\n";
+    print $fh "START: ". localtime($start_time). "\n";
+    print $fh "DURATION: $duration\n";
+    print $fh "COMMENT: $rollout_comment\n";
+    print $fh "FROM: $host $port\n";
+    print $fh "HOSTNAME: $hostname\n";
+    print $fh "\n$log\n";
+    print $fh "\n";
+  }
+
   # Uncomment this section to notify a central server of each rollout
 #  eval
 #  {
