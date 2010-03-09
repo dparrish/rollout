@@ -9,9 +9,9 @@
 #   ],
 # },
 
-my %crontab = flatten_hash(c("crontab"));
+my %crontab = flatten_hash(c("$hostname/crontab"));
 map { text_install("/etc/cron.d/$_", join("\n", @{$crontab{$_}}). "\n") } keys %crontab;
 
-my %crontab_include = flatten_hash(c("crontab_include"));
+my %crontab_include = flatten_hash(c("$hostname/crontab_include"));
 map { file_append("/etc/crontab", $_, $crontab_include{$_}) } keys %crontab_include;
 

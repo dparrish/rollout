@@ -12,13 +12,13 @@
 #
 
 
-my %comment = flatten_hash(c("file_comment"));
+my %comment = flatten_hash(c("$hostname/file_comment"));
 while (my($file, $regex) = each(%comment)) {
   $regex = [ $regex ] unless ref $regex eq 'ARRAY';
   file_comment(-file => $file, -match => $regex)
 }
 
-my %uncomment = flatten_hash(c("file_uncomment"));
+my %uncomment = flatten_hash(c("$hostname/file_uncomment"));
 while (my($file, $regex) = each(%uncomment)) {
   $regex = [ $regex ] unless ref $regex eq 'ARRAY';
   file_uncomment(-file => $file, -match => $regex)

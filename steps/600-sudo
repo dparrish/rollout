@@ -25,7 +25,7 @@ EOF
 }
 
 my %sudo;
-my %input = flatten_hash(c("sudo"));
+my %input = flatten_hash(c("$hostname/sudo"));
 while(my($username, $commands) = each(%input)) {
   next unless i_should($username);
   map { $sudo{$username}->{$_}++ } @$commands;

@@ -71,8 +71,8 @@ if (i_should("local_install")) {
   }
 }
 
-push @skip_steps, flatten_list(c("skip_steps"));
-if (c("rollout/require_reason") &&
+push @skip_steps, flatten_list(c("$hostname/skip_steps"));
+if (c("$hostname/rollout/require_reason") &&
     (!$rollout_comment || $rollout_comment eq 'No comment specified')) {
   # A comment is required, fail if none was provided
   fatal "You must enter a reason for this rollout run on the command line."

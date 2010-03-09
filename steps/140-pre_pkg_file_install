@@ -16,7 +16,7 @@
 # },
 
 my %done_files;
-my %files = flatten_hash(c("pre_pkg_file_install"));
+my %files = flatten_hash(c("$hostname/pre_pkg_file_install"));
 while (my($dest, $f) = each(%files)) {
   next if $done_files{$dest}++;
   next if i_immutable_file($dest);

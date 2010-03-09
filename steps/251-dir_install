@@ -13,7 +13,7 @@
 #   },
 # },
 
-my %dir_install = flatten_hash(c("dir_install"));
+my %dir_install = flatten_hash(c("$hostname/dir_install"));
 while (my($dest, $src) = each(%dir_install)) {
   next unless i_should($dest);
   $src = { -src => $src } if ref $src ne 'HASH';

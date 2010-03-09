@@ -16,7 +16,7 @@ if (!$safe_mode) {
   my $duration = abs($end_time - $start_time);
 
   # Record a log file of each rollout run
-  my $fn = c("rollout/logfile");
+  my $fn = c("$hostname/rollout/logfile");
   if ($fn && (my $fh = new IO::File ">>$fn"))
   {
     print $fh "-------------------------------------------------\n";

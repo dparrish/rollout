@@ -3,7 +3,7 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 
 my $changed = 0;
-my %sysctl = flatten_hash(c("sysctl"));
+my %sysctl = flatten_hash(c("$hostname/sysctl"));
 while (my($item, $value) = each(%sysctl)) {
   file_append(-file => "/etc/sysctl.conf", -add => "$item = $value", -match => qr/$item/,
               -uid => 0, -gid => 0) and $changed++;

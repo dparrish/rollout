@@ -2,7 +2,7 @@
 # Extract tarballs
 # vim:tw=100 sw=2 expandtab ft=perl
 
-my %file_extract = flatten_hash(c("file_extract"));
+my %file_extract = flatten_hash(c("$hostname/file_extract"));
 while (my($source, $f) = each(%file_extract)) {
   next unless i_should($source);
   $f->{dest} ||= "/";

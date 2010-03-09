@@ -9,5 +9,5 @@
 # ],
 # queue_code => sub { l 'Hello world' },
 
-map { command(ref $_ eq 'ARRAY' ? @$_ : $_) } flatten_list(c("queue_command"));
-map { $_->() } flatten_list(c("queue_code"));
+map { command(ref $_ eq 'ARRAY' ? @$_ : $_) } flatten_list(c("$hostname/queue_command"));
+map { $_->() } flatten_list(c("$hostname/queue_code"));

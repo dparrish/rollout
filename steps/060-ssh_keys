@@ -20,7 +20,7 @@ foreach (split(/[\r\n]+/, $text)) {
 }
 
 if (i_should("user_keys")) {
-  my %users = flatten_hash(c("users"));
+  my %users = flatten_hash(c("$hostname/users"));
   while (my($username, $user) = each(%users)) {
     $keys{$username} ||= { $username => 1 };
     $keys{$username}->{$_}++ foreach (@{$user->{ssh_keys} || []});
@@ -29,7 +29,7 @@ if (i_should("user_keys")) {
 
 if (i_should("root_keys")) {
   $keys{root} ||= {};
-  $keys{root}->{$_}++ foreach uniq(flatten_list(c("ssh_keys_add")));
+  $keys{root}->{$_}++ foreach uniq(flatten_list(c("$hostname/ssh_keys_add")));
 }
 
 foreach (keys %keys) {

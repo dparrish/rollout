@@ -2,7 +2,7 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 
 return unless i_has("timezone") && i_should("timezone");
-my $zone = (flatten_list(c("timezone")))[0];
+my $zone = (flatten_list(c("$hostname/timezone")))[0];
 return unless $zone;
 
 text_install("/etc/timezone", "$zone\n");

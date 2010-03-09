@@ -37,7 +37,7 @@ my %all_limits = (
   "-x" => "locks",
 );
 
-my %ulimits = flatten_hash(c("ulimit"));
+my %ulimits = flatten_hash(c("$hostname/ulimit"));
 while (my($name, $l) = each(%ulimits)) {
   next unless i_should($name);
   if ($name =~ /^[@%](.*)/) {

@@ -8,7 +8,7 @@
 #   '/tmp/foobar2' => { mode => 0644, uid => 0, gid => 0 },
 # },
 
-my %attr = flatten_hash(c("file_attr"));
+my %attr = flatten_hash(c("$hostname/file_attr"));
 while (my($file, $attr) = each %attr) {
   $attr = { -mode => $attr } unless ref $attr eq 'HASH';
   $attr->{-file} = $file;

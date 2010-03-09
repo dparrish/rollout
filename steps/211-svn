@@ -2,7 +2,7 @@
 # svn checkout
 # vim:tw=100 sw=2 expandtab ft=perl
 
-return unless my %svn = flatten_hash(c("svn"));
+return unless my %svn = flatten_hash(c("$hostname/svn"));
 package_check("subversion");
 
 dir_check("/root/.subversion/auth/svn.simple");

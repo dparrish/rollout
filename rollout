@@ -422,10 +422,6 @@ sub c {
   return wantarray ? () : undef unless $key;
   $donecache ||= {};
   my(@key) = split(/\//, $key);
-  if (!$m{$key[0]}) {
-    return wantarray ? () : $default unless $m{$hostname};
-    unshift @key, $hostname;
-  }
   my $base = shift @key;
   return wantarray ? () : $default if $donecache->{$base}++;
 

@@ -13,7 +13,7 @@
 #   '/r2' => { path => 'fileserver:/r2', options => [ 'sync' ] },
 # },
 
-my %shares = flatten_hash(c("nfs_share"));
+my %shares = flatten_hash(c("$hostname/nfs_share"));
 if (%shares) {
   # Install NFS server packages
   package_check("nfs-common", "nfs-kernel-server") if i_distro("debian", "ubuntu");
@@ -78,7 +78,7 @@ EOF
   command("exportfs -a") if $re_export;
 }
 
-my %mounts = flatten_hash(c("nfs_mount"));
+my %mounts = flatten_hash(c("$hostname/nfs_mount"));
 if (%mounts) {
   package_check("nfs-common") if i_os("debian", "ubuntu");
 

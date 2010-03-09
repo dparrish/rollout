@@ -2,7 +2,7 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 
 my $text;
-my %logrotate = flatten_hash(c("logrotate"));
+my %logrotate = flatten_hash(c("$hostname/logrotate"));
 while (my($file, $l) = each(%logrotate)) {
   next unless i_should($file);
   $text .= "$file {\n";

@@ -19,7 +19,7 @@
 
 return unless i_has('cvs');
 
-my %cvspass = flatten_hash(c("cvspass"));
+my %cvspass = flatten_hash(c("$hostname/cvspass"));
 while (my($user, $pass) = each %cvspass) {
   file_append(-file => "/root/.cvspass", -add => "/1 $user $pass", -match => qr/ $user /,
               -uid => 0, -gid => 0, -mode => 0600, -create => 1);
@@ -30,7 +30,7 @@ file_append(-file => "/root/.cvsrc", -add => "update -d -P", -match => qr/^updat
 file_append(-file => "/root/.cvsrc", -add => "checkout -P", -match => qr/^checkout/);
 file_append(-file => "/root/.cvsrc", -add => "diff -u -b -B", -match => qr/^diff/);
 
-my %cvs = flatten_hash(c("cvs"));
+my %cvs = flatten_hash(c("$hostname/cvs"));
 package_check("cvs") if keys %cvs;
 while (my($dir, $x) = each(%cvs)) {
   w "No module specified for $dir" or next unless $x->{module};

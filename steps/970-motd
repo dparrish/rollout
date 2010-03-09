@@ -13,6 +13,6 @@ if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
 }
 
 $text .= "\nUpdated by rollout at ". localtime(time). " from $host\n\n".
-   join("\n", flatten_list(c("motd")));
+   join("\n", flatten_list(c("$hostname/motd")));
 
 text_install("/etc/motd", $text);

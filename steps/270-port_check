@@ -2,7 +2,7 @@
 # Add ports to /etc/services
 # vim:tw=100 sw=2 expandtab ft=perl
 
-my @ports = flatten_list(c("port_check"));
+my @ports = flatten_list(c("$hostname/port_check"));
 for (my $i = 0; $i < @ports; $i += 2) {
   my($name, $port, $comment) = ($ports[$i], $ports[$i + 1], undef);
   if (ref $port eq 'HASH') {

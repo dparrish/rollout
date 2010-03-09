@@ -2,4 +2,4 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 
 package_check("python-setuptools") if i_has("python");
-command("easy_install", "-q", $_) foreach flatten_list(c("python"));
+command("easy_install", "-q", $_) foreach flatten_list(c("$hostname/python"));

@@ -8,13 +8,13 @@
 #       hosts_append - Add custom hosts_append entries
 
 if (i_should("localhost")) {
-  my $domain = (flatten_list(c("domain_name")))[0] || "localdomain";
+  my $domain = (flatten_list(c("$hostname/domain_name")))[0] || "localdomain";
   file_append(-file => "/etc/hosts",
               -add => "127.0.0.1\tlocalhost.localdomain localhost $hostname.$domain $hostname",
               -match => qr/(?:^127\.0\.0\.1\s.*|.+\s$hostname.*)/);
 }
 
-my @networks = flatten_list(c("network"));
+my @networks = flatten_list(c("$hostname/network"));
 if (i_should("network") && @networks) {
   v "Looking for other machines in my networks (". join(" ", @networks). ")";
 
@@ -37,7 +37,7 @@ if (i_should("network") && @networks) {
 }
 
 if (i_should("hosts_append")) {
-  my %append = flatten_hash(c("hosts_append"));
+  my %append = flatten_hash(c("$hostname/hosts_append"));
   while (my($ip, $alias) = each %append) {
     v "Adding $ip $alias to /etc/hosts";
     file_append(-file => "/etc/hosts", -add => "$ip\t$alias",

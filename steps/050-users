@@ -9,7 +9,7 @@
 
 if (i_should("groups")) {
   # Deal with groups first
-  my %groups = flatten_hash(c("group"));
+  my %groups = flatten_hash(c("$hostname/group"));
   v "Checking groups: ". join(" ", keys %groups);
   while (my($name, $group) = each(%groups)) {
     my($gid) = getgrnam($name);
@@ -30,7 +30,7 @@ if (i_should("groups")) {
 
 # Now all the users
 if (i_should("users")) {
-  my %users = flatten_hash(c("users"));
+  my %users = flatten_hash(c("$hostname/users"));
 
   foreach my $username (keys %users) {
     v "Checking user $username";

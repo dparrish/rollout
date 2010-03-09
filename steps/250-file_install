@@ -21,7 +21,7 @@
 # },
 
 my %done_files;
-my %files = flatten_hash(c("file_install"));
+my %files = flatten_hash(c("$hostname/file_install"));
 while (my($dest, $f) = each(%files)) {
   next if $done_files{$dest}++;
   next if i_immutable_file($dest);
@@ -42,7 +42,7 @@ while (my($dest, $f) = each(%files)) {
   }
 }
 
-my %symlinks = flatten_hash(c("symlink_check"));
+my %symlinks = flatten_hash(c("$hostname/symlink_check"));
 while (my($dest, $src) = each %symlinks)
 {
   if (ref $src eq 'ARRAY')

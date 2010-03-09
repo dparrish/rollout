@@ -10,5 +10,5 @@
 #   ],
 # ],
 
-my @list = flatten_list(c("file_modify"));
+my @list = flatten_list(c("$hostname/file_modify"));
 file_modify(-file => shift @list, -modify => shift @list) while @list;

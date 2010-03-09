@@ -6,5 +6,5 @@
 #  [ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],
 # ],
 
-dir_check(@$_) foreach flatten_list(c("pre_pkg_dir_check"));
+dir_check(@$_) foreach flatten_list(c("$hostname/pre_pkg_dir_check"));
 

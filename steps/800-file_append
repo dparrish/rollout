@@ -15,4 +15,4 @@
 #   ],
 # ],
 
-file_append(@$_) foreach flatten_list(c("file_append"));
+file_append(@$_) foreach flatten_list(c("$hostname/file_append"));

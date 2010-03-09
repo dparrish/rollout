@@ -3,7 +3,7 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 use IO::Dir;
 
-my %services = flatten_hash(c("service"));
+my %services = flatten_hash(c("$hostname/service"));
 while (my($service, $s) = each(%services)) {
   v "Checking service $service";
   my $processname;
