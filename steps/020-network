@@ -81,7 +81,7 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
       userctl => "no",
       onboot => "". ($d->{inactive} ? "no" : "yes"),
     );
-    foreach (qw( gateway bootproto type stp arp multicast userctl netmask )) {
+    foreach (qw( gateway bootproto type stp arp multicast userctl netmask bridge )) {
       $c{$_} = $d->{$_} if defined $d->{$_};
     }
     $c{hwaddr} = $d->{mac} if defined $d->{mac} && i_should("iftab");
