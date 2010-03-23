@@ -38,6 +38,15 @@
 #     mac => '00:50:8d:6d:c6:0e',
 #     hostname => 'test-client',
 #   },
+#   # Bonding interface created from eth0 & eth1 which should not already be configured
+#   bond0 => {
+#     ip => '192.168.1.5',
+#     netmask => '255.255.255.0',
+#     gateway => '192.168.1.1',
+#     bond => [ 'eth0', 'eth1' ],
+#     multicast => 'no',
+#     stp => 'off',
+#   },
 # },
 # resolver => {   # Optional
 #   timeout => 5,
@@ -65,44 +74,48 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
   my %interface_files;
   while (my($device, $d) = each %ints) {
     next if $d->{disabled};
-    my @c = (
-      "DEVICE=$device",
-      "TYPE=Ethernet",
-      "IPV6INIT=". ($d->{ipv6} ? "yes" : "no"),
-      "USERCTL=no",
-      "ONBOOT=". ($d->{inactive} ? "no" : "yes"),
+    my %c = (
+      device => $device,
+      type => "Ethernet",
+      ipv6init => "". ($d->{ipv6} ? "yes" : "no"),
+      userctl => "no",
+      onboot => "". ($d->{inactive} ? "no" : "yes"),
     );
-    push @c, "GATEWAY=$d->{gateway}" if $d->{gateway};
-    push @c, "HWADDR=$d->{mac}" if $d->{mac} && i_should("iftab");
+    foreach (qw( gateway bootproto type stp arp multicast userctl netmask )) {
+      $c{$_} = $d->{$_} if defined $d->{$_};
+    }
+    $c{hwaddr} = $d->{mac} if defined $d->{mac} && i_should("iftab");
 
     if ($d->{ip}) {
-      push @c, "IPADDR=$d->{ip}", "NETMASK=". ($d->{netmask} || "255.255.255.0");
+      $c{ipaddr} = $d->{ip};
+      $c{netmask} ||= "255.255.255.0";
     } elsif ($d->{dhcp}) {
-      push @c, "BOOTPROTO=dhcp", "DHCP_HOSTNAME=". ($d->{dhcp} !~ /^1$/ ? $d->{dhcp} : $hostname),
-           "PEERDNS=yes";
+      $c{bootproto} = "dhcp";
+      $c{dhcp_hostname} = ($d->{dhcp} !~ /^1$/ ? $d->{dhcp} : $hostname),
+      $c{peerdns} = "yes";
     }
+    $interface_files{$device} ||= \%c;
 
     if (i_should("bond")) {
       if ($device =~ /^bond(\d+)/) {
-        foreach (@{$d->{slaves} || []}) {
+        foreach (@{$d->{slaves} || $d->{bond} || []}) {
           # Create a device entry for each slave interface
-          my @c = (
-            "DEVICE=$_",
-            "ONBOOT=no",
-            "TYPE=Ethernet",
-            "MASTER=$device",
-            "SLAVE=yes",
-            "PEERDNS=yes",
-            "USERCTL=no",
-            "IPV6INIT=no",
+          my %c = (
+            device => $_,
+            onboot => "no",
+            type => "Ethernet",
+            master => $device,
+            slave => "yes",
+            peerdns => "yes",
+            userctl => "no",
+            ipv6init => "no",
           );
-          push @c, "HWADDR=$m{$hostname}->{interfaces}{$_}{mac}"
-            if $m{$hostname}->{interfaces}{$_}{mac};
-          $interface_files{$_} = \@c;
+          $c{hwaddr} = $m{$hostname}->{interfaces}{$_}{mac}
+            if i_should("iftab") && $m{$hostname}->{interfaces}{$_}{mac};
+          $interface_files{$_} = \%c;
         }
       }
     }
-    $interface_files{$device} ||= \@c;
 
     if (i_should("routes")) {
       my $routes = join("", map { "$_ via $d->{routes}->{$_} dev $device\n" }
@@ -119,22 +132,24 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
   }
 
   my $alerted = 0;
-  if (i_should("bond")) {
-    if (keys %interface_files) {
+  if (keys %interface_files) {
+    if (i_should("bond")) {
       if (grep /^bond\d+$/, keys %interface_files) {
         file_append("/etc/modprobe.conf",
                     "options bonding mode=1 miimon=100 downdelay=300 updelay=300 max_bonds=4",
                     qr/^options bond(?:\d+|ing) /);
       }
-      foreach (keys %interface_files) {
-        file_append("/etc/modprobe.conf", "alias $_ bonding", qr/^alias $_/) if /^bond\d+$/;
-        if (text_install("/etc/sysconfig/network-scripts/ifcfg-$_",
-                         join("\n", @{$interface_files{$_}}). "\n", undef, { mode => 0644 })) {
-          $changes++;
-          if (!$safe_mode) {
-            w "Network configuration has been changed for $_, you must restart the interface ".
-              "manually to apply the changes.";
-          }
+    }
+    while (my($int, $c) = each %interface_files) {
+      file_append("/etc/modprobe.conf", "alias $int bonding", qr/^alias $int/)
+        if i_should("bond") && $int =~ /^bond\d+$/;
+
+      if (text_install("/etc/sysconfig/network-scripts/ifcfg-$int",
+                       join("", map { uc($_). "=$c->{$_}\n" } sort keys %$c), undef, { mode => 0644 })) {
+        $changes++;
+        if (!$safe_mode) {
+          w "Network configuration has been changed for $int, you must restart the interface ".
+            "manually to apply the changes.";
         }
       }
     }
