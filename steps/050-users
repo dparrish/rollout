@@ -16,7 +16,7 @@ if (i_should("groups")) {
     if (!$gid) {
       # Create Group
       l("Create group $name");
-      command("groupadd", ($group->{gid} ? ("-g", $group->{gid}, "-f") : ()), $_);
+      command("groupadd", ($group->{gid} ? ("-g", $group->{gid}, "-f") : ()), $name);
     } else {
       # Group exists
       if ($group->{gid} && $group->{gid} != $gid) {
