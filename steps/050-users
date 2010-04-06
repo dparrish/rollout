@@ -12,7 +12,7 @@ if (i_should("groups")) {
   my %groups = flatten_hash(c("$hostname/group"));
   v "Checking groups: ". join(" ", keys %groups);
   while (my($name, $group) = each(%groups)) {
-    my($gid) = getgrnam($name);
+    my $gid = getgrnam($name);
     if (!$gid) {
       # Create Group
       l("Create group $name");
