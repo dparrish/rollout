@@ -26,6 +26,7 @@
 use vars qw( %networks );
 
 # This first step has to be done without safe mode
+my $global_safe_mode = $safe_mode;
 local $safe_mode = 0;
 
 my $machines_data = http_file "rollout.cfg";
@@ -88,7 +89,8 @@ if (i_should("local_install")) {
 
 push @skip_steps, flatten_list(c("$hostname/skip_steps"));
 if (c("$hostname/rollout/require_reason") &&
-    (!$rollout_comment || $rollout_comment eq 'No comment specified')) {
+    (!$rollout_comment || $rollout_comment eq 'No comment specified') &&
+    !$global_safe_mode) {
   # A comment is required, fail if none was provided
   fatal "You must enter a reason for this rollout run on the command line."
 }
