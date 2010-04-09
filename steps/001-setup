@@ -25,8 +25,8 @@
 
 use vars qw( %networks );
 
-# This first step has to be done without safe mode
 my $global_safe_mode = $safe_mode;
+# This first step has to be done without safe mode
 local $safe_mode = 0;
 
 my $machines_data = http_file "rollout.cfg";
