@@ -36,7 +36,7 @@ use Socket;
 
 use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous
              %networks @only_steps $server_mode $server_allow $server_base
-             $server_listen $rollout_comment );
+             $server_listen $rollout_comment $start_time );
 $rollout_url = "http://rollout.domain";
 $verbosity = 1;
 $safe_mode = 0;
@@ -90,7 +90,7 @@ sub usage {
 
 # Global variables
 $hostname =~ s/\..*//;
-my(@all_steps, @steps, %steps_code, $current_step);
+my(@all_steps, $steps, %steps_code, $current_step);
 use vars qw( %m );
 my $log = "";
 $rollout_comment = join(" ", @ARGV) || "No comment specified";
@@ -487,41 +487,134 @@ sub flatten_list_all {
   return @output;
 }
 # }}}
+# PriorityQueue {{{
+package PriorityQueue;
+
+sub new {
+  my $self = { queue => [], prios => {} };
+  return bless $self, shift();
+}
+
+sub pop {
+  my($self) = @_;
+  return undef unless @{$self->{queue}};
+  delete($self->{prios}->{$self->{queue}->[0]});
+  return shift(@{$self->{queue}});
+}
+
+sub insert {
+  my($self, $payload, $priority, $lower, $upper) = @_;
+  $lower ||= 0;
+  $upper = scalar(@{$self->{queue}}) - 1 unless defined($upper);
+  $self->{prios}->{$payload} = $priority;
+  return push(@{$self->{queue}}, $payload) unless @{$self->{queue}};
+  return push(@{$self->{queue}}, $payload) if $priority >= $self->{prios}->{$self->{queue}->[-1]};
+  return unshift(@{$self->{queue}}, $payload) if $priority < $self->{prios}->{$self->{queue}->[0]};
+  return splice(@{$self->{queue}}, 1, 0, $payload) if @{$self->{queue}} == 2;
+  my $midpoint;
+  while ($upper >= $lower) {
+    $midpoint = ($upper + $lower) >> 1;
+    if ($priority < $self->{prios}->{$self->{queue}->[$midpoint]}) {
+      $upper = $midpoint - 1;
+      next;
+    }
+    $lower = $midpoint + 1;
+  }
+
+  splice(@{$self->{queue}}, $lower, 0, $payload);
+}
+
+sub _find_payload_pos {
+  my($self, $payload) = @_;
+  my $priority = $self->{prios}->{$payload};
+  return undef unless defined($priority);
+  my $lower = 0;
+  my $upper = @{$self->{queue}} - 1;
+  my $midpoint;
+  while ($upper >= $lower) {
+    $midpoint = ($upper + $lower) >> 1;
+    if ($priority < $self->{prios}->{$self->{queue}->[$midpoint]}) {
+      $upper = $midpoint - 1;
+      next;
+    }
+    $lower = $midpoint + 1;
+  }
+  while ($lower-- >= 0) {
+    return $lower if ($self->{queue}->[$lower] eq $payload);
+  }
+}
+
+sub delete {
+  my($self, $payload) = @_;
+  my $pos = $self->_find_payload_pos($payload);
+  return undef unless defined($pos);
+  delete($self->{prios}->{$payload});
+  splice(@{$self->{queue}}, $pos, 1);
+  return $pos;
+}
+
+sub update {
+  my($self, $payload, $new_prio) = @_;
+  my $old_prio = $self->{prios}->{$payload};
+  my $old_pos = $self->delete($payload);
+  my($upper, $lower);
+  if ($new_prio - $old_prio > 0) {
+    $upper = @{$self->{queue}};
+    $lower = $old_pos;
+  } else {
+    $upper = $old_pos;
+    $lower = 0;
+  }
+  $self->insert($payload, $new_prio, $lower, $upper);
+}
+
+package main;
+# }}}
 
 sub queue_step {
   my($step) = @_;
 
   my($x) = grep /((?:\d+-)?$step)/, @all_steps;
   fatal "Can't find step $step to queue" unless $x;
-  return if grep /$x/, @steps;
 
   v "Queueing step $x";
-  unshift @steps, $x;
+  $steps->insert($x, 0);
+}
+
+sub run_step {
+  my($filename) = @_;
+  $current_step = $filename;
+  l $filename, 0;
+  $steps_code{$filename} ||= http_file -url => "steps/$filename";
+  w "Can't retrieve step $filename" and next unless $steps_code{$filename};
+
+  eval $steps_code{$filename};
+  exit unless $pid == $$;
+  if ($@) {
+    l "------ FATAL ERROR ------";
+    l "$_" foreach ($@);
+    my($step, $last_step);
+    while (($step = $steps->pop())) {
+      $last_step = $step;
+    }
+    $steps->insert($last_step, 0) if $last_step;
+  }
 }
 
 # Adds a command to be run just before completion
 sub queue_command {
-  my($cmd) = @_;
-
-  $m{$hostname}->{queue_command} ||= [];
-  $m{$hostname}->{queue_command} = [ $m{$hostname}->{queue_command} ]
-    unless ref $m{$hostname}->{queue_command} eq 'ARRAY';
-  v "Queueing command $cmd";
-  push @{$m{$hostname}->{queue_command}}, $cmd
-    unless grep { $_ eq $cmd } @{$m{$hostname}->{queue_command}};
+  my($cmd, $prio) = @_;
+  $prio = 998 unless defined $prio;
+  v "Queueing command $cmd at $prio";
+  $steps->insert(sub { command($cmd) }, $prio);
 }
 
 # Adds a sub to be run just before completion
 sub queue_code {
-  my($sub) = @_;
-
-  $m{$hostname}->{queue_code} ||= [];
-  $m{$hostname}->{queue_code} = [ $m{$hostname}->{queue_code} ]
-    unless ref $m{$hostname}->{queue_code} eq 'ARRAY';
-
-  v "Queueing code $sub";
-  push @{$m{$hostname}->{queue_code}}, $sub
-    unless grep { $_ eq $sub } @{$m{$hostname}->{queue_code}};
+  my($sub, $prio) = @_;
+  $prio = 998 unless defined $prio;
+  v "Queueing code $sub at $prio";
+  $steps->insert($sub, $prio);
 }
 
 # File & Directory modification #{{{
@@ -545,7 +638,7 @@ sub file_append {
   }
 
   # Only compare first line for multiline $p->{-add}
-  my ($firstline) = $p->{-add};
+  my($firstline) = $p->{-add};
   $firstline =~ s/\n.*$/\n/s;
 
   unless (-f $p->{-file}) {
@@ -600,7 +693,7 @@ sub file_modify {
 
   my $fh = IO::File->new($p->{-file}) or return l "$p->{-file} unable to be opened: $!";
 
-  my ($changes, $f, %c);
+  my($changes, $f, %c);
   while (<$fh>) {
     my $original = $_;
 
@@ -629,7 +722,7 @@ sub file_modify {
 sub safe_write {
   my $p = named_params @_, [ -file => undef, -text => undef, -mode => undef, -comment => undef ];
 
-  my ($dir, $file) = $p->{-file} =~ /(?:(.*)\/)?(.*)/;
+  my($dir, $file) = $p->{-file} =~ /(?:(.*)\/)?(.*)/;
   $p->{-mode} ||= (stat($p->{-file}))[2];
   $p->{-comment} ||= "Rollout";
 
@@ -1322,30 +1415,41 @@ if (open(LOCKFILE, ">/var/run/rollout.lock")) {
     unless flock(LOCKFILE, LOCK_EX | LOCK_NB);
 }
 
-my $start_time = time;
+$start_time = time;
 @all_steps = http_index "steps";
 fatal "Can't find any steps to execute" unless @all_steps;
-@steps = sort grep(/^\d+-.*/, @all_steps);
 unshift @only_steps, "setup", "os-detection" if @only_steps;
 push @only_steps, "complete" if @only_steps;
 v "Only running steps: " . join(", ", @only_steps) if @only_steps;
 
-while (@steps) {
-  $current_step = shift @steps;
-  next if grep { $current_step =~ /^\d*-?$_$/ } @skip_steps;
-  next if @only_steps && !grep { $current_step =~ /^\d*-?$_$/ } @only_steps;
-  next if !i_should('*');
+$steps = new PriorityQueue;
+foreach (@all_steps) {
+  next unless /^(\d+)-(.*)/;
+  $steps->insert($_, int($1));
+}
 
-  l $current_step, 0;
-  $steps_code{$current_step} ||= http_file -url => "steps/$current_step";
-  w "Can't retrieve step $current_step" and next unless $steps_code{$current_step};
+# Run the first step (001-setup)
+run_step($steps->pop());
 
-  eval $steps_code{$current_step};
-  exit unless $pid == $$;
-  if ($@) {
-    l "------ FATAL ERROR ------";
-    l "$_" foreach ($@);
-    while (@steps && $steps[0] ne '999-complete') { shift @steps };
+# Allow steps to be reordered and duplicated
+my @reorder_steps = flatten_list(c("$hostname/rollout/reorder_steps"));
+for (my $i = 0; $i < @reorder_steps; $i += 2) {
+  $steps->update($reorder_steps[$i], $reorder_steps[$i + 1]);
+}
+my @copy_steps = flatten_list(c("$hostname/rollout/copy_steps"));
+for (my $i = 0; $i < @copy_steps; $i += 2) {
+  $steps->insert($copy_steps[$i], $copy_steps[$i + 1]);
+}
+
+while ((my $step = $steps->pop())) {
+  next if grep { $step =~ /^\d*-?$_$/ } @skip_steps;
+  next if @only_steps && !grep { $step =~ /^\d*-?$_$/ } @only_steps;
+  next unless i_should('*'); # skip_steps => [ 'foobar:*' ]
+
+  if (ref $step eq 'CODE') {
+    $step->();
+  } else {
+    run_step($step);
   }
 }
 

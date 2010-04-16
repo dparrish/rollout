@@ -6,7 +6,15 @@
 # rollout => {
 #   require_reason => 1,               # A reason for running rollout must be given on the command line
 #   logfile => "/var/log/rollout.log", # Log each run to this file
+#   reorder_steps => [
+#     "240-dir_check" => 140,
+#     "060-ssh_keys" => 170,
+#   ],
 # },
+# command => [
+#   200 => 'ls /tmp',
+#   210 => sub { l "Hello world" },
+# ],
 #
 # Available skip_steps items:
 #  local_install - Install rollout locally (in /usr/local/sbin)
@@ -22,7 +30,7 @@ carp "Can't retrieve rollout configuration rollout.cfg: $@" unless $machines_dat
 eval $machines_data;
 die "Can't parse rollout configuration rollout.cfg: $@" unless keys %m;
 
-get_fragments("fragments");
+get_fragments("fragments"); #{{{
 sub get_fragments {
   my ($location) = @_;
   my @fragments = http_index $location;
@@ -45,12 +53,13 @@ sub get_fragments {
     }
   }
 }
+#}}}
 
 v "Evaluated Rollout config: ". scalar(grep /^[a-z]/, keys %m). " devices, ".
   scalar(grep /^[A-Z]/, keys %m). " classes";
 fatal "Can't find configuration entry for $hostname" unless $m{$hostname};
 
-# Install rollout locally, keeping the rollout URL parameter permanently
+# Install rollout locally, keeping the rollout URL parameter permanently {{{
 if (i_should("local_install")) {
   my $rollout = http_file "/rollout";
   fatal "Can't download rollout to install locally" unless $rollout;
@@ -71,6 +80,8 @@ if (i_should("local_install")) {
   }
 }
 
+# }}}
+
 push @skip_steps, flatten_list(c("$hostname/skip_steps"));
 if (c("$hostname/rollout/require_reason") &&
     (!$rollout_comment || $rollout_comment eq 'No comment specified')) {
@@ -78,6 +89,15 @@ if (c("$hostname/rollout/require_reason") &&
   fatal "You must enter a reason for this rollout run on the command line."
 }
 
+# Look for any "command" blocks and queue the commands
+my @commands = flatten_list(c("$hostname/command"));
+for (my $i = 0; $i < @commands; $i += 2) {
+  my($prio, $cmd) = @commands[$i..$i + 1];
+  $steps->insert(ref $cmd ? $cmd : sub { command($cmd) }, $prio);
+}
+
+
+# Build networks map {{{
 sub _expand_network {
   my($network) = @_;
   return () unless $network;
@@ -128,7 +148,8 @@ foreach my $d (grep { $m{$_}->{ISA} } keys %m) {
   }
 }
 
-sub compile_perl {
+# }}}
+sub compile_perl { # {{{
   my($code) = @_;
   my $pid;
 
@@ -157,4 +178,4 @@ sub compile_perl {
 
   return wantarray ? ($?, @output) : $?;
 }
-
+# }}}
