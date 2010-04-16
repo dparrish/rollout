@@ -6,9 +6,13 @@
 # rollout => {
 #   require_reason => 1,               # A reason for running rollout must be given on the command line
 #   logfile => "/var/log/rollout.log", # Log each run to this file
-#   reorder_steps => [
+#   reorder_steps => [                 # Change the order of steps
 #     "240-dir_check" => 140,
 #     "060-ssh_keys" => 170,
+#   ],
+#   copy_steps => [                    # Run a step multiple times during the run
+#     "800-file_append" => 850,
+#     "800-file_append" => 880,
 #   ],
 # },
 # command => [
