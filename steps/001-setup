@@ -77,11 +77,12 @@ if (i_should("local_install")) {
     exit;
   }
 
-  if (text_install(-file => "/usr/local/sbin/rollout", -text => $rollout, -mode => 0750,
-                   -uid => 0, -group => 0 )) {
+  my $dest = $0;
+  $dest = "/usr/local/sbin/rollout" unless $dest =~ /^\//;
+  if (text_install(-file => $dest, -text => $rollout, -mode => 0750, -uid => 0, -group => 0 )) {
     # rollout has been updated, switch to it
-    l "rollout has been updated, re-executing";
-    exec("/usr/local/sbin/rollout", @original_argv);
+    l "Rollout has been installed to $dest, re-executing";
+    exec($dest, @original_argv);
   }
 }
 
