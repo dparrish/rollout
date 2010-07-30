@@ -8,16 +8,18 @@ use File::Spec::Functions qw( canonpath );
 use HTTP::Server::Simple::CGI;
 use HTTP::Server::Simple::Static;
 use IO::Dir;
+use IO::Socket::SSL;
 use Net::Netmask;
 use URI::Escape;
 
 use base qw( HTTP::Server::Simple::CGI );
 
 sub new {
-  my($class, $listen, $allow) = @_;
+  my($class, $listen, $allow, $ssl) = @_;
   my $self = bless(new HTTP::Server::Simple::CGI, $class);
 
   $self->{allow} = [];
+  $self->{ssl} = $ssl;
   foreach (split /,/, $allow) {
     my $net = new Net::Netmask $_;
     push @{$self->{allow}}, $net;
@@ -30,14 +32,30 @@ sub new {
   return $self;
 }
 
+sub accept_hook {
+  my($self) = @_;
+  $self->SUPER::accept_hook(@_);
+
+  if ($self->{ssl}) {
+    my $newfh = IO::Socket::SSL->start_SSL($self->stdio_handle,
+      SSL_server    => 1,
+      SSL_use_cert  => 1,
+      SSL_cert_file => 'rolloutd.pem',
+      SSL_key_file  => 'rolloutd.key',
+      SSL_verify_mode => 0x01 | 0x02,
+    ) or warn "Problem setting up SSL socket: " . IO::Socket::SSL::errstr();
+
+    $self->stdio_handle($newfh) if $newfh;
+  }
+}
 
 sub handle_request {
   my($self, $cgi) = @_;
-  my $path = canonpath(uri_unescape($cgi->path_info()));
+  my $path = canonpath("./". uri_unescape($cgi->path_info()));
 
   printf STDERR "%s %s %s [%s] \"%s %s %s\" %s %s\n",
     $cgi->remote_host(), "-", "-", scalar(localtime()), $cgi->request_method(),
-    $path, "HTTP/1.0", "200", 0;
+    $path, "HTTP/1.1", "200", 0;
 
   my $found = 0;
   foreach (@{$self->{allow}}) {
@@ -50,7 +68,7 @@ sub handle_request {
 
   my $localpath = canonpath(uri_unescape($path));
   if (-d $localpath) {
-    print "HTTP/1.0 200 OK\n";
+    print "HTTP/1.1 200 OK\n";
     print "Content-Type: text/html\n\n";
     print "<html><body><h1>Directory Listing of $path</h1>\n";
     my $dir = new IO::Dir $localpath;
@@ -64,7 +82,7 @@ sub handle_request {
   }
 
   if (!$self->serve_static($cgi, ".")) {
-    print "HTTP/1.0 404 Not Found\n\n";
+    print "HTTP/1.1 404 Not Found\n\n";
     print "The file you requested was not found\n";
   }
 }
@@ -87,6 +105,7 @@ my $daemon = 0;
 my $chroot = 0;
 my $user;
 my $group;
+my $ssl;
 my $logfile = "/dev/null";
 
 GetOptions(
@@ -99,6 +118,7 @@ GetOptions(
   "user=s"        => \$user,
   "group=s"       => \$group,
   "logfile=s"     => \$logfile,
+  "ssl"           => \$ssl,
   "help|?"        => \&usage,
 ) or usage();
 
@@ -112,6 +132,7 @@ sub usage {
   print " chroot  Chroot to the base directory\n";
   print " user    Become this user after backgrounding\n";
   print " group   Become this group after backgrounding\n";
+  print " ssl     Use SSL for communication\n";
   print "\n";
   exit;
 }
@@ -170,7 +191,7 @@ $SIG{INT} = $SIG{QUIT} = sub {
 };
 
 # By this point, we should have dropped all extra privileges and be ready to run as a daemon
-my $server = new RolloutServer($server_listen, $server_allow);
+my $server = new RolloutServer($server_listen, $server_allow, $ssl);
 $server->run();
 
 # Should never get to here, but clean up just in case

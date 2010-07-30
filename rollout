@@ -20,7 +20,6 @@
 #
 
 use strict;
-use Net::HTTP;
 use Carp;
 use Sys::Hostname;
 use Data::Dumper;
@@ -122,6 +121,74 @@ sub d($) { return v(Dumper(@_)) }
 sub v(@) { l(@_) if $verbosity > 1; return 1 }
 
 # }}}
+# RolloutHTTP package {{{
+package RolloutHTTP::HTTP;
+
+use strict;
+use Net::HTTP;
+use Data::Dumper;
+use vars qw( @ISA );
+
+eval { require IO::Socket::INET } || require IO::Socket;
+require Net::HTTP::Methods;
+
+@ISA = qw(IO::Socket::INET Net::HTTP::Methods);
+
+sub configure {
+  my($self, $cnf) = @_;
+  $self->http_configure($cnf);
+}
+
+sub http_connect {
+  my($self, $cnf) = @_;
+  $self->SUPER::configure($cnf);
+}
+
+package RolloutHTTP::HTTPS;
+
+use strict;
+use Net::HTTP;
+use Data::Dumper;
+use vars qw( @ISA );
+
+eval { require IO::Socket::SSL };
+require Net::HTTP::Methods;
+
+@ISA = qw(IO::Socket::SSL Net::HTTP::Methods);
+
+sub configure {
+  my($self, $cnf) = @_;
+  $self->http_configure($cnf);
+}
+
+sub http_connect {
+  my($self, $cnf) = @_;
+  $self->SUPER::configure($cnf);
+}
+
+package RolloutHTTP;
+
+my $cache = {};
+
+sub new {
+  my($class, %args) = @_;
+  $args{KeepAlive} = 30 unless exists($args{KeepAlive});
+  $args{HTTPVersion} = "1.1" unless exists($args{HTTPVersion});
+  my $key = "$args{Host}|$args{PeerPort}";
+  if (!$cache->{$key} || $cache->{$key}->connected) {
+    print "Creating connection to $key\n";
+    if ($args{Protocol} && $args{Protocol} eq 'https') {
+      $cache->{$key} = new RolloutHTTP::HTTPS %args
+    } else {
+      $cache->{$key} = new RolloutHTTP::HTTP %args;
+    }
+  }
+  print "Reusing connection to $key\n";
+  return $cache->{$key};
+}
+
+package main;
+# }}}
 sub named_params(\@$) { #{{{
   my($params, $defaults) = @_;
   return undef unless $params && @$params;
@@ -166,12 +233,13 @@ sub http_file(@) {
   my $file = $p->{-url};
   return undef unless $file;
 
-  my $url = $file =~ /^http:\/\// ? $file : "$rollout_url/$file";
-  my($host, $port, $path) = $url =~ /^(?:http:\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
-  my $s = Net::HTTP->new(Host => $host, PeerPort => $port || 80) || fatal $@;
+  my $url = $file =~ /^https?:\/\// ? $file : "$rollout_url/$file";
+  my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
+  my $s = RolloutHTTP->new(Host => $host, PeerPort => $port || 80, Protocol => $protocol) || fatal $@;
 
   $s->write_request(GET => $path, 'User-Agent' => "Rollout/1.0");
   my($code, $mess, %h) = $s->read_response_headers;
+  print join("", map { "$_: $h{$_}\n" } keys %h);
 
   w "GET $url returned $code" and return undef unless $code =~ /^2../;
 
