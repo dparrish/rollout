@@ -176,14 +176,15 @@ sub new {
   $args{HTTPVersion} = "1.1" unless exists($args{HTTPVersion});
   my $key = "$args{Host}|$args{PeerPort}";
   if (!$cache->{$key} || $cache->{$key}->connected) {
-    print "Creating connection to $key\n";
+    #print "Creating connection to $key\n";
     if ($args{Protocol} && $args{Protocol} eq 'https') {
       $cache->{$key} = new RolloutHTTP::HTTPS %args
     } else {
       $cache->{$key} = new RolloutHTTP::HTTP %args;
     }
-  }
+  } else {
   print "Reusing connection to $key\n";
+}
   return $cache->{$key};
 }
 
@@ -239,7 +240,6 @@ sub http_file(@) {
 
   $s->write_request(GET => $path, 'User-Agent' => "Rollout/1.0");
   my($code, $mess, %h) = $s->read_response_headers;
-  print join("", map { "$_: $h{$_}\n" } keys %h);
 
   w "GET $url returned $code" and return undef unless $code =~ /^2../;
 
