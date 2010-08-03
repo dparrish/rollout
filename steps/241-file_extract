@@ -8,7 +8,7 @@ while (my($source, $f) = each(%file_extract)) {
   $f->{dest} ||= "/";
   v "Skipping $source, $f->{check} exists" and next if $f->{check} && -e $f->{check};
 
-  $source =~ s/^rollout:/$rollout_url/;
+  $source =~ s/^rollout:/$config->{base_url}/;
 
   l "Extracting $source to $f->{dest}";
   my $fn = $source;

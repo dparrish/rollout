@@ -34,7 +34,7 @@ if (!$safe_mode) {
 #  {
 #    require URI::Escape;
 #    import URI::Escape;
-#    print http_post("$rollout_url/complete.php",
+#    print http_post("$config->{base_url}/complete.php",
 #      hostname  => $hostname,
 #      on_host    => hostname,
 #      start_time  => $start_time,

@@ -39,7 +39,8 @@ get_fragments("fragments"); #{{{
 sub get_fragments {
   my ($location) = @_;
   my @fragments = http_index $location;
-  foreach my $fragment (sort @fragments) {
+  foreach (sort { $a->{filename} cmp $b->{filename} } @fragments) {
+    my $fragment = $_->{filename};
     if ($fragment =~ /\/$/) {
       # making the output look pretty in verbose
       $fragment =~ s/\/$//;
@@ -69,7 +70,6 @@ if (i_should("local_install")) {
   my $rollout = http_file "/rollout";
   fatal "Can't download rollout to install locally" unless $rollout;
 
-  $rollout =~ s/^\$rollout_url = ".+?";/\$rollout_url = "$rollout_url";/m;
   my($rc, @output) = compile_perl($rollout);
   if ($rc) {
     l map { "$_\n" } @output;

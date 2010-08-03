@@ -21,17 +21,17 @@
 
 use strict;
 use Carp;
-use Sys::Hostname;
 use Data::Dumper;
+use Digest::MD5 qw( md5_hex );
+use English;
+use Fcntl ':flock';
+use File::Temp qw/ tempfile tempdir /;
+use Getopt::Long;
 use IO::File;
 use IO::Select;
-use Digest::MD5 qw( md5_hex );
-use Getopt::Long;
 use POSIX qw( setsid );
-use File::Temp qw/ tempfile tempdir /;
-use Fcntl ':flock';
-use English;
 use Socket;
+use Sys::Hostname;
 
 use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
              $rollout_comment $start_time );
@@ -295,10 +295,31 @@ sub http_index(@) {
   return () unless $html;
 
   my @files;
-  while ($html =~ /^(?:<tr><td valign="top">)?<img src="[^"]+" alt="[^"]+">(?:<\/td><td>| )?<a href="([^"]+)">(.+?)<\/a>(?:<\/td>| )/mg) {
-    my($filename, $name) = ($1, $2);
-    next if !$filename || $name =~ /Parent Directory/i || $filename =~ /\?/;
-    push @files, $filename;
+  if ($html =~ /Rolloutd File Listing/) {
+    # Internal rolloutd listing format
+    fatal "Invalid file list format from $p->{-url}" unless
+      $html =~ /<tr id='header'><th>(.*?)<\/th><\/tr>/;
+    my @fields = split /<\/th><th>/, $1;
+    while ($html =~ /<tr class='file'><td>(.*?)<\/td><\/tr>/mg) {
+      my @values = split /<\/td><td>/, $1;
+      my %entry = map { $fields[$_] => $values[$_] } 0..$#fields;
+      $entry{size} = int($entry{size} || "");
+      $entry{mtime} = int($entry{mtime} || "");
+      push @files, \%entry;
+    }
+  } else {
+    # Look for Apache style directory listing
+    while ($html =~ /^(?:<tr><td valign="top">)?<img src="[^"]+" alt="[^"]+">(?:<\/td><td>| )?<a href="([^"]+)">(.+?)<\/a>(?:<\/td>| )/mg) {
+      my($filename, $name) = ($1, $2);
+      next if !$filename || $name =~ /Parent Directory/i || $filename =~ /\?/;
+      push @files, {
+        filename => $filename,
+        type => ($filename =~ /\/$/) ? "directory" : "file",
+        size => 0,
+        mtime => 0,
+        checksum => "",
+      }
+    }
   }
   return @files;
 }
@@ -325,11 +346,12 @@ sub dir_install {
   if ($p->{-src} =~ /^http:\/\//) {
     my @files = http_index $p->{-src};
     return w "Couldn't retrieve index $p->{-src}" unless @files;
-    foreach my $filename (@files) {
-      if ($filename =~ /\/$/) {
+    foreach (@files) {
+      my $filename = $_->{filename};
+      if ($_->{type} eq 'directory') {
         # It's a directory
         $filename =~ s/\/$//;
-        if (!$p->{-flags}->{no_recurse}) {
+        if (!$p->{-flags}{no_recurse}) {
           v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
           dir_install(-src => "$p->{-src}/$filename",
                       -dest => "$p->{-dest}/$filename",
@@ -337,10 +359,22 @@ sub dir_install {
                       -dir_flags => $p->{-dir_flags}) && $restart++;
         }
       } else {
+        my @stat = stat("$p->{-dest}/$filename");
+        if (@stat && $_->{mtime} <= $stat[9] && $_->{size} == $stat[7]) {
+          # Same file size and newer locally, check the checksum to see if it should be skipped
+          if (@stat && $_->{checksum}) {
+            my $md5 = Digest::MD5->new->add(slurp_file("$p->{-dest}/$filename"))->hexdigest;
+            if ($md5 && $_->{checksum} && $_->{checksum} eq $md5) {
+              v "Skipping $p->{-src}/$filename -> $p->{-dest}/$filename, it's the same";
+              next;
+            }
+          }
+        }
         v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
         my $file = http_file -url => "$p->{-src}/$filename";
         if (defined($file)) {
-          text_install(-file => "$p->{-dest}/$filename", -text => $file, -flags => $p->{-flags})
+          text_install(-file => "$p->{-dest}/$filename", -text => $file, -flags => $p->{-flags},
+                       -skip_checksum => 1)
             && $restart++;
           set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}}) && $restart++;
         } else {
@@ -929,7 +963,8 @@ sub set_attr {
 }
 
 sub text_install {
-  my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {} ];
+  my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {},
+                             -skip_checksum => undef ];
   my $changed = 1;
 
   # Create containing directory if it doesn't exist
@@ -942,7 +977,7 @@ sub text_install {
   # If they are the same, don't bother ..
   #   and they can't have the same md5 if they're different sizes ..
 
-  if (-f $p->{-file} and -s _ == length($p->{-text})) {
+  if (!$p->{-skip_checksum} and -f $p->{-file} and -s _ == length($p->{-text})) {
     my $src_md5 = Digest::MD5->new->add($p->{-text})->hexdigest;
     my $dst_md5 = Digest::MD5->new->add(slurp_file $p->{-file})->hexdigest;
     $changed = 0 if $src_md5 eq $dst_md5;
@@ -1468,8 +1503,9 @@ v "Only running steps: " . join(", ", @only_steps) if @only_steps;
 
 $steps = new PriorityQueue;
 foreach (@all_steps) {
-  next unless /^(\d+)-(.*)/;
-  $steps->insert($_, int($1));
+  next if $_->{type} eq 'directory';
+  next unless $_->{filename} =~ /^(\d+)-(.*)/;
+  $steps->insert($_->{filename}, int($1));
 }
 
 # Run the first step (001-setup)
