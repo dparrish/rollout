@@ -1,5 +1,7 @@
 syntax: glob
 *~
-
 syntax: glob
 .*.swp
+
+syntax: glob
+.rolloutd_checksums
