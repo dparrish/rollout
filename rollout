@@ -33,11 +33,15 @@ use POSIX qw( setsid );
 use Socket;
 use Sys::Hostname;
 
-use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
-             $rollout_comment $start_time );
-$rollout_url = "http://rollout.domain";
+use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
+             $rollout_comment $start_time $configfile $configdir %m );
 $verbosity = 1;
 $safe_mode = 0;
+$configdir = "/etc/rollout";
+$config = {
+  # This is the default configuration
+  base_url => "http://rollout.domain",
+};
 my $hostname = hostname;
 my @original_argv = @ARGV;
 
@@ -45,12 +49,14 @@ GetOptions(
   "verbose|v"       => sub { $verbosity++ },
   "quiet|q"         => sub { $verbosity = 0 },
   "safe_mode|s"     => \$safe_mode,
-  "url|u=s"         => \$rollout_url,
+  "url|u=s"         => \$config->{base_url},
   "skip_step|k=s"   => \@skip_steps,
   "hostname|h=s"    => \$hostname,
   "only|o=s"        => \@only_steps,
   "help|?"          => \&usage,
   "force|f=s"       => \@force_dangerous,
+  "configdir=s"     => \$configdir,
+  "configfile=s"    => \$configfile,
 ) or usage();
 
 sub usage {
@@ -59,11 +65,13 @@ sub usage {
   print " quiet|q        Don't print anything except fatal errors\n";
   print " safe_mode|s    Show what will be changed, but don't actually do anything\n";
   print " url|u          Set the base Rollout HTTP url\n";
-  print " skip_step|k=s  Specify a step to be skipped, may be specified multiple times\n";
-  print " hostname|h=s   Rollout configuration for a different host. If -f network is provided, ".
+  print " skip_step|k    Specify a step to be skipped, may be specified multiple times\n";
+  print " hostname|h     Rollout configuration for a different host. If -f network is provided, ".
                          "the hostname will be changed\n";
-  print " only|o=s       Only run a specific step (can be specified multiple times)\n";
-  print " force|f=s      Force a dangerous step to be run\n";
+  print " only|o         Only run a specific step (can be specified multiple times)\n";
+  print " force|f        Force a dangerous step to be run\n";
+  print " configdir      Directory to store configuration files\n";
+  print " configfile     File to store configuration (inside configdir unless full path)\n";
   print "\n";
   print "Steps which are considered dangerous are always run in safe mode, unless the -f ".
         "parameter is specified with a step name as argument.\n";
@@ -77,11 +85,31 @@ sub usage {
 # Global variables
 $hostname =~ s/\..*//;
 my(@all_steps, $steps, %steps_code, $current_step);
-use vars qw( %m );
+$configfile ||= "$configdir/rollout.cfg";
+$configfile = "$configdir/$configfile" unless $configfile =~ /^\//;
 my $log = "";
 $rollout_comment = join(" ", @ARGV) || "No comment specified";
 $rollout_comment =~ s/(^['"]|['"]$)//g;
 my $pid = $$;
+
+sub read_config {
+  return unless my $fh = new IO::File $configfile, "r";
+  my $newconfig = {%$config};
+  while (<$fh>) {
+    s/[\r\n]+$//;
+    next if /^\s*#/;
+    my($key, $value) = split /\s*=\s*/, $_, 2;
+    next unless $key && $value;
+    $newconfig->{$key} = $value;
+  }
+  $fh->close;
+  return $config = $newconfig;
+}
+
+sub write_config {
+  text_install(-file => $configfile,
+               -text => join("", map { "$_ = $config->{$_}\n" } keys %$config));
+ }
 
 # Logging wrappers {{{
 sub l(@) {
@@ -234,9 +262,10 @@ sub http_file(@) {
   my $file = $p->{-url};
   return undef unless $file;
 
-  my $url = $file =~ /^https?:\/\// ? $file : "$rollout_url/$file";
+  my $url = $file =~ /^https?:\/\// ? $file : "$config->{base_url}/$file";
   my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
-  my $s = RolloutHTTP->new(Host => $host, PeerPort => $port || 80, Protocol => $protocol) || fatal $@;
+  my $s = RolloutHTTP->new(Host => $host, PeerPort => $port || 80, Protocol => $protocol) 
+    or fatal $@;
 
   $s->write_request(GET => $path, 'User-Agent' => "Rollout/1.0");
   my($code, $mess, %h) = $s->read_response_headers;
@@ -341,7 +370,7 @@ sub dir_install {
   return w "No source specified" unless $p->{-src};
   return w "No destination specified" unless $p->{-dest};
 
-  $p->{-src} =~ s/^rollout:/$rollout_url/;
+  $p->{-src} =~ s/^rollout:/$config->{base_url}/;
   my $restart = 0;
   if ($p->{-src} =~ /^http:\/\//) {
     my @files = http_index $p->{-src};
@@ -1013,7 +1042,7 @@ sub file_install {
   my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
   my $srctext = '';
 
-  $p->{-src} =~ s/^rollout:/$rollout_url/;
+  $p->{-src} =~ s/^rollout:/$config->{base_url}/;
   if ($p->{-src} =~ /^http:\/\//) {
     local $_;
     $_ = http_file -url => $p->{-src};
@@ -1278,7 +1307,7 @@ sub package_check {
   }
 
   foreach my $url (@packages) {
-    $url =~ s/^rollout:/$rollout_url/;
+    $url =~ s/^rollout:/$config->{base_url}/;
     next unless $url =~ /^(http:\/\/[^\/]+).*\/([a-z0-9\._\-]+\.(?:deb|rpm))/i;
 
     my($package, $filename) = ($2, $2);
@@ -1495,6 +1524,7 @@ if (open(LOCKFILE, ">/var/run/rollout.lock")) {
 }
 
 $start_time = time;
+read_config();
 @all_steps = http_index "steps";
 fatal "Can't find any steps to execute" unless @all_steps;
 unshift @only_steps, "setup", "os-detection" if @only_steps;
@@ -1533,6 +1563,7 @@ while ((my $step = $steps->pop())) {
   }
 }
 
+write_config();
 close(LOCKFILE);
 unlink("/var/run/rollout.lock");
 
