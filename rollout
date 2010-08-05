@@ -25,7 +25,6 @@ use Data::Dumper;
 use Digest::MD5 qw( md5_hex );
 use English;
 use Fcntl ':flock';
-use File::Temp qw/ tempfile tempdir /;
 use Getopt::Long;
 use IO::File;
 use IO::Select;
@@ -34,7 +33,8 @@ use Socket;
 use Sys::Hostname;
 
 use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
-             $rollout_comment $start_time $configfile $configdir %m );
+             $rollout_comment $start_time $configfile $configdir $VERSION %m );
+$VERSION = "1.1";
 $verbosity = 1;
 $safe_mode = 0;
 $configdir = "/etc/rollout";
@@ -143,6 +143,7 @@ sub fatal(@) {
   print "$_\n" foreach (@_);
   print "Current Step: $current_step\n" if $current_step;
   exit 1 if $current_step;
+  return 1;
 }
 
 sub d($) { return v(Dumper(@_)) }
@@ -701,6 +702,7 @@ sub queue_step {
 
 sub run_step {
   my($filename) = @_;
+  fatal("Attempt to run a step with no filename") and return unless $filename;
   $current_step = $filename;
   l $filename, 0;
   $steps_code{$filename} ||= http_file -url => "steps/$filename";
@@ -1526,7 +1528,7 @@ if (open(LOCKFILE, ">/var/run/rollout.lock")) {
 $start_time = time;
 read_config();
 @all_steps = http_index "steps";
-fatal "Can't find any steps to execute" unless @all_steps;
+fatal("Can't find any steps to execute") and exit(1) unless @all_steps;
 unshift @only_steps, "setup", "os-detection" if @only_steps;
 push @only_steps, "complete" if @only_steps;
 v "Only running steps: " . join(", ", @only_steps) if @only_steps;
