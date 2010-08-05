@@ -17,9 +17,14 @@ while (my($source, $f) = each(%file_extract)) {
   w "/tmp/$fn already exists, refusing to overwrite" and next if -f "/tmp/$fn";
 
   if (-x "/usr/bin/wget") {
-    system("wget", $source, "-O", "/tmp/$fn") unless $safe_mode;
+    system("/usr/bin/wget", $source, "-O", "/tmp/$fn") unless $safe_mode;
   } else {
-    http_file -url => $source, -dest => "/tmp/$fn" unless $safe_mode;
+    try {
+      http_file(-url => $source, -dest => "/tmp/$fn") unless $safe_mode;
+    } catch HttpException with {
+      w "Couldn't install $f->{dest} from $source: ". shift();
+      next;
+    };
   }
 
   dir_check($f->{dest}) unless $f->{dest} eq '/';

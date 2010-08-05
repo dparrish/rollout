@@ -11,13 +11,16 @@ return unless i_has("user") || i_has("ssh_keys_add");
 my %keys;
 my %all_keys;
 
-return l "Can't get authorized_keys file"
-  unless my $text = http_file "conf/authorized_keys";
-foreach (split(/[\r\n]+/, $text)) {
-  my($key, $name) = $_ =~ /(.*) ([\w\@\-_]+)$/;
-  $all_keys{$name} ||= "";
-  $all_keys{$name} .= "$_\n";
-}
+try {
+  my $text = http_file "conf/authorized_keys";
+  foreach (split(/[\r\n]+/, $text)) {
+    my($key, $name) = $_ =~ /(.*) ([\w\@\-_]+)$/;
+    $all_keys{$name} ||= "";
+    $all_keys{$name} .= "$_\n";
+  }
+} catch HttpException with {
+  return l "Can't get authorized_keys file: ". shift();
+};
 
 if (i_should("user_keys")) {
   my %users = flatten_hash(c("$hostname/users"));

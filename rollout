@@ -22,13 +22,14 @@
 use strict;
 use Carp;
 use Data::Dumper;
-use Digest::MD5 qw( md5_hex );
+use Digest::MD5 'md5_hex';
 use English;
+use Error ':try';
 use Fcntl ':flock';
 use Getopt::Long;
 use IO::File;
 use IO::Select;
-use POSIX qw( setsid );
+use POSIX 'setsid';
 use Socket;
 use Sys::Hostname;
 
@@ -128,6 +129,28 @@ sub d($) { return v(Dumper(@_)) if $verbosity >= 3; return 1 };
 sub v(@) { l(@_) if $verbosity >= 2; return 1 }
 
 # }}}
+# Exceptions {{{
+
+package RolloutException;
+use base 'Error';
+use overload ('""' => 'stringify');
+sub new {
+  my($self) = shift;
+  my $text = "". shift;
+  my @args = ();
+  local $Error::Depth = $Error::Depth + 1;
+  local $Error::Debug = 1;
+  $self->SUPER::new(-text => $text, @args);
+}
+1;
+
+package HttpException;
+use base 'RolloutException';
+1;
+
+package main;
+
+# }}}
 # RolloutHTTP package {{{
 
 package RolloutHTTP;
@@ -191,9 +214,8 @@ sub get {
       $len += length($chunk);
     });
     if (!$res || !$res->is_success) {
-      throw HttpException($res->status_line);
       $self->{message} = $res->status_line;
-      return undef;
+      throw HttpException($res->status_line);
     } else {
       $self->{message} = "OK";
     }
@@ -203,7 +225,7 @@ sub get {
     my $req = new Net::HTTP Host => $host, PeerPort => $port || 80, Protocol => $protocol;
     if (!$req) {
       $self->{message} = $@;
-      return undef;
+      throw HttpException($@);
     }
 
     $req->write_request(GET => $path, 'User-Agent' => "Rollout/$::VERSION");
@@ -299,12 +321,11 @@ sub http_file(@) {
   $req->get($url, sub {
     my($chunk) = @_;
     if ($first) {
-      w "GET $url returned $req->{code}" and return undef unless $req->is_success;
+      throw HttpException "GET $url returned $req->{code}" unless $req->is_success;
       if ($p->{-dest}) {
         v "Writing to $p->{-dest}.$$";
         if (!($fh = new IO::File ">$p->{-dest}.$$")) {
-          w "Can't write to $p->{-dest}.$$: $!";
-          return undef;
+          throw HttpException "Can't write to $p->{-dest}.$$: $!";
         }
       }
       $first = 0;
@@ -313,22 +334,22 @@ sub http_file(@) {
       if (!$fh->write($chunk)) {
         $fh->close;
         unlink("$p->{-dest}.$$");
+        throw IOException "Error writing to $p->{-dest}.$$: $!";
       }
       $res += length($chunk);
     } else {
       $res .= $chunk;
     }
-    return 1;
-  }) or w "Couldn't retrieve $url: ". $req->error_message;
+    return $res;
+  });
 
   if ($p->{-dest} && $fh) {
     $fh->close;
     if (-f $p->{-dest} && -s $p->{-dest} && !-s "$p->{-dest}.$$") {
-      w "Not overwriting existing file with nothing";
       unlink "$p->{-dest}.$$";
-      return undef;
+      throw HttpException "Not overwriting existing file with nothing";
     }
-    w "Unable to rename $p->{-dest}.$$ to $p->{-dest}" unless
+    throw IOException "Unable to rename $p->{-dest}.$$ to $p->{-dest}" unless
       rename("$p->{-dest}.$$", $p->{-dest});
   }
 
@@ -354,8 +375,8 @@ sub http_index(@) {
     while ($html =~ /<tr class='file'><td>(.*?)<\/td><\/tr>/mg) {
       my @values = split /<\/td><td>/, $1;
       my %entry = map { $fields[$_] => $values[$_] } 0..$#fields;
-      $entry{size} = int($entry{size} || "");
-      $entry{mtime} = int($entry{mtime} || "");
+      $entry{size} = int($entry{size} || 0);
+      $entry{mtime} = int($entry{mtime} || 0);
       push @files, \%entry;
     }
   } else {
@@ -395,8 +416,13 @@ sub dir_install {
   $p->{-src} =~ s/^rollout:/$config->{base_url}/;
   my $restart = 0;
   if ($p->{-src} =~ /^http:\/\//) {
-    my @files = http_index $p->{-src};
-    return w "Couldn't retrieve index $p->{-src}" unless @files;
+    my @files;
+    try {
+      @files = http_index $p->{-src};
+    } catch HttpException with {
+      return w "Couldn't retrieve index $p->{-src}: ". shift();
+    };
+    return w "Empty index $p->{-src}" unless @files;
     foreach (@files) {
       my $filename = $_->{filename};
       if ($_->{type} eq 'directory') {
@@ -422,15 +448,15 @@ sub dir_install {
           }
         }
         v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
-        my $file = http_file -url => "$p->{-src}/$filename";
-        if (defined($file)) {
+        try {
+          my $file = http_file -url => "$p->{-src}/$filename";
           text_install(-file => "$p->{-dest}/$filename", -text => $file, -flags => $p->{-flags},
                        -skip_checksum => 1)
             && $restart++;
           set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}}) && $restart++;
-        } else {
-          w "Error retrieving $p->{-src}/$filename";
-        }
+        } catch HttpException with {
+          w "Error retrieving $p->{-src}/$filename: ". shift();
+        };
       }
     }
   }
@@ -725,20 +751,22 @@ sub run_step {
   fatal("Attempt to run a step with no filename") and return unless $filename;
   $current_step = $filename;
   l $filename, 0;
-  $steps_code{$filename} ||= http_file -url => "steps/$filename";
-  w "Can't retrieve step $filename" and next unless $steps_code{$filename};
-
-  eval $steps_code{$filename};
-  exit unless $pid == $$;
-  if ($@) {
-    l "------ FATAL ERROR ------";
-    l "$_" foreach ($@);
-    my($step, $last_step);
-    while (($step = $steps->pop())) {
-      $last_step = $step;
+  try {
+    $steps_code{$filename} ||= http_file -url => "steps/$filename";
+    eval $steps_code{$filename};
+    exit unless $pid == $$;
+    if ($@) {
+      l "------ FATAL ERROR ------";
+      l "$_" foreach ($@);
+      my($step, $last_step);
+      while (($step = $steps->pop())) {
+        $last_step = $step;
+      }
+      $steps->insert($last_step, 0) if $last_step;
     }
-    $steps->insert($last_step, 0) if $last_step;
-  }
+  } catch HttpException with {
+    w "Can't retrieve step $filename: ". shift();
+  };
 }
 
 # Adds a command to be run just before completion
@@ -1063,17 +1091,20 @@ sub file_install {
   my $p = named_params @_, [ -file => undef, -src => undef, -cmd => undef, -flags => {},
                              -modify => [] ];
   my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
-  my $srctext = '';
+  my $srctext;
 
   $p->{-src} =~ s/^rollout:/$config->{base_url}/;
   if ($p->{-src} =~ /^http:\/\//) {
-    local $_;
-    $_ = http_file -url => $p->{-src};
-    return w "Couldn't retrieve $p->{-src}" unless $_;
-    foreach my $e (@expr) {
-      eval $e;
-    }
-    $srctext = $_;
+    try {
+      local $_;
+      $_ = http_file -url => $p->{-src};
+      foreach my $e (@expr) {
+        eval $e;
+      }
+      $srctext = $_;
+    } catch HttpException with {
+      w "Couldn't retrieve $p->{-src}: ". shift();
+    };
   } elsif (-s $p->{-src}) {
     if (@expr) {
       my $fh = IO::File->new($p->{-src}) or fatal "can't open $p->{-src}: $!";
@@ -1091,6 +1122,7 @@ sub file_install {
     }
   }
 
+  return unless defined $srctext;
   $p->{-flags}{srcfn} ||= $p->{-src};
   $p->{-text} = $srctext;
   return text_install($p);
@@ -1344,26 +1376,26 @@ sub package_check {
     if ($filename =~ /\.rpm$/) {
       command("rpm", "-U", $url) && $changes++;
     } else {
-      my $data = http_file -url => $url;
-      if (!$data) {
-        w "Couldn't retrieve $url";
-        next;
-      }
-      if ((my $fh = new IO::File ">/tmp/$filename")) {
-        print $fh $data;
-        close($fh);
+      try {
+        my $data = http_file -url => $url;
+        if ((my $fh = new IO::File ">/tmp/$filename")) {
+          print $fh $data;
+          close($fh);
 
-        if ($filename =~ /\.deb$/) {
-          command("dpkg", "-i", "/tmp/$filename") && $changes++;
+          if ($filename =~ /\.deb$/) {
+            command("dpkg", "-i", "/tmp/$filename") && $changes++;
+          } else {
+            w "Unknown package type for $url";
+          }
+
+          unlink("/tmp/$filename");
         } else {
-          w "Unknown package type for $url";
+          w "Couldn't write to /tmp/$filename: $!";
+          next;
         }
-
-        unlink("/tmp/$filename");
-      } else {
-        w "Couldn't write to /tmp/$filename: $!";
-        next;
-      }
+      } catch HttpException with {
+        w "Couldn't retrieve package from $url". shift();
+      };
     }
   }
 
@@ -1573,9 +1605,12 @@ Getopt::Long::GetOptionsFromArray([@ARGV],
   "help|?"          => \&usage,
 ) or usage();
 
-
-@all_steps = http_index "steps";
-fatal("Can't find any steps to execute") and exit(1) unless @all_steps;
+try {
+  @all_steps = http_index "steps";
+} catch HttpException with {
+  fatal("Can't find any steps to execute: ". shift());
+  exit(1);
+};
 unshift @only_steps, "setup", "os-detection" if @only_steps;
 push @only_steps, "complete" if @only_steps;
 v "Only running steps: " . join(", ", @only_steps) if @only_steps;
