@@ -697,7 +697,6 @@ sub update {
 }
 
 package main;
-# }}}
 
 sub queue_step {
   my($step) = @_;
@@ -746,6 +745,7 @@ sub queue_code {
   $steps->insert($sub, $prio);
 }
 
+# }}}
 # File & Directory modification #{{{
 
 sub slurp_file($) {
@@ -1376,6 +1376,66 @@ sub package_uncheck {
   }
 }
 #}}}
+# Revision Control Systems checkouts {{{
+
+sub cvs_checkout {
+  my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef,
+                             -cmd => undef ];
+  return w "Not enough parameters specified to cvs_checkout"
+    unless $p->{-dest} && $p->{-module} && $p->{repo};
+
+  v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
+  if (-d $p->{-dest} && !-d "$p->{-dest}/CVS") {
+    w "$p->{-dest} exists but is not a CVS checkout";
+    return 0;
+  }
+  if (-d $p->{-dest}) {
+    chdir $p->{-dest};
+    command("cvs", "-q", "update", "-dPA", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
+    command($p->{-cmd}) if $p->{-cmd};
+    return 1;
+  } else {
+    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
+    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
+    dir_check($base);
+    return w "Checkout to $p->{-dest} failed" unless -d $base;
+    chdir $base;
+    command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
+            ($p->{-rev} ? ("-r", $p->{-rev}) : ()), "-d", $newdir, $p->{-module});
+    chdir $p->{-module} && command($p->{-cmd}) if $p->{-cmd};
+    return 1;
+  }
+  return 0;
+}
+
+sub svn_checkout {
+  my $p = named_params @_, [ -dest => undef, -url => undef, -rev => undef, -cmd => undef ];
+  return w "Not enough parameters specified to svn_checkout" unless $p->{-dest} && $p->{-url};
+
+  v "svn checkout $p->{-dest}:". ($p->{-rev} || "HEAD");
+  if (-d $p->{-dest} && !-d "$p->{-dest}/.svn") {
+    w "$p->{-dest} exists but is not a svn checkout";
+    return 0;
+  }
+  if (-d $p->{-dest}) {
+    chdir $p->{-dest};
+    command("svn", "update", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
+    command($p->{-cmd}) if $p->{-cmd};
+    return 1;
+  } else {
+    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
+    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
+    dir_check($base);
+    return w "Checkout to $p->{-dest} failed" unless -d $base;
+    chdir $base;
+    command("svn", "checkout", ($p->{-rev} ? ("-r", $p->{-rev}) : ()), $p->{-url}, $newdir);
+    chdir $newdir && command($p->{-cmd}) if $p->{-cmd};
+    return 1;
+  }
+  return 0;
+}
+
+# }}}
 
 # An optional hashref as the last argument can set custom messages:
 #   failure - print this if command fails.
@@ -1462,63 +1522,6 @@ sub command {
 
   # emulate a return of system()
   return $?;
-}
-
-sub cvs_checkout {
-  my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef,
-                             -cmd => undef ];
-  return w "Not enough parameters specified to cvs_checkout"
-    unless $p->{-dest} && $p->{-module} && $p->{repo};
-
-  v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
-  if (-d $p->{-dest} && !-d "$p->{-dest}/CVS") {
-    w "$p->{-dest} exists but is not a CVS checkout";
-    return 0;
-  }
-  if (-d $p->{-dest}) {
-    chdir $p->{-dest};
-    command("cvs", "-q", "update", "-dPA", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
-    command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  } else {
-    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
-    dir_check($base);
-    return w "Checkout to $p->{-dest} failed" unless -d $base;
-    chdir $base;
-    command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
-            ($p->{-rev} ? ("-r", $p->{-rev}) : ()), "-d", $newdir, $p->{-module});
-    chdir $p->{-module} && command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  }
-  return 0;
-}
-
-sub svn_checkout {
-  my $p = named_params @_, [ -dest => undef, -url => undef, -rev => undef, -cmd => undef ];
-  return w "Not enough parameters specified to svn_checkout" unless $p->{-dest} && $p->{-url};
-
-  v "svn checkout $p->{-dest}:". ($p->{-rev} || "HEAD");
-  if (-d $p->{-dest} && !-d "$p->{-dest}/.svn") {
-    w "$p->{-dest} exists but is not a svn checkout";
-    return 0;
-  }
-  if (-d $p->{-dest}) {
-    chdir $p->{-dest};
-    command("svn", "update", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
-    command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  } else {
-    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
-    dir_check($base);
-    return w "Checkout to $p->{-dest} failed" unless -d $base;
-    chdir $base;
-    command("svn", "checkout", ($p->{-rev} ? ("-r", $p->{-rev}) : ()), $p->{-url}, $newdir);
-    chdir $newdir && command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  }
-  return 0;
 }
 
 sub expand_network($) {
