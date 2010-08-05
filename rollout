@@ -43,44 +43,15 @@ $config = {
   base_url => "http://rollout.domain",
 };
 my $hostname = hostname;
-my @original_argv = @ARGV;
 
-GetOptions(
-  "verbose|v"       => sub { $verbosity++ },
-  "quiet|q"         => sub { $verbosity = 0 },
-  "safe_mode|s"     => \$safe_mode,
-  "url|u=s"         => \$config->{base_url},
-  "skip_step|k=s"   => \@skip_steps,
-  "hostname|h=s"    => \$hostname,
-  "only|o=s"        => \@only_steps,
-  "help|?"          => \&usage,
-  "force|f=s"       => \@force_dangerous,
+# Parse some initial options
+Getopt::Long::Configure(qw( default bundling auto_version auto_help pass_through ));
+Getopt::Long::GetOptionsFromArray([@ARGV],
   "configdir=s"     => \$configdir,
   "configfile=s"    => \$configfile,
-) or usage();
-
-sub usage {
-  print "Command line arguments are:\n";
-  print " verbose|v      Increase verbosity\n";
-  print " quiet|q        Don't print anything except fatal errors\n";
-  print " safe_mode|s    Show what will be changed, but don't actually do anything\n";
-  print " url|u          Set the base Rollout HTTP url\n";
-  print " skip_step|k    Specify a step to be skipped, may be specified multiple times\n";
-  print " hostname|h     Rollout configuration for a different host. If -f network is provided, ".
-                         "the hostname will be changed\n";
-  print " only|o         Only run a specific step (can be specified multiple times)\n";
-  print " force|f        Force a dangerous step to be run\n";
-  print " configdir      Directory to store configuration files\n";
-  print " configfile     File to store configuration (inside configdir unless full path)\n";
-  print "\n";
-  print "Steps which are considered dangerous are always run in safe mode, unless the -f ".
-        "parameter is specified with a step name as argument.\n";
-  print "Any additional arguments will be combined to form the 'comment' which will be logged. ".
-        "This should be used to describe the reason for running rollout, ".
-        "i.e. a change tracking number or authorization\n";
-  print "\n";
-  exit;
-}
+  "quiet|q"         => sub { $verbosity = 0 },
+  "verbose|v"       => sub { $verbosity++ },
+);
 
 # Global variables
 $hostname =~ s/\..*//;
@@ -114,7 +85,7 @@ sub write_config {
 # Logging wrappers {{{
 sub l(@) {
   my($text, $indent) = @_;
-  return unless $verbosity;
+  return unless $verbosity && defined $text;
   $indent = 2 unless defined $indent;
   $indent = " " x $indent;
   my $newtext = $text;
@@ -140,14 +111,18 @@ sub w(@) {
 
 sub fatal(@) {
   print "------ FATAL ERROR ------\n";
-  print "$_\n" foreach (@_);
+  if ($verbosity >= 3) {
+    carp "$_\n" foreach (grep { defined $_ } @_);
+  } else {
+    print "$_\n" foreach (grep { defined $_ } @_);
+  }
   print "Current Step: $current_step\n" if $current_step;
   exit 1 if $current_step;
   return 1;
 }
 
-sub d($) { return v(Dumper(@_)) }
-sub v(@) { l(@_) if $verbosity > 1; return 1 }
+sub d($) { return v(Dumper(@_)) if $verbosity >= 3; return 1 };
+sub v(@) { l(@_) if $verbosity >= 2; return 1 }
 
 # }}}
 # RolloutHTTP package {{{
@@ -1527,6 +1502,22 @@ if (open(LOCKFILE, ">/var/run/rollout.lock")) {
 
 $start_time = time;
 read_config();
+
+# Read the rest of the options
+Getopt::Long::Configure(qw( default bundling auto_version auto_help ));
+Getopt::Long::GetOptionsFromArray([@ARGV],
+  "configdir=s"     => \$configdir,
+  "configfile=s"    => \$configfile,
+  "force|f=s"       => \@force_dangerous,
+  "hostname|h=s"    => \$hostname,
+  "only|o=s"        => \@only_steps,
+  "quiet|q"         => sub {},
+  "safe_mode|s"     => \$safe_mode,
+  "skip_step|k=s"   => \@skip_steps,
+  "url|u=s"         => \$config->{base_url},
+  "verbose|v"       => sub {},
+) or exit(1);
+
 @all_steps = http_index "steps";
 fatal("Can't find any steps to execute") and exit(1) unless @all_steps;
 unshift @only_steps, "setup", "os-detection" if @only_steps;
@@ -1568,4 +1559,123 @@ while ((my $step = $steps->pop())) {
 write_config();
 close(LOCKFILE);
 unlink("/var/run/rollout.lock");
+
+__END__
+=head1 NAME
+
+rollout - Rollout is a tool designed to automate system administration on UNIX servers.
+
+=head1 SYNOPSIS
+
+rollout [options] <message>
+
+B<Options>
+
+=over 4
+
+=item --help
+
+Brief help message
+
+=item --verbose -v
+
+Increase verbosity
+
+=item --quiet -q
+
+Don't print anything except fatal errors
+
+=item --safe_mode -s
+
+Show what will be changed, but don't actually do anything
+
+=item --url -u
+
+Set the base Rollout HTTP url
+
+=item --skip_step -k
+
+Specify a step to be skipped, may be specified multiple times
+
+=item --hostname -h
+
+Rollout configuration for a different host. If -f network is provided, the
+hostname will be changed
+
+=item --only -o
+
+Only run a specific step (can be specified multiple times)
+
+=item --force -f
+
+Force a dangerous step to be run
+
+=item --configdir
+
+Directory to store configuration files
+
+=item --configfile
+
+File to store configuration (inside configdir unless full path)
+
+=back
+
+Steps which are considered dangerous are always run in safe mode, unless the -f
+parameter is specified with a step name as argument.
+
+Any additional arguments will be combined to form the 'comment' which will be
+logged.  This should be used to describe the reason for running rollout, i.e. a
+change tracking number or authorization
+
+=head1 DESCRIPTION
+
+Rollout is a system developed to automate system administration on UNIX servers.
+It is primarily focused towards Linux, but could be adapted to Solaris, HP-UX,
+AIX, etc.
+
+It is written purely in Perl, and the configuration is also a Perl source file.
+Some Perl knowledge is required to edit the configuration, but copy-and-paste
+may suffice.
+
+System Administration can generally be reduced to a set of steps, which must be
+completed in order.  Some example steps include:
+
+=over 4
+
+=item * Copy files, create symlinks
+
+=item * Edit configuration files
+
+=item * Start / stop services
+
+=item * Add / modify users & groups
+
+=item * Install applications
+
+=back
+
+The idea behind Rollout is to automate all these steps in a configurable way.
+Rollout is by design idempotent - it can be run many times on a single server
+and produce the same results.
+
+=head1 SEE ALSO
+
+=head1 COPYRIGHT
+
+Copyright 2007 David Parrish
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place, Suite 330, Boston, MA  02111-1307  USA
+
+=cut
 
