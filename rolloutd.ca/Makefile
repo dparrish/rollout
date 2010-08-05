@@ -21,6 +21,7 @@ ${CACERT}:
 		-subj "/commonName=Rollout CA/countryName=AU" \
 		-selfsign -extensions v3_ca -infiles careq.pem
 	@rm careq.pem
+	openssl x509 -in $@ -out cacert.crt
 
 clean:
 	rm -f serial* crlnumber newcerts/* private/* \

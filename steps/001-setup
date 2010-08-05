@@ -82,7 +82,7 @@ if (i_should("local_install")) {
   if (text_install(-file => $dest, -text => $rollout, -mode => 0750, -uid => 0, -group => 0 )) {
     # rollout has been updated, switch to it
     l "Rollout has been installed to $dest, re-executing";
-    exec($dest, @original_argv);
+    exec($dest, @ARGV);
   }
 }
 

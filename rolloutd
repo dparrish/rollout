@@ -44,27 +44,14 @@ sub new {
   $self->{listen_port} = $port;
   $self->{checksum_file_fields} = ["filename", "checksum", "inode", "size", "mtime"];
 
-  if ($self->{ssl}) {
-    require IO::Socket::SSL;
-    $self->{sock} = new IO::Socket::SSL
-      Listen => 5,
-      LocalAddr => $address,
-      LocalPort => $port,
-      Proto     => 'tcp',
-      ReuseAddr => 1,
-      SSL_cert_file => 'rolloutd.pem',
-      SSL_key_file  => 'rolloutd.key',
-      SSL_verify_mode => 0x01 | 0x02
-    or die "Unable to create socket: ". IO::Socket::SSL::errstr();
-  } else {
-    $self->{sock} = new IO::Socket::INET
-      Listen => 5,
-      LocalAddr => $address,
-      LocalPort => $port,
-      Proto     => 'tcp',
-      ReuseAddr => 1
-    or die "Unable to create socket: ". IO::Socket::INET::errstr();
-  }
+  require IO::Socket::SSL if $self->{ssl};
+  $self->{sock} = new IO::Socket::INET
+    Listen => 5,
+    LocalAddr => $address,
+    LocalPort => $port,
+    Proto     => 'tcp',
+    ReuseAddr => 1
+  or die "Unable to create socket: ". IO::Socket::INET::errstr();
 
   return $self;
 }
@@ -74,8 +61,32 @@ sub run {
   while (my($sock, $peer) = $self->{sock}->accept) {
     my($port, $packed_ipaddr) = sockaddr_in($peer);
     my $ipaddr = inet_ntoa($packed_ipaddr);
-
+    #print "Accepted connection from $ipaddr:$port\n";
     next if fork();
+
+    if ($self->{ssl}) {
+      use Net::SSLeay;
+      $Net::SSLeay::trace = 2;
+      #IO::Socket::SSL::set_ctx_defaults(mode => 0x03);
+      # Activate SSL on the socket and require a valid client certificate
+      $sock = IO::Socket::SSL->start_SSL($sock,
+        SSL_server => 1,
+        SSL_error_trap => sub {
+          my($sock, $error) = @_;
+          print "SSL error on $sock: $error\n";
+        },
+        SSL_use_cert => 1,
+        SSL_ca_file => 'rolloutd.ca/cacert.crt',
+        SSL_cert_file => 'rolloutd.ca/certs/rolloutd.pem',
+        SSL_key_file  => 'rolloutd.ca/certs/rolloutd.key',
+        SSL_verify_mode => 0x01) or exit;
+
+      my $peer_cert = $sock->get_peer_certificate;
+      print "SSL connection\n";
+      print "  subject_name: ". ($peer_cert->subject_name || ""). "\n";
+      print "  issuer_name: ". ($peer_cert->issuer_name || ""). "\n";
+      print "  cipher: ". $sock->get_cipher. "\n";
+    }
 
     binmode $sock, ':raw';
     $self->{peer} = [$ipaddr, $port];
