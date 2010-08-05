@@ -41,6 +41,9 @@ $configdir = "/etc/rollout";
 $config = {
   # This is the default configuration
   base_url => "http://rollout.domain",
+  client_certificate => "cert.pem",
+  client_certificate_key => "cert.key",
+  ca_certificate => "cacert.crt",
 };
 my $hostname = hostname;
 
@@ -126,70 +129,106 @@ sub v(@) { l(@_) if $verbosity >= 2; return 1 }
 
 # }}}
 # RolloutHTTP package {{{
-package RolloutHTTP::HTTP;
-
-use strict;
-use Net::HTTP;
-use Data::Dumper;
-use vars qw( @ISA );
-
-eval { require IO::Socket::INET } || require IO::Socket;
-require Net::HTTP::Methods;
-
-@ISA = qw(IO::Socket::INET Net::HTTP::Methods);
-
-sub configure {
-  my($self, $cnf) = @_;
-  $self->http_configure($cnf);
-}
-
-sub http_connect {
-  my($self, $cnf) = @_;
-  $self->SUPER::configure($cnf);
-}
-
-package RolloutHTTP::HTTPS;
-
-use strict;
-use Net::HTTP;
-use Data::Dumper;
-use vars qw( @ISA );
-
-eval { require IO::Socket::SSL };
-require Net::HTTP::Methods;
-
-@ISA = qw(IO::Socket::SSL Net::HTTP::Methods);
-
-sub configure {
-  my($self, $cnf) = @_;
-  $self->http_configure($cnf);
-}
-
-sub http_connect {
-  my($self, $cnf) = @_;
-  $self->SUPER::configure($cnf);
-}
 
 package RolloutHTTP;
 
-my $cache = {};
+use Net::HTTP;
+use Net::SSLeay;
 
 sub new {
-  my($class, %args) = @_;
-  $args{KeepAlive} = 30 unless exists($args{KeepAlive});
-  $args{HTTPVersion} = "1.1" unless exists($args{HTTPVersion});
-  my $key = "$args{Host}|$args{PeerPort}";
-  if (!$cache->{$key} || $cache->{$key}->connected) {
-    #print "Creating connection to $key\n";
-    if ($args{Protocol} && $args{Protocol} eq 'https') {
-      $cache->{$key} = new RolloutHTTP::HTTPS %args
+  my($class) = @_;
+
+  my $self = bless {}, $class;
+  eval {
+    # See if LWP is supported (for HTTPS)
+    $ENV{HTTPS_CERT_FILE} = "$::configdir/$::config->{client_certificate}";
+    $ENV{HTTPS_KEY_FILE} = "$::configdir/$::config->{client_certificate_key}";
+    $ENV{HTTPS_CA_FILE} = "$::configdir/$::config->{ca_certificate}";
+    require LWP::UserAgent;
+    require LWP::ConnCache;
+    require HTTP::Request;
+    $self->{ua} = new LWP::UserAgent;
+    $self->{ua}->conn_cache(new LWP::ConnCache total_capacity => 10);
+    $self->{ua}->agent("Rollout/$::VERSION");
+
+    if ($::config->{debug_ssl} || $::verbosity >= 3) {
+      require IO::Socket::SSL;
+      import IO::Socket::SSL qw(debug3);
+      $self->{ua}->add_handler("request_send",  sub {
+        print "--------- SENDING REQUEST ---------\n";
+        shift->dump;
+        return;
+      });
+      $self->{ua}->add_handler("response_done",  sub {
+        print "--------- RESPONSE DONE ---------\n";
+        shift->dump;
+        return;
+      });
+    }
+    $self->{_lwp} = 1;
+  };
+  ::w "Error loading the LWP modules. SSL is disabled. Consider installing LWP.\n" if $@;
+  return $self;
+}
+
+sub get {
+  my($self, $url, $data_cb) = @_;
+  my $len = 0;
+  if ($self->{_lwp}) {
+    my $req = new HTTP::Request('GET', $url);
+    my $res = $self->{ua}->request($req, sub {
+      my($chunk, $res, $proto) = @_;
+      $self->{res} = $res;
+      $self->{code} = $res->code;
+      $self->{message} = $res->message;
+      $data_cb->($chunk);
+      $len += length($chunk);
+    });
+    if (!$res || !$res->is_success) {
+      $self->{message} = $res->status_line;
+      return undef;
     } else {
-      $cache->{$key} = new RolloutHTTP::HTTP %args;
+      $self->{message} = "OK";
     }
   } else {
-  print "Reusing connection to $key\n";
+    my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
+    ::fatal("HTTPS is not supported without the LWP module") if $protocol eq 'https';
+    my $req = new Net::HTTP Host => $host, PeerPort => $port || 80, Protocol => $protocol;
+    if (!$req) {
+      $self->{message} = $@;
+      return undef;
+    }
+
+    $req->write_request(GET => $path, 'User-Agent' => "Rollout/$::VERSION");
+    ($self->{code}, $self->{message}) = $req->read_response_headers;
+    my $buf;
+    while (1) {
+      my $n = $req->read_entity_body($buf, 4096);
+      last unless $n;
+      $data_cb->($buf);
+      $len += $n;
+    }
+  }
+  return $len;
 }
-  return $cache->{$key};
+
+sub error_message {
+  my($self) = @_;
+  if ($self->{_lwp}) {
+    return undef if $self->{res} && $self->{res}->is_success();
+    return $self->{message};
+  } else {
+    return $self->{message};
+  }
+}
+
+sub is_success {
+  my($self) = @_;
+  if ($self->{_lwp}) {
+    return $self->{res}->is_success();
+  } else {
+    return $self->{code} =~ /^2../;
+  }
 }
 
 package main;
@@ -239,43 +278,38 @@ sub http_file(@) {
   return undef unless $file;
 
   my $url = $file =~ /^https?:\/\// ? $file : "$config->{base_url}/$file";
-  my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
-  my $s = RolloutHTTP->new(Host => $host, PeerPort => $port || 80, Protocol => $protocol) 
-    or fatal $@;
 
-  $s->write_request(GET => $path, 'User-Agent' => "Rollout/1.0");
-  my($code, $mess, %h) = $s->read_response_headers;
-
-  w "GET $url returned $code" and return undef unless $code =~ /^2../;
-
+  my $req = new RolloutHTTP;
   my $fh;
-  if ($p->{-dest}) {
-    v "Writing to $p->{-dest}.$$";
-    if (!($fh = new IO::File ">$p->{-dest}.$$")) {
-      w "Can't write to $p->{-dest}.$$: $!";
-      return undef;
-    }
-  }
-
+  my $first = 1;
   my $res = "";
-  while (1) {
-    my $buf;
-    my $n = $s->read_entity_body($buf, 1024);
-    fatal "Read failed: $!" unless defined $n;
-    last unless $n;
+  $req->get($url, sub {
+    my($chunk) = @_;
+    if ($first) {
+      w "GET $url returned $req->{code}" and return undef unless $req->is_success;
+      if ($p->{-dest}) {
+        v "Writing to $p->{-dest}.$$";
+        if (!($fh = new IO::File ">$p->{-dest}.$$")) {
+          w "Can't write to $p->{-dest}.$$: $!";
+          return undef;
+        }
+      }
+      $first = 0;
+    }
     if ($fh) {
-      if (syswrite($fh, $buf, $n) < $n) {
+      if (!$fh->write($chunk)) {
         fatal "Error writing to $p->{-dest}.$$: $!";
         $fh->close;
         unlink("$p->{-dest}.$$");
       }
-      $res += $n;
+      $res += length($chunk);
     } else {
-      $res .= $buf;
+      $res .= $chunk;
     }
-  }
+    return 1;
+  }) or w "Couldn't retrieve $url: ". $req->error_message;
 
-  if ($p->{-dest}) {
+  if ($p->{-dest} && $fh) {
     $fh->close;
     if (-f $p->{-dest} && -s $p->{-dest} && !-s "$p->{-dest}.$$") {
       w "Not overwriting existing file with nothing";
