@@ -48,7 +48,7 @@ $config = {
 my $hostname = hostname;
 
 # Parse some initial options
-Getopt::Long::Configure(qw( default bundling auto_version auto_help pass_through ));
+Getopt::Long::Configure(qw( default bundling auto_version pass_through ));
 Getopt::Long::GetOptionsFromArray([@ARGV],
   "configdir=s"     => \$configdir,
   "configfile=s"    => \$configfile,
@@ -1537,8 +1537,13 @@ if (open(LOCKFILE, ">/var/run/rollout.lock")) {
 $start_time = time;
 read_config();
 
+sub usage {
+  require Pod::Usage;
+  Pod::Usage::pod2usage(-exitval => 1, -verbose => 99, -sections => "NAME|SYNOPSIS|OPTIONS");
+}
+
 # Read the rest of the options
-Getopt::Long::Configure(qw( default bundling auto_version auto_help ));
+Getopt::Long::Configure(qw( default bundling auto_version ));
 Getopt::Long::GetOptionsFromArray([@ARGV],
   "configdir=s"     => \$configdir,
   "configfile=s"    => \$configfile,
@@ -1550,7 +1555,9 @@ Getopt::Long::GetOptionsFromArray([@ARGV],
   "skip_step|k=s"   => \@skip_steps,
   "url|u=s"         => \$config->{base_url},
   "verbose|v"       => sub {},
-) or exit(1);
+  "help|?"          => \&usage,
+) or usage();
+
 
 @all_steps = http_index "steps";
 fatal("Can't find any steps to execute") and exit(1) unless @all_steps;
@@ -1603,52 +1610,52 @@ rollout - Rollout is a tool designed to automate system administration on UNIX s
 
 rollout [options] <message>
 
-B<Options>
+=head1 OPTIONS
 
 =over 4
 
-=item --help
+=item B<--help -?>
 
 Brief help message
 
-=item --verbose -v
+=item B<--verbose -v>
 
 Increase verbosity
 
-=item --quiet -q
+=item B<--quiet -q>
 
 Don't print anything except fatal errors
 
-=item --safe_mode -s
+=item B<--safe_mode -s>
 
 Show what will be changed, but don't actually do anything
 
-=item --url -u
+=item B<--url -u> <url>
 
 Set the base Rollout HTTP url
 
-=item --skip_step -k
+=item B<--skip_step -k> <step>
 
 Specify a step to be skipped, may be specified multiple times
 
-=item --hostname -h
+=item B<--hostname -h> <hostname>
 
 Rollout configuration for a different host. If -f network is provided, the
 hostname will be changed
 
-=item --only -o
+=item B<--only -o> <step>
 
 Only run a specific step (can be specified multiple times)
 
-=item --force -f
+=item B<--force -f> <step>
 
 Force a dangerous step to be run
 
-=item --configdir
+=item B<--configdir> <path>
 
 Directory to store configuration files
 
-=item --configfile
+=item B<--configfile> <filename>
 
 File to store configuration (inside configdir unless full path)
 
