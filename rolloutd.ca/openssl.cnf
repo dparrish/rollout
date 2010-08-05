@@ -30,7 +30,6 @@ preserve = no
 private_key = $dir/private/ca.key
 serial = $dir/serial
 unique_subject = no
-x509_extensions = usr_cert
 
 [policy_match]
 commonName = supplied
@@ -43,22 +42,24 @@ stateOrProvinceName = optional
 [req]
 default_bits = 1024
 distinguished_name = req_distinguished_name
-x509_extensions = v3_ca
-req_extensions = v3_req
 
-[usr_cert]
+[server_cert]
 basicConstraints = CA:FALSE
 nsCertType = server
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-nsComment = "OpenSSL Generated Certificate"
+nsComment = "Rollout Server Certificate"
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid,issuer
 
-[v3_req]
+[client_cert]
 basicConstraints = CA:FALSE
+nsCertType = client
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+nsComment = "Rollout Client Certificate"
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
 
-[v3_ca]
+[ca_cert]
 subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid:always,issuer:always
 basicConstraints = CA:true

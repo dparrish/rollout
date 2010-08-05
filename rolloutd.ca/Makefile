@@ -16,10 +16,10 @@ ${CAKEY}:
 	openssl genrsa -out $@ 1024
 
 ${CACERT}:
-	openssl req ${CACONF} -new -batch -key ${CAKEY} -out careq.pem
+	openssl req ${CACONF} -new -batch -key ${CAKEY} -out careq.pem -extensions ca_cert
 	openssl ca ${CACONF} -batch -create_serial -out $@ -days 1095 -batch -keyfile ${CAKEY} \
 		-subj "/commonName=Rollout CA/countryName=AU" \
-		-selfsign -extensions v3_ca -infiles careq.pem
+		-selfsign -extensions ca_cert -infiles careq.pem
 	@rm careq.pem
 	openssl x509 -in $@ -out cacert.crt
 
@@ -28,7 +28,12 @@ clean:
 		index.txt* certs/*
 
 server: ca
-	@make certs/rolloutd.pem
+	openssl req ${CACONF} -new -newkey rsa:1024 -nodes -days 365 -out certreq.csr \
+		-keyout certs/rolloutd.key -subj "/commonName=rolloutd/countryName=AU" \
+		-extensions server_cert
+	openssl ca ${CACONF} -in certreq.csr -out certs/rolloutd.pem -cert ${CACERT} \
+		-keyfile ${CAKEY} -batch
+	@rm -f certreq.csr
 
 client: ca
 	@if [ "x${HOSTNAME}" = "x" ]; then echo "Usage: make client HOSTNAME=<hostname>"; exit 1; fi
@@ -37,7 +42,8 @@ client: ca
 certs/%.pem: HOSTNAME = ${notdir ${basename $@}}
 certs/%.pem: ca
 	openssl req ${CACONF} -new -newkey rsa:1024 -nodes -days 365 -out certreq.csr \
-		-keyout certs/${HOSTNAME}.key -subj "/commonName=${HOSTNAME}/countryName=AU"
+		-keyout certs/${HOSTNAME}.key -subj "/commonName=${HOSTNAME}/countryName=AU" \
+		-extensions client_cert
 	openssl ca ${CACONF} -in certreq.csr -out $@ -cert ${CACERT} -keyfile ${CAKEY} -batch
 	@rm -f certreq.csr
 

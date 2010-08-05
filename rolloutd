@@ -61,14 +61,9 @@ sub run {
   while (my($sock, $peer) = $self->{sock}->accept) {
     my($port, $packed_ipaddr) = sockaddr_in($peer);
     my $ipaddr = inet_ntoa($packed_ipaddr);
-    #print "Accepted connection from $ipaddr:$port\n";
     next if fork();
 
     if ($self->{ssl}) {
-      use Net::SSLeay;
-      $Net::SSLeay::trace = 2;
-      #IO::Socket::SSL::set_ctx_defaults(mode => 0x03);
-      # Activate SSL on the socket and require a valid client certificate
       $sock = IO::Socket::SSL->start_SSL($sock,
         SSL_server => 1,
         SSL_error_trap => sub {
@@ -79,13 +74,10 @@ sub run {
         SSL_ca_file => 'rolloutd.ca/cacert.crt',
         SSL_cert_file => 'rolloutd.ca/certs/rolloutd.pem',
         SSL_key_file  => 'rolloutd.ca/certs/rolloutd.key',
-        SSL_verify_mode => 0x01) or exit;
+        SSL_verify_mode => 0x01 | 0x02) or exit;
 
       my $peer_cert = $sock->get_peer_certificate;
-      print "SSL connection\n";
-      print "  subject_name: ". ($peer_cert->subject_name || ""). "\n";
-      print "  issuer_name: ". ($peer_cert->issuer_name || ""). "\n";
-      print "  cipher: ". $sock->get_cipher. "\n";
+      print "SSL connection from ". ($peer_cert->subject_name || ""). ", issued by ". ($peer_cert->issuer_name || ""). "\n";
     }
 
     binmode $sock, ':raw';

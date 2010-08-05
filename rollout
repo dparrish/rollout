@@ -135,52 +135,52 @@ package RolloutHTTP;
 use Net::HTTP;
 use Net::SSLeay;
 
-use vars qw( $ua $setup_debugging );
+use vars qw( $ua %per_host_certs $done_setup $use_lwp );
 
-sub new {
-  my($class) = @_;
-
-  my $self = bless {}, $class;
+sub _setup {
+  return if $done_setup;
+  $done_setup = 1;
   eval {
     # See if LWP is supported (for HTTPS)
-    $ENV{HTTPS_CERT_FILE} = "$::configdir/$::config->{client_certificate}";
-    $ENV{HTTPS_KEY_FILE} = "$::configdir/$::config->{client_certificate_key}";
-    $ENV{HTTPS_CA_FILE} = "$::configdir/$::config->{ca_certificate}";
     require LWP::UserAgent;
     require LWP::ConnCache;
     require HTTP::Request;
 
+    *LWP::Protocol::https::_extra_sock_opts = sub {
+      my($self, $host, $port) = @_;
+      return SSL_ca_file => "$::configdir/$::config->{ca_certificate}",
+          %{$per_host_certs{"$host:$port"} || {}};
+    };
+
     if (!$ua) {
       $ua = new LWP::UserAgent;
-      #$ua->conn_cache(new LWP::ConnCache);
+      $ua->conn_cache(new LWP::ConnCache);
       $ua->agent("Rollout/$::VERSION");
     }
-
-    if ($::config->{debug_ssl} || $::verbosity >= 3 && !$setup_debugging) {
-      $setup_debugging = 1;
-      require IO::Socket::SSL;
-      import IO::Socket::SSL qw(debug3);
-      $ua->add_handler("request_send",  sub {
-        print "--------- SENDING REQUEST ---------\n";
-        shift->dump;
-        return;
-      });
-      $ua->add_handler("response_done",  sub {
-        print "--------- RESPONSE DONE ---------\n";
-        shift->dump;
-        return;
-      });
-    }
-    $self->{_lwp} = 1;
+    $use_lwp = 1;
   };
   ::w "Error loading the LWP modules. SSL is disabled. Consider installing LWP.\n" if $@;
+}
+
+sub add_client_cert {
+  my($self, $host, $port, $cert_file, $key_file) = @_;
+  $per_host_certs{"$host:$port"} = {
+    SSL_cert_file => $cert_file,
+    SSL_key_file => $key_file,
+  };
+}
+
+sub new {
+  my($class) = @_;
+  _setup();
+  my $self = bless {}, $class;
   return $self;
 }
 
 sub get {
   my($self, $url, $data_cb) = @_;
   my $len = 0;
-  if ($self->{_lwp}) {
+  if ($use_lwp) {
     my $req = new HTTP::Request('GET', $url);
     my $res = $ua->request($req, sub {
       my($chunk, $res, $proto) = @_;
@@ -191,6 +191,7 @@ sub get {
       $len += length($chunk);
     });
     if (!$res || !$res->is_success) {
+      throw HttpException($res->status_line);
       $self->{message} = $res->status_line;
       return undef;
     } else {
@@ -220,7 +221,7 @@ sub get {
 
 sub error_message {
   my($self) = @_;
-  if ($self->{_lwp}) {
+  if ($use_lwp) {
     return undef if $self->{res} && $self->{res}->is_success();
     return $self->{message};
   } else {
@@ -230,7 +231,7 @@ sub error_message {
 
 sub is_success {
   my($self) = @_;
-  if ($self->{_lwp}) {
+  if ($use_lwp) {
     return $self->{res}->is_success();
   } else {
     return $self->{code} =~ /^2../;
@@ -286,6 +287,12 @@ sub http_file(@) {
   my $url = $file =~ /^https?:\/\// ? $file : "$config->{base_url}/$file";
 
   my $req = new RolloutHTTP;
+  my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
+  if ($protocol eq 'https') {
+    $req->add_client_cert($host, $port, "$::configdir/$::config->{client_certificate}",
+                          "$::configdir/$::config->{client_certificate_key}");
+  }
+
   my $fh;
   my $first = 1;
   my $res = "";
@@ -304,7 +311,6 @@ sub http_file(@) {
     }
     if ($fh) {
       if (!$fh->write($chunk)) {
-        fatal "Error writing to $p->{-dest}.$$: $!";
         $fh->close;
         unlink("$p->{-dest}.$$");
       }
