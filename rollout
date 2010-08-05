@@ -34,7 +34,7 @@ use Sys::Hostname;
 
 use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
              $rollout_comment $start_time $configfile $configdir $VERSION %m );
-$VERSION = "1.1";
+$VERSION = "1.1.0";
 $verbosity = 1;
 $safe_mode = 0;
 $configdir = "/etc/rollout";
@@ -135,6 +135,8 @@ package RolloutHTTP;
 use Net::HTTP;
 use Net::SSLeay;
 
+use vars qw( $ua $setup_debugging );
+
 sub new {
   my($class) = @_;
 
@@ -147,19 +149,23 @@ sub new {
     require LWP::UserAgent;
     require LWP::ConnCache;
     require HTTP::Request;
-    $self->{ua} = new LWP::UserAgent;
-    $self->{ua}->conn_cache(new LWP::ConnCache total_capacity => 10);
-    $self->{ua}->agent("Rollout/$::VERSION");
 
-    if ($::config->{debug_ssl} || $::verbosity >= 3) {
+    if (!$ua) {
+      $ua = new LWP::UserAgent;
+      #$ua->conn_cache(new LWP::ConnCache);
+      $ua->agent("Rollout/$::VERSION");
+    }
+
+    if ($::config->{debug_ssl} || $::verbosity >= 3 && !$setup_debugging) {
+      $setup_debugging = 1;
       require IO::Socket::SSL;
       import IO::Socket::SSL qw(debug3);
-      $self->{ua}->add_handler("request_send",  sub {
+      $ua->add_handler("request_send",  sub {
         print "--------- SENDING REQUEST ---------\n";
         shift->dump;
         return;
       });
-      $self->{ua}->add_handler("response_done",  sub {
+      $ua->add_handler("response_done",  sub {
         print "--------- RESPONSE DONE ---------\n";
         shift->dump;
         return;
@@ -176,7 +182,7 @@ sub get {
   my $len = 0;
   if ($self->{_lwp}) {
     my $req = new HTTP::Request('GET', $url);
-    my $res = $self->{ua}->request($req, sub {
+    my $res = $ua->request($req, sub {
       my($chunk, $res, $proto) = @_;
       $self->{res} = $res;
       $self->{code} = $res->code;
