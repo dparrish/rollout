@@ -30,10 +30,13 @@ use File::Basename;
 use Getopt::Long;
 use IO::File;
 use IO::Select;
-use Memoize;
 use POSIX 'setsid';
 use Socket;
 use Sys::Hostname;
+eval {
+  require Memoize;
+  import Memoize;
+};
 
 use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
              $rollout_comment $start_time $configfile $configdir $VERSION %m );
@@ -435,6 +438,7 @@ sub dir_install {
             my $md5 = Digest::MD5->new->add(slurp_file("$p->{-dest}/$filename"))->hexdigest;
             if ($md5 && $_->{checksum} && $_->{checksum} eq $md5) {
               v "Skipping $p->{-src}/$filename -> $p->{-dest}/$filename, it's the same";
+              set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}}) && $restart++;
               next;
             }
           }
@@ -483,6 +487,7 @@ sub i_has {
   i_iterate($class, sub { $ret = $_[1]; return undef });
   return $ret;
 }
+eval { memoize('i_has') };
 
 sub _i_in {
   my($grep) = @_;
@@ -492,14 +497,17 @@ sub _i_in {
 sub i_immutable_file {
   return i_iterate("immutable_file", _i_in($_[0]), $_[1]);
 }
+eval { memoize('i_immutable_file') };
 
 sub i_unsafe_file {
   return i_iterate("unsafe_file", _i_in($_[0]), $_[1]);
 }
+eval { memoize('i_unsafe_file') };
 
 sub i_unsafe_dir {
   return i_iterate("unsafe_dir", _i_in($_[0]), $_[1]);
 }
+eval { memoize('i_unsafe_dir') };
 
 sub i_should {
   my($item, $m) = @_;
@@ -511,6 +519,7 @@ sub i_should {
   });
   return !$should_not;
 }
+eval { memoize('i_should') };
 
 sub i_isa {
   my($class, $m) = @_;
@@ -525,6 +534,7 @@ sub i_isa {
   }
   return 0;
 }
+eval { memoize('i_isa') };
 
 sub i_isa_fetchall {
   my($class, $m) = @_;
@@ -532,15 +542,7 @@ sub i_isa_fetchall {
   i_iterate($class, sub { push @list, $_[1] }, $m);
   return @list;
 }
-
-sub add_isa {
-  my($class, $m) = @_;
-
-  $m ||= $hostname;
-  return 0 unless $m{$m};
-  $m{$m}->{ISA} ||= {};
-  $m{$m}->{ISA}{$class} ||= 1;
-}
+eval { memoize('i_isa_fetchall') };
 
 sub i_isa_classes {
   my($class) = @_;
@@ -559,6 +561,7 @@ sub i_isa_classes {
 
   return keys %list;
 }
+eval { memoize('i_isa_classes') };
 
 sub i_ip {
   my($host) = @_;
@@ -572,6 +575,7 @@ sub i_ip {
   }
   return undef;
 }
+eval { memoize('i_ip') };
 
 # }}}
 # Configuration lookup functions {{{
@@ -598,6 +602,7 @@ sub c {
   }
   return wantarray ? @ret : ($ret[0] || $default);
 }
+eval { memoize('c') };
 
 sub uniq {
   my(@input) = @_;
@@ -954,9 +959,9 @@ sub lookup_user {
     return $uid
   }
   w "Can't find user $user";
-  return -1;
+  return undef;
 }
-memoize('lookup_user');
+eval { memoize('lookup_user') };
 
 sub lookup_group {
   my($group) = @_;
@@ -967,9 +972,9 @@ sub lookup_group {
     return $uid
   }
   w "Can't find group $group";
-  return -1;
+  return undef;
 }
-memoize('lookup_group');
+eval { memoize('lookup_group') };
 
 sub set_attr {
   my $p = named_params @_, [ -file => undef, -mode => undef, -uid => undef, -gid => undef,
@@ -999,7 +1004,7 @@ sub set_attr {
   }
 
   $uid = lookup_user($p->{-owner} || $p->{-uid});
-  $gid = lookup_user($p->{-group} || $p->{-gid});
+  $gid = lookup_group($p->{-group} || $p->{-gid});
 
   return 0 unless defined $mode or defined $uid or defined $gid;
 
@@ -1012,7 +1017,7 @@ sub set_attr {
 
   my $changed = 0;
   if (defined $mode and ($stat[2] & 07777) != $mode) {
-    l sprintf("Changing mode of %s to %o", $p->{-file}, $mode);
+    l sprintf("Changing mode of %s to 0%o", $p->{-file}, $mode);
     $changed++;
     unless ($safe_mode) {
       chmod $mode, $p->{-file} or
@@ -1065,7 +1070,8 @@ sub text_install {
   if ($changed) {
     my $ref = ref $p->{-flags}->{srcfn};
     if ($ref eq "ARRAY") {
-      throw ConfigException "Multiple sources for \"$p->{-file}\":\n" . join("\n", @{$p->{-flags}->{srcfn}});
+      throw ConfigException "Multiple sources for \"$p->{-file}\":\n".
+        join("\n", @{$p->{-flags}->{srcfn}});
     } else {
       l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
     }
@@ -1136,17 +1142,17 @@ sub dir_check {
   my $flags;
   my $changed;
 
-  unless (-e $p->{-dir}) {
+  unless (-d $p->{-dir}) {
     # make parent if required
     (my $parent = $p->{-dir}) =~ s/\/[^\/]+$//;
     if ($parent && !-e $parent) {
-      my $x = $p;
+      my $x = {%$p};
       $x->{-dir} = $parent;
-      dir_check($p);
+      dir_check($x);
     }
     $p->{-mode} ||= 0755;
 
-    l sprintf("Creating directory %s with mode 0%03o", $p->{-dir}, $p->{-mode});
+    l sprintf("Creating directory %s with mode 0%o", $p->{-dir}, $p->{-mode});
     return 1 if $safe_mode;
 
     my $mask = umask 0;
@@ -1155,13 +1161,13 @@ sub dir_check {
     umask $mask;
 
     $changed++;
+    set_attr($p) && $changed++;
+    return $changed;
   } else {
     throw LocalFileException "Existing $p->{-dir} is not a directory" unless -d _;
   }
-
-  return (set_attr($p)) || $changed;
 }
-memoize('dir_check');
+eval { memoize('dir_check') };
 
 sub symlink_check {
   my $p = named_params @_, [ -src => undef, -dest => undef ];

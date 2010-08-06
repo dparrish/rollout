@@ -46,7 +46,7 @@ if (i_should("users")) {
       command("useradd",
         ($users{$username}->{uid} ? ("-u", $users{$username}->{uid}, "-o") : ()),
         ($users{$username}->{gid} ? ("-g", $users{$username}->{gid}) : ()),
-        ($users{$username}->{groups} ? ("-G", join(",", @{$users{$username}->{groups}}), "-n") : ()),
+        ($users{$username}->{groups} ? ("-G", join(",", @{$users{$username}->{groups}})) : ()),
         ($users{$username}->{home} ? ("-d", $users{$username}->{home}, "-m") : ()),
         ($users{$username}->{password} ? ("-p", $users{$username}->{password}) : ()),
         ($users{$username}->{name} ? ("-c", $users{$username}->{name}) : ()),
