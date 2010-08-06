@@ -26,9 +26,11 @@ use Digest::MD5 'md5_hex';
 use English;
 use Error ':try';
 use Fcntl ':flock';
+use File::Basename;
 use Getopt::Long;
 use IO::File;
 use IO::Select;
+use Memoize;
 use POSIX 'setsid';
 use Socket;
 use Sys::Hostname;
@@ -67,68 +69,6 @@ $rollout_comment = join(" ", @ARGV) || "No comment specified";
 $rollout_comment =~ s/(^['"]|['"]$)//g;
 my $pid = $$;
 
-sub read_config {
-  return unless my $fh = new IO::File $configfile, "r";
-  my $newconfig = {%$config};
-  while (<$fh>) {
-    s/[\r\n]+$//;
-    next if /^\s*#/;
-    my($key, $value) = split /\s*=\s*/, $_, 2;
-    next unless $key && $value;
-    $newconfig->{$key} = $value;
-  }
-  $fh->close;
-  return $config = $newconfig;
-}
-
-sub write_config {
-  text_install(-file => $configfile,
-               -text => join("", map { "$_ = $config->{$_}\n" } keys %$config));
- }
-
-# Logging wrappers {{{
-sub l(@) {
-  my($text, $indent) = @_;
-  return unless $verbosity && defined $text;
-  $indent = 2 unless defined $indent;
-  $indent = " " x $indent;
-  my $newtext = $text;
-  $newtext =~ s/^/$indent/mg;
-  print "$newtext\n";
-  $log .= "$text\n";
-  return 0;
-}
-
-sub w(@) {
-  my($text, $indent) = @_;
-  return unless $text;
-
-  $indent = 2 unless defined $indent;
-  $indent = " " x $indent;
-  my $newtext = $text;
-  $newtext =~ s/^/${indent}WARNING: /mg;
-  print "$newtext\n";
-  $log .= "$text\n";
-
-  return 0;
-}
-
-sub fatal(@) {
-  print "------ FATAL ERROR ------\n";
-  if ($verbosity >= 3) {
-    carp "$_\n" foreach (grep { defined $_ } @_);
-  } else {
-    print "$_\n" foreach (grep { defined $_ } @_);
-  }
-  print "Current Step: $current_step\n" if $current_step;
-  exit 1 if $current_step;
-  return 1;
-}
-
-sub d($) { return v(Dumper(@_)) if $verbosity >= 3; return 1 };
-sub v(@) { l(@_) if $verbosity >= 2; return 1 }
-
-# }}}
 # Exceptions {{{
 
 package RolloutException;
@@ -148,7 +88,59 @@ package HttpException;
 use base 'RolloutException';
 1;
 
+package LocalFileException;
+use base 'RolloutException';
+1;
+
+package ConfigException;
+use base 'RolloutException';
+1;
+
+package SafeModeException;
+use base 'RolloutException';
+1;
+
 package main;
+
+# }}}
+# Logging wrappers {{{
+sub l(@) {
+  my($text, $indent) = @_;
+  return unless $verbosity && defined $text;
+  $indent = 2 unless defined $indent;
+  $indent = " " x $indent;
+  my $newtext = $text;
+  $newtext =~ s/^/$indent/mg;
+  print "$newtext\n";
+  $log .= "$text\n";
+  return 0;
+}
+
+sub w(@) {
+  my($text, $indent) = @_;
+  return 1 unless $text;
+  $indent = 2 unless defined $indent;
+  $indent = " " x $indent;
+  my $newtext = $text;
+  $newtext =~ s/^/${indent}WARNING: /mg;
+  print "$newtext\n";
+  $log .= "$text\n";
+}
+
+sub fatal(@) {
+  print "------ FATAL ERROR ------\n";
+  if ($verbosity >= 3) {
+    carp "$_\n" foreach (grep { defined $_ } @_);
+  } else {
+    print "$_\n" foreach (grep { defined $_ } @_);
+  }
+  print "Current Step: $current_step\n" if $current_step;
+  exit 1 if $current_step;
+  return 1;
+}
+
+sub d($) { return v(Dumper(@_)) if $verbosity >= 3; return 1 };
+sub v(@) { l(@_) if $verbosity >= 2; return 1 }
 
 # }}}
 # RolloutHTTP package {{{
@@ -334,7 +326,7 @@ sub http_file(@) {
       if (!$fh->write($chunk)) {
         $fh->close;
         unlink("$p->{-dest}.$$");
-        throw IOException "Error writing to $p->{-dest}.$$: $!";
+        throw LocalFileException "Error writing to $p->{-dest}.$$: $!";
       }
       $res += length($chunk);
     } else {
@@ -349,7 +341,7 @@ sub http_file(@) {
       unlink "$p->{-dest}.$$";
       throw HttpException "Not overwriting existing file with nothing";
     }
-    throw IOException "Unable to rename $p->{-dest}.$$ to $p->{-dest}" unless
+    throw LocalFileException "Unable to rename $p->{-dest}.$$ to $p->{-dest}" unless
       rename("$p->{-dest}.$$", $p->{-dest});
   }
 
@@ -408,14 +400,14 @@ sub dir_install {
     $p->{-dir_flags}{-$_} ||= $p->{-$_} if $p->{-$_};
     $p->{-flags}{-$_} ||= $p->{-$_} if $p->{-$_};
   }
-  dir_check(-dir => $p->{-dest}, %{$p->{-dir_flags}});
 
   return w "No source specified" unless $p->{-src};
   return w "No destination specified" unless $p->{-dest};
 
   $p->{-src} =~ s/^rollout:/$config->{base_url}/;
   my $restart = 0;
-  if ($p->{-src} =~ /^http:\/\//) {
+  d($p);
+  if ($p->{-src} =~ /^https?:\/\//) {
     my @files;
     try {
       @files = http_index $p->{-src};
@@ -792,7 +784,7 @@ sub slurp_file($) {
   my $file = shift;
   local $/;
 
-  my $fh = IO::File->new($file) or return w "Can't open file $file: $!";
+  my $fh = IO::File->new($file) or throw LocalFileException "Can't open file $file: $!";
   return <$fh>;
 }
 
@@ -811,13 +803,15 @@ sub file_append {
   $firstline =~ s/\n.*$/\n/s;
 
   unless (-f $p->{-file}) {
+    # Touch file.
     return w "$p->{-file} does not exist!" if $safe_mode;
-    IO::File->new(">$p->{-file}")->close if $p->{-create}; # Touch file.
+    IO::File->new(">$p->{-file}")->close
+      or throw LocalFileException "Unable to create $p->{-file}: $!" if $p->{-create};
   }
 
   my $t = '';
   my $added = 0;
-  my $fh = IO::File->new($p->{-file}) or return w "$p->{-file} unable to be opened: $!";
+  my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
 
   while (<$fh>) {
     if ($p->{-match} and /$p->{-match}/) {
@@ -860,7 +854,7 @@ sub file_modify {
 
   (-f $p->{-file}) or return l "$p->{-file} does not exist!";
 
-  my $fh = IO::File->new($p->{-file}) or return l "$p->{-file} unable to be opened: $!";
+  my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
 
   my($changes, $f, %c);
   while (<$fh>) {
@@ -933,22 +927,49 @@ sub safe_write_file {
 
   return 1 if $safe_mode;
 
-  my $fh = IO::File->new(">$file.$$") or fatal "Unable to open $file: $!";
+  my $fh = new IO::File("$file.$$", "w") or throw LocalFileException "Unable to open $file: $!";
 
   # If the argument is a filehandle, use that.
   if (ref $p->{-file} and defined fileno $p->{-file}) {
     local ($_, $!);
     my $in = $p->{-file};
-    $fh->print($_) while <$in>;
-    fatal "Unable to write $file: $!" if $!;
+    while (<$in>) {
+      $fh->print($_) or throw LocalFileException "Unable to write $file: $!";
+    }
   } else {
-    $fh->print($p->{-text}) or fatal "Unable to write to $file: $!";
+    $fh->print($p->{-text}) or throw LocalFileException "Unable to write to $file: $!";
   }
 
-  $fh->close or fatal "Unable to write to $file: $!";
+  $fh->close or throw LocalFileException "Unable to close $file: $!";
 
-  rename("$file.$$", $file) or fatal "Unable to rename $file.$$: $!";
+  rename("$file.$$", $file) or throw LocalFileException "Unable to rename $file.$$: $!";
 }
+
+sub lookup_user {
+  my($user) = @_;
+  local $^W = 0;
+  return unless defined $user;
+  return $user if int($user) eq $user;
+  if (defined(my $uid = getpwnam $user)) {
+    return $uid
+  }
+  w "Can't find user $user";
+  return -1;
+}
+memoize('lookup_user');
+
+sub lookup_group {
+  my($group) = @_;
+  local $^W = 0;
+  return unless defined $group;
+  return $group if int($group) eq $group;
+  if (defined(my $uid = getgrnam $group)) {
+    return $uid
+  }
+  w "Can't find group $group";
+  return -1;
+}
+memoize('lookup_group');
 
 sub set_attr {
   my $p = named_params @_, [ -file => undef, -mode => undef, -uid => undef, -gid => undef,
@@ -973,40 +994,19 @@ sub set_attr {
         $shift--;
       }
     } else {
-      fatal "Invalid mode for $p->{-file}: $_";
+      throw ConfigException "Invalid mode for $p->{-file}: $_";
     }
   }
 
-  for ($p->{-owner} || $p->{-uid}) {
-    last unless defined;
-    if (/^\d+$/) {
-      $uid = $_;
-    } else {
-      unless (defined ($uid = getpwnam $_)) {
-        w "Can't find user $_";
-        $uid = -1;
-      }
-    }
-  }
-
-  for ($p->{-group} || $p->{-gid}) {
-    last unless defined;
-    if (/^\d+$/) {
-      $gid = $_;
-    } else {
-      unless (defined ($gid = getgrnam $_)) {
-        w "Can't find group $_";
-        $gid = -1;
-      }
-    }
-  }
+  $uid = lookup_user($p->{-owner} || $p->{-uid});
+  $gid = lookup_user($p->{-group} || $p->{-gid});
 
   return 0 unless defined $mode or defined $uid or defined $gid;
 
   my @stat = stat $p->{-file};
   unless (@stat) {
     # May not exist yet
-    w "Can't stat $p->{-file}: $!" unless $safe_mode;
+    throw LocalFileException "Can't stat $p->{-file}: $!" unless $safe_mode;
     return 0;
   }
 
@@ -1016,7 +1016,7 @@ sub set_attr {
     $changed++;
     unless ($safe_mode) {
       chmod $mode, $p->{-file} or
-        w sprintf("chmod %o %s failed: $!", $mode, $p->{-file});
+        throw LocalFileException sprintf("chmod %o %s failed: $!", $mode, $p->{-file});
     }
   }
 
@@ -1036,7 +1036,7 @@ sub set_attr {
 
   if ($uid != -1 or $gid != -1 && !$safe_mode) {
     chown $uid, $gid, $p->{-file} or
-      w sprintf("chown %d:%d %s failed: $!", $uid, $gid, $p->{-file});
+      throw LocalFileException sprintf("chown %d:%d %s failed: $!", $uid, $gid, $p->{-file});
   }
 
   return $changed;
@@ -1048,9 +1048,8 @@ sub text_install {
   my $changed = 1;
 
   # Create containing directory if it doesn't exist
-
-  (my $path = $p->{-file}) =~ s,/[^/]+$,,;
-  command("mkdir -p $path") if $path and $path ne $p->{-file} and ! -d $path;
+  my $path = dirname($p->{-file});
+  dir_check(-dir => $path) if $path and $path ne $p->{-file} and ! -d $path;
 
   $p->{-flags}->{srcfn} ||= "text";
 
@@ -1066,15 +1065,19 @@ sub text_install {
   if ($changed) {
     my $ref = ref $p->{-flags}->{srcfn};
     if ($ref eq "ARRAY") {
-      fatal "Multiple sources for \"$p->{-file}\":\n" . join("\n", @{$p->{-flags}->{srcfn}}) . "\n";
+      throw ConfigException "Multiple sources for \"$p->{-file}\":\n" . join("\n", @{$p->{-flags}->{srcfn}});
     } else {
       l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
     }
     if ($safe_mode) {
-      v $p->{-text};
+      d $p->{-text};
     } else {
-      safe_write(-file => $p->{-file}, -text => $p->{-text})
-      or return w "Unable to install $p->{-file}: $!";
+      try {
+        safe_write(-file => $p->{-file}, -text => $p->{-text})
+      } catch LocalFileException with {
+        my $ex = shift;
+        $ex->throw("Unable to install $p->{-file}: ". $ex);
+      };
     }
   }
 
@@ -1094,7 +1097,7 @@ sub file_install {
   my $srctext;
 
   $p->{-src} =~ s/^rollout:/$config->{base_url}/;
-  if ($p->{-src} =~ /^http:\/\//) {
+  if ($p->{-src} =~ /^https?:\/\//) {
     try {
       local $_;
       $_ = http_file -url => $p->{-src};
@@ -1107,7 +1110,7 @@ sub file_install {
     };
   } elsif (-s $p->{-src}) {
     if (@expr) {
-      my $fh = IO::File->new($p->{-src}) or fatal "can't open $p->{-src}: $!";
+      my $fh = new IO::File $p->{-src} or throw LocalFileException "Unable to read $p->{-src}: $!";
       local $_;
       while (<$fh>) {
         foreach my $e (@expr) {
@@ -1147,16 +1150,18 @@ sub dir_check {
     return 1 if $safe_mode;
 
     my $mask = umask 0;
-    mkdir $p->{-dir}, $p->{-mode} or fatal "Can't create directory $p->{-dir}: $!";
+    mkdir $p->{-dir}, $p->{-mode}
+      or throw LocalFileException "Can't create directory $p->{-dir}: $!";
     umask $mask;
 
     $changed++;
   } else {
-    fatal "$p->{-dir} is not a directory" unless -d _;
+    throw LocalFileException "Existing $p->{-dir} is not a directory" unless -d _;
   }
 
   return (set_attr($p)) || $changed;
 }
+memoize('dir_check');
 
 sub symlink_check {
   my $p = named_params @_, [ -src => undef, -dest => undef ];
@@ -1164,17 +1169,19 @@ sub symlink_check {
     return 0 if (readlink $p->{-dest}) eq $p->{-src};
     l "Changing target of symlink $p->{-dest} to $p->{-src}";
     unless ($safe_mode) {
-      unlink $p->{-dest} or fatal "Can't unlink $p->{-dest}: $!";
-      symlink $p->{-src}, $p->{-dest} or fatal "Can't symlink $p->{-src} to $p->{-dest}: $!";
+      unlink $p->{-dest} or throw LocalFileException "Can't unlink $p->{-dest}: $!";
+      symlink $p->{-src}, $p->{-dest}
+        or throw LocalFileException "Can't symlink $p->{-src} to $p->{-dest}: $!";
     }
 
     return 1
   }
 
-  w "$p->{-dest} is not a symlink" or return 0 if -e _;
+  throw LocalFileException "$p->{-dest} is not a symlink" if -e _;
   unless ($safe_mode) {
     l "Creating symlink from $p->{-src} to $p->{-dest}";
-    symlink $p->{-src}, $p->{-dest} or fatal "Can't symlink $p->{-src} to $p->{-dest}: $!";
+    symlink $p->{-src}, $p->{-dest}
+      or throw LocalFileException "Can't symlink $p->{-src} to $p->{-dest}: $!";
   }
 
   return 1
@@ -1191,9 +1198,7 @@ sub file_comment_spec {
 
   return w "$p->{-file} does not exist!" unless -f $p->{-file};
 
-  my $fh = new IO::File $p->{-file}
-    or return w "$p->{-file} unable to be opened: $!";
-
+  my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
   my($changes, $f, %c);
   while (<$fh>) {
     if (! /^$p->{-pat}/) {
@@ -1209,7 +1214,6 @@ sub file_comment_spec {
 
     $f .= $_;
   }
-
   $fh->close;
   return unless $changes;
 
@@ -1236,9 +1240,7 @@ sub file_uncomment_spec {
 
   return w "$p->{-file} does not exist!" unless -f $p->{-file};
 
-  my $fh = new IO::File $p->{-file}
-    or return w "$p->{-file} unable to be opened: $!";
-
+  my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
   my($changes, $f, %c);
   while (<$fh>) {
     foreach my $r (@regex) {
@@ -1251,7 +1253,6 @@ sub file_uncomment_spec {
     }
     $f .= $_;
   }
-
   $fh->close;
   return unless $changes;
 
@@ -1346,7 +1347,7 @@ sub package_check {
   foreach my $package (@packages) {
     next if $m{$hostname}->{_done_packages}{$package}++;
     next if package_status($package);
-    next if $package =~ /^(http:\/\/|rollout:)/;
+    next if $package =~ /^(https?:\/\/|rollout:)/;
     push @add, $package;
   }
 
@@ -1363,7 +1364,7 @@ sub package_check {
 
   foreach my $url (@packages) {
     $url =~ s/^rollout:/$config->{base_url}/;
-    next unless $url =~ /^(http:\/\/[^\/]+).*\/([a-z0-9\._\-]+\.(?:deb|rpm))/i;
+    next unless $url =~ /^(https?:\/\/[^\/]+).*\/([a-z0-9\._\-]+\.(?:deb|rpm))/i;
 
     my($package, $filename) = ($2, $2);
     $package =~ s/[_-]\d+.*//;
@@ -1378,21 +1379,18 @@ sub package_check {
     } else {
       try {
         my $data = http_file -url => $url;
-        if ((my $fh = new IO::File ">/tmp/$filename")) {
-          print $fh $data;
-          close($fh);
+        my $fh = new IO::File "/tmp/$filename", "w"
+          or throw LocalFileException "Unable to write to /tmp/$filename: $!";
+        print $fh $data;
+        $fh->close;
 
-          if ($filename =~ /\.deb$/) {
-            command("dpkg", "-i", "/tmp/$filename") && $changes++;
-          } else {
-            w "Unknown package type for $url";
-          }
-
-          unlink("/tmp/$filename");
+        if ($filename =~ /\.deb$/) {
+          command("dpkg", "-i", "/tmp/$filename") && $changes++;
         } else {
-          w "Couldn't write to /tmp/$filename: $!";
-          next;
+          w "Unknown package type for $url";
         }
+
+        unlink("/tmp/$filename");
       } catch HttpException with {
         w "Couldn't retrieve package from $url". shift();
       };
@@ -1425,7 +1423,7 @@ sub package_uncheck {
 sub cvs_checkout {
   my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef,
                              -cmd => undef ];
-  return w "Not enough parameters specified to cvs_checkout"
+  throw ConfigException "Not enough parameters specified to cvs_checkout"
     unless $p->{-dest} && $p->{-module} && $p->{repo};
 
   v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
@@ -1440,9 +1438,13 @@ sub cvs_checkout {
     return 1;
   } else {
     my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
-    dir_check($base);
-    return w "Checkout to $p->{-dest} failed" unless -d $base;
+    throw ConfigException "Can't parse dir $p->{-dest}" unless $base && $newdir;
+    try {
+      dir_check($base);
+    } catch LocalFileException with {
+      my($ex) = @_;
+      $ex->throw("Checkout to $p->{-dest} failed: ". $ex);
+    }
     chdir $base;
     command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
             ($p->{-rev} ? ("-r", $p->{-rev}) : ()), "-d", $newdir, $p->{-module});
@@ -1454,7 +1456,8 @@ sub cvs_checkout {
 
 sub svn_checkout {
   my $p = named_params @_, [ -dest => undef, -url => undef, -rev => undef, -cmd => undef ];
-  return w "Not enough parameters specified to svn_checkout" unless $p->{-dest} && $p->{-url};
+  throw ConfigException "Not enough parameters specified to svn_checkout"
+    unless $p->{-dest} && $p->{-url};
 
   v "svn checkout $p->{-dest}:". ($p->{-rev} || "HEAD");
   if (-d $p->{-dest} && !-d "$p->{-dest}/.svn") {
@@ -1468,9 +1471,13 @@ sub svn_checkout {
     return 1;
   } else {
     my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
-    dir_check($base);
-    return w "Checkout to $p->{-dest} failed" unless -d $base;
+    throw ConfigException "Can't parse dir $p->{-dest}" unless $base && $newdir;
+    try {
+      dir_check($base);
+    } catch LocalFileException with {
+      my($ex) = @_;
+      $ex->throw("Checkout to $p->{-dest} failed: ". $ex);
+    }
     chdir $base;
     command("svn", "checkout", ($p->{-rev} ? ("-r", $p->{-rev}) : ()), $p->{-url}, $newdir);
     chdir $newdir && command($p->{-cmd}) if $p->{-cmd};
@@ -1575,6 +1582,26 @@ sub expand_network($) {
   return ($network) if $network =~ /^\d+\.\d+\.\d+\.\d+/;
   return @{$networks{$network} || []};
 }
+
+sub read_config {
+  my $fh = new IO::File $configfile
+    or throw LocalFileException "Unable to read config $configfile: $!";
+  my $newconfig = {%$config};
+  while (<$fh>) {
+    s/[\r\n]+$//;
+    next if /^\s*#/;
+    my($key, $value) = split /\s*=\s*/, $_, 2;
+    next unless $key && $value;
+    $newconfig->{$key} = $value;
+  }
+  $fh->close;
+  return $config = $newconfig;
+}
+
+sub write_config {
+  text_install(-file => $configfile,
+               -text => join("", map { "$_ = $config->{$_}\n" } keys %$config));
+ }
 
 if (open(LOCKFILE, ">/var/run/rollout.lock")) {
   die "There is already an instance of rollout running"
