@@ -76,7 +76,7 @@ v "Evaluated Rollout config: ". scalar(grep /^[a-z]/, keys %m). " devices, ".
 fatal "Can't find configuration entry for $hostname" unless $m{$hostname};
 
 # Install rollout locally, keeping the rollout URL parameter permanently {{{
-if (i_should("local_install")) {
+if (i_should("local_install") && !$safe_mode) {
   try {
     my $rollout = http_file "/rollout";
 

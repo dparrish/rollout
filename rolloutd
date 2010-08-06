@@ -111,7 +111,7 @@ sub send_headers {
 
   $self->{_responded} = 1;
   $self->{response_headers}{"Content-Type"} ||= "text/plain";
-  $self->{response_headers}{"Server"} ||= "Rolloutd/1.1.0";
+  $self->{response_headers}{"Server"} ||= "Rolloutd/1.2.0";
   $self->{response_headers}{"Date"} ||= strftime("%a, %d %b %Y %T %Z", localtime(time));
 
   if ($self->{protocol} || 'HTTP/1.0' eq 'HTTP/1.1') {

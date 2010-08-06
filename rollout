@@ -39,11 +39,12 @@ eval {
 };
 
 use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
-             $rollout_comment $start_time $configfile $configdir $VERSION %m );
-$VERSION = "1.1.0";
+             $rollout_comment $start_time $configfile $configdir $VERSION %m $no_step_labels );
+$VERSION = "1.2.0";
 $verbosity = 1;
 $safe_mode = 0;
 $configdir = "/etc/rollout";
+$no_step_labels = 0;
 $config = {
   # This is the default configuration
   base_url => "http://rollout.domain",
@@ -742,15 +743,25 @@ sub queue_step {
   $steps->insert($x, 0);
 }
 
+my $errors = 0;
 sub run_step {
   my($filename) = @_;
-  fatal("Attempt to run a step with no filename") and return unless $filename;
+  validate("Attempt to run a step with no filename", $filename);
   $current_step = $filename;
-  l $filename, 0;
+  l $filename, 0 unless $no_step_labels;
   try {
     $steps_code{$filename} ||= http_file -url => "steps/$filename";
+  } catch HttpException with {
+    w "Can't retrieve step $filename: ". shift();
+    return;
+  };
+  try {
     eval $steps_code{$filename};
-    exit unless $pid == $$;
+    $@->throw if $@;
+  } catch ConfigException with {
+    $errors++;
+    print "Configuration error in step $filename:\n". shift(). "\n";
+  } catch Error with {
     if ($@) {
       l "------ FATAL ERROR ------";
       l "$_" foreach ($@);
@@ -760,8 +771,8 @@ sub run_step {
       }
       $steps->insert($last_step, 0) if $last_step;
     }
-  } catch HttpException with {
-    w "Can't retrieve step $filename: ". shift();
+  } finally {
+    exit unless $pid == $$;
   };
 }
 
@@ -980,7 +991,7 @@ sub set_attr {
                              -owner => undef, -group => undef, -flags => {}];
   $p->{-file} ||= $p->{-dir};
   $p->{$_} ||= $p->{-flags}{$_} foreach keys %{$p->{-flags}};
-  return w "No filename given to set_attr" unless $p->{-file};
+  validate("set_attr called with no filename",  $p->{-file});
   my($mode, $uid, $gid);
 
   for ($p->{-mode}) {
@@ -1052,6 +1063,9 @@ sub set_attr {
 sub text_install {
   my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {},
                              -skip_checksum => undef ];
+  validate("text_install called with no filename" => $p->{-file});
+  validate("text_install called without text for $p->{-file}", defined $p->{-text});
+
   my $changed = 1;
 
   # Create containing directory if it doesn't exist
@@ -1070,13 +1084,10 @@ sub text_install {
   }
 
   if ($changed) {
-    my $ref = ref $p->{-flags}->{srcfn};
-    if ($ref eq "ARRAY") {
-      throw ConfigException "Multiple sources for \"$p->{-file}\":\n".
-        join("\n", @{$p->{-flags}->{srcfn}});
-    } else {
-      l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
-    }
+    throw ConfigException "Multiple sources for \"$p->{-file}\":\n".
+                          join("\n", @{$p->{-flags}->{srcfn}})
+      if ref($p->{-flags}->{srcfn}) eq 'ARRAY';
+    l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
     d $p->{-text};
     try {
       safe_write(-file => $p->{-file}, -text => $p->{-text})
@@ -1422,8 +1433,8 @@ sub package_uncheck {
 sub cvs_checkout {
   my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef,
                              -cmd => undef ];
-  throw ConfigException "Not enough parameters specified to cvs_checkout"
-    unless $p->{-dest} && $p->{-module} && $p->{repo};
+  validate("Not enough parameters specified to cvs_checkout",
+           $p->{-dest}, $p->{-module}, $p->{repo});
 
   v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
   if (-d $p->{-dest} && !-d "$p->{-dest}/CVS") {
@@ -1437,7 +1448,7 @@ sub cvs_checkout {
     return 1;
   } else {
     my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    throw ConfigException "Can't parse dir $p->{-dest}" unless $base && $newdir;
+    validate("Can't parse dir $p->{-dest}", $base, $newdir);
     try {
       dir_check($base);
     } catch LocalFileException with {
@@ -1455,8 +1466,7 @@ sub cvs_checkout {
 
 sub svn_checkout {
   my $p = named_params @_, [ -dest => undef, -url => undef, -rev => undef, -cmd => undef ];
-  throw ConfigException "Not enough parameters specified to svn_checkout"
-    unless $p->{-dest} && $p->{-url};
+  validate("Not enough parameters specified to svn_checkout", $p->{-dest}, $p->{-url});
 
   v "svn checkout $p->{-dest}:". ($p->{-rev} || "HEAD");
   if (-d $p->{-dest} && !-d "$p->{-dest}/.svn") {
@@ -1470,7 +1480,7 @@ sub svn_checkout {
     return 1;
   } else {
     my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    throw ConfigException "Can't parse dir $p->{-dest}" unless $base && $newdir;
+    validate("Can't parse dir $p->{-dest}", $base, $newdir);
     try {
       dir_check($base);
     } catch LocalFileException with {
@@ -1486,6 +1496,13 @@ sub svn_checkout {
 }
 
 # }}}
+
+sub validate($@) {
+  my($message, @checks) = @_;
+  foreach (@checks) {
+    throw ConfigException $message unless $_;
+  }
+}
 
 # An optional hashref as the last argument can set custom messages:
 #   failure - print this if command fails.
@@ -1628,6 +1645,7 @@ Getopt::Long::GetOptionsFromArray([@ARGV],
   "skip_step|k=s"   => \@skip_steps,
   "url|u=s"         => \$config->{base_url},
   "verbose|v"       => sub {},
+  "no_step_labels"  => \$no_step_labels,
   "help|?"          => \&usage,
 ) or usage();
 
@@ -1676,6 +1694,8 @@ while ((my $step = $steps->pop())) {
 write_config();
 close(LOCKFILE);
 unlink("/var/run/rollout.lock");
+
+exit $errors;
 
 __END__
 =head1 NAME
@@ -1734,6 +1754,10 @@ Directory to store configuration files
 =item B<--configfile> <filename>
 
 File to store configuration (inside configdir unless full path)
+
+=item B<--no_step_labels>
+
+Don't print the filename of each step as it's run.
 
 =back
 
