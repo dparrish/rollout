@@ -25,6 +25,7 @@ try {
 if (i_should("user_keys")) {
   my %users = flatten_hash(c("$hostname/users"));
   while (my($username, $user) = each(%users)) {
+    next unless defined $user;
     $keys{$username} ||= { $username => 1 };
     $keys{$username}->{$_}++ foreach (@{$user->{ssh_keys} || []});
   }

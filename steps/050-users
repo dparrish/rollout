@@ -102,7 +102,6 @@ if (i_should("users")) {
 
 # Remove users and groups that are not required
 if (i_should("users")) {
-  my %users = flatten_hash(c("$hostname/users"));
   while (my($username, $user) = each(%users)) {
     next if defined $user;
     next unless my $uid = getpwnam($username);
