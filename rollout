@@ -760,7 +760,7 @@ sub run_step {
     $@->throw if $@;
   } catch ConfigException with {
     $errors++;
-    print "Configuration error in step $filename:\n". shift(). "\n";
+    w "Configuration error in step $filename:\n". shift();
   } catch Error with {
     if ($@) {
       l "------ FATAL ERROR ------";

@@ -13,7 +13,7 @@ while (my($source, $f) = each(%file_extract)) {
   l "Extracting $source to $f->{dest}";
   my $fn = $source;
   $fn =~ s/.*\///;
-  w "Unknown filename $source" and next unless $fn;
+  validate("Unknown filename $source", $fn);
   w "/tmp/$fn already exists, refusing to overwrite" and next if -f "/tmp/$fn";
 
   if (-x "/usr/bin/wget") {
@@ -22,8 +22,8 @@ while (my($source, $f) = each(%file_extract)) {
     try {
       http_file(-url => $source, -dest => "/tmp/$fn") unless $safe_mode;
     } catch HttpException with {
-      w "Couldn't install $f->{dest} from $source: ". shift();
-      next;
+      my($ex) = @_;
+      $ex->throw("Couldn't install $f->{dest} from $source: $ex");
     };
   }
 
@@ -38,6 +38,6 @@ while (my($source, $f) = each(%file_extract)) {
     command("tar", "jxf", "/tmp/$fn");
   }
 
-  unlink("/tmp/$fn");
+  unlink("/tmp/$fn") unless $safe_mode;
 }
 

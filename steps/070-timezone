@@ -5,6 +5,8 @@ return unless i_has("timezone") && i_should("timezone");
 my $zone = (flatten_list(c("$hostname/timezone")))[0];
 return unless $zone;
 
+validate("Unknown timezone $zone", -f "/usr/share/zoneinfo/$zone");
+
 text_install("/etc/timezone", "$zone\n");
 
 if (-f "/etc/sysconfig/clock") {

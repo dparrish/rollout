@@ -29,6 +29,7 @@ my $global_safe_mode = $safe_mode;
 # This first step has to be done without safe mode
 local $safe_mode = 0;
 
+# Retreive and parse configuration {{{
 try {
   my $machines_data = http_file "rollout.cfg";
   eval $machines_data;
@@ -40,7 +41,7 @@ try {
 };
 
 try {
-  get_fragments("fragments"); #{{{
+  get_fragments("fragments");
 } catch HttpException with {
   fatal "Error retrieving fragments: ". shift;
 };
@@ -69,12 +70,12 @@ sub get_fragments {
     }
   }
 }
-#}}}
 
 v "Evaluated Rollout config: ". scalar(grep /^[a-z]/, keys %m). " devices, ".
   scalar(grep /^[A-Z]/, keys %m). " classes";
 fatal "Can't find configuration entry for $hostname" unless $m{$hostname};
 
+# }}}
 # Install rollout locally, keeping the rollout URL parameter permanently {{{
 if (i_should("local_install") && !$safe_mode) {
   try {

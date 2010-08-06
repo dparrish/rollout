@@ -19,7 +19,8 @@ try {
     $all_keys{$name} .= "$_\n";
   }
 } catch HttpException with {
-  return l "Can't get authorized_keys file: ". shift();
+  my($ex) = @_;
+  $ex->throw("Can't get authorized_keys file: $ex");
 };
 
 if (i_should("user_keys")) {
@@ -41,6 +42,10 @@ foreach (keys %keys) {
   w "User $_ doesn't exist" and next unless $name;
   w "User ${name}'s homedir doesn't exist" and next unless -d $dir;
   v "Checking keys for $_ -> ". join(", ", keys %{$keys{$_}});
+  foreach (keys %{$keys{$_}}) {
+    throw ConfigException "Missing key \"$_\" for user $name, should be in authorized_keys"
+      unless $all_keys{$_};
+  }
   v "No keys found for $_" and next unless
     my $text = join("", grep defined, map { $all_keys{$_} } keys %{$keys{$_}});
   dir_check(-dir => "$dir/.ssh", -mode => 0700, -uid => $uid, -gid => $gid);
