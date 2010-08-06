@@ -408,7 +408,7 @@ sub dir_install {
   return w "No destination specified" unless $p->{-dest};
 
   $p->{-src} =~ s/^rollout:/$config->{base_url}/;
-  my $restart = 0;
+  my $changed = 0;
   d($p);
   if ($p->{-src} =~ /^https?:\/\//) {
     my @files;
@@ -428,7 +428,7 @@ sub dir_install {
           dir_install(-src => "$p->{-src}/$filename",
                       -dest => "$p->{-dest}/$filename",
                       -flags => $p->{-flags},
-                      -dir_flags => $p->{-dir_flags}) && $restart++;
+                      -dir_flags => $p->{-dir_flags}) && $changed++;
         }
       } else {
         my @stat = stat("$p->{-dest}/$filename");
@@ -438,7 +438,7 @@ sub dir_install {
             my $md5 = Digest::MD5->new->add(slurp_file("$p->{-dest}/$filename"))->hexdigest;
             if ($md5 && $_->{checksum} && $_->{checksum} eq $md5) {
               v "Skipping $p->{-src}/$filename -> $p->{-dest}/$filename, it's the same";
-              set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}}) && $restart++;
+              $changed += set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}});
               next;
             }
           }
@@ -447,9 +447,8 @@ sub dir_install {
         try {
           my $file = http_file -url => "$p->{-src}/$filename";
           text_install(-file => "$p->{-dest}/$filename", -text => $file, -flags => $p->{-flags},
-                       -skip_checksum => 1)
-            && $restart++;
-          set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}}) && $restart++;
+                       -skip_checksum => 1, -flags => $p->{-flags})
+            && $changed++;
         } catch HttpException with {
           w "Error retrieving $p->{-src}/$filename: ". shift();
         };
@@ -457,8 +456,8 @@ sub dir_install {
     }
   }
 
-  command($p->{-cmd}) if $restart && $p->{-cmd};
-  return $restart ? 1 : 0;
+  command($p->{-cmd}) if $changed && $p->{-cmd};
+  return $changed ? 1 : 0;
 }
 
 #}}}
@@ -978,10 +977,10 @@ eval { memoize('lookup_group') };
 
 sub set_attr {
   my $p = named_params @_, [ -file => undef, -mode => undef, -uid => undef, -gid => undef,
-                             -owner => undef, -group => undef];
+                             -owner => undef, -group => undef, -flags => {}];
   $p->{-file} ||= $p->{-dir};
+  $p->{$_} ||= $p->{-flags}{$_} foreach keys %{$p->{-flags}};
   return w "No filename given to set_attr" unless $p->{-file};
-
   my($mode, $uid, $gid);
 
   for ($p->{-mode}) {
@@ -1012,39 +1011,42 @@ sub set_attr {
   unless (@stat) {
     # May not exist yet
     throw LocalFileException "Can't stat $p->{-file}: $!" unless $safe_mode;
-    return 0;
+    @stat = (-1, -1, -1, -1, -1, -1);
   }
 
-  my $changed = 0;
-  if (defined $mode and ($stat[2] & 07777) != $mode) {
-    l sprintf("Changing mode of %s to 0%o", $p->{-file}, $mode);
-    $changed++;
-    unless ($safe_mode) {
-      chmod $mode, $p->{-file} or
-        throw LocalFileException sprintf("chmod %o %s failed: $!", $mode, $p->{-file});
-    }
-  }
-
+  my @changes;
   if (defined $uid and $stat[4] != $uid) {
-    l "Changing owner of $p->{-file} to $uid";
-    $changed++;
+    push @changes, "owner=$uid";
   } else {
-    $uid = -1;
+    $uid = $stat[4];
   }
 
   if (defined $gid and $stat[5] != $gid) {
-    l "Changing group of $p->{-file} to $gid";
-    $changed++;
+    push @changes, "group=$gid";
   } else {
-    $gid = -1;
+    $gid = $stat[5];
   }
 
-  if ($uid != -1 or $gid != -1 && !$safe_mode) {
-    chown $uid, $gid, $p->{-file} or
-      throw LocalFileException sprintf("chown %d:%d %s failed: $!", $uid, $gid, $p->{-file});
+  if (defined $mode and ($stat[2] & 07777) != $mode) {
+    push @changes, sprintf("mode=0%o", $mode);
   }
 
-  return $changed;
+  if (@changes) {
+    l "Changing attributes of $p->{-file}: ". join(", ", @changes);
+    unless ($safe_mode) {
+      if (defined $mode and ($stat[2] & 07777) != $mode) {
+        chmod $mode, $p->{-file} or
+          throw LocalFileException sprintf("chmod %o %s failed: $!", $mode, $p->{-file});
+      }
+      if ($uid != $stat[4] or $gid != $stat[5]) {
+        chown $uid, $gid, $p->{-file} or
+          throw LocalFileException sprintf("chown %d:%d %s failed: $!", $uid, $gid, $p->{-file})
+          unless $safe_mode;
+      }
+    }
+  }
+
+  return scalar @changes;
 }
 
 sub text_install {
@@ -1075,20 +1077,17 @@ sub text_install {
     } else {
       l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
     }
-    if ($safe_mode) {
-      d $p->{-text};
-    } else {
-      try {
-        safe_write(-file => $p->{-file}, -text => $p->{-text})
-      } catch LocalFileException with {
-        my $ex = shift;
-        $ex->throw("Unable to install $p->{-file}: ". $ex);
-      };
-    }
+    d $p->{-text};
+    try {
+      safe_write(-file => $p->{-file}, -text => $p->{-text})
+    } catch LocalFileException with {
+      my $ex = shift;
+      $ex->throw("Unable to install $p->{-file}: ". $ex);
+    };
   }
 
   $changed += set_attr($p);
-  if ($changed and defined $p->{-cmd} and !$safe_mode) {
+  if ($changed and defined $p->{-cmd}) {
     l "Running $p->{-cmd} to finish install of $p->{-file}";
     command($p->{-cmd});
   }
@@ -1140,32 +1139,26 @@ sub file_install {
 sub dir_check {
   my $p = named_params @_, [ -dir => undef, -mode => undef, -uid => undef, -gid => undef ];
   my $flags;
-  my $changed;
+  throw LocalFileException "Existing $p->{-dir} is not a directory" if -e $p->{-dir} && ! -d _;
+  return set_attr($p) if -d _;
 
-  unless (-d $p->{-dir}) {
-    # make parent if required
-    (my $parent = $p->{-dir}) =~ s/\/[^\/]+$//;
-    if ($parent && !-e $parent) {
-      my $x = {%$p};
-      $x->{-dir} = $parent;
-      dir_check($x);
-    }
-    $p->{-mode} ||= 0755;
-
-    l sprintf("Creating directory %s with mode 0%o", $p->{-dir}, $p->{-mode});
-    return 1 if $safe_mode;
-
-    my $mask = umask 0;
-    mkdir $p->{-dir}, $p->{-mode}
-      or throw LocalFileException "Can't create directory $p->{-dir}: $!";
-    umask $mask;
-
-    $changed++;
-    set_attr($p) && $changed++;
-    return $changed;
-  } else {
-    throw LocalFileException "Existing $p->{-dir} is not a directory" unless -d _;
+  # make parent if required
+  (my $parent = $p->{-dir}) =~ s/\/[^\/]+$//;
+  if ($parent && !-e $parent) {
+    my $x = {%$p};
+    $x->{-dir} = $parent;
+    dir_check($x);
   }
+  $p->{-mode} ||= 0755;
+
+  l sprintf("Creating directory %s with mode 0%o", $p->{-dir}, $p->{-mode});
+  return 1 if $safe_mode;
+
+  my $mask = umask 0;
+  mkdir $p->{-dir}, $p->{-mode}
+    or throw LocalFileException "Can't create directory $p->{-dir}: $!";
+  umask $mask;
+  return 1;
 }
 eval { memoize('dir_check') };
 
