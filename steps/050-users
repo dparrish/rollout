@@ -7,11 +7,14 @@
 #  groups - Create and update group entries
 #  force_password - Reset user's passwords if they have changed them
 
+my %groups = flatten_hash(c("$hostname/group"));
+my %users = flatten_hash(c("$hostname/users"));
+
 if (i_should("groups")) {
   # Deal with groups first
-  my %groups = flatten_hash(c("$hostname/group"));
   v "Checking groups: ". join(" ", keys %groups);
   while (my($name, $group) = each(%groups)) {
+    next unless defined $group;
     my $gid = getgrnam($name);
     if (!$gid) {
       # Create Group
@@ -30,12 +33,12 @@ if (i_should("groups")) {
 
 # Now all the users
 if (i_should("users")) {
-  my %users = flatten_hash(c("$hostname/users"));
+  v "Checking groups: ". join(" ", keys %users);
 
-  foreach my $username (keys %users) {
-    v "Checking user $username";
-    $users{$username}->{name} ||= "";
-    $users{$username}->{name} =~ s/\$hostname/$hostname/;
+  while (my($username, $user) = each(%users)) {
+    next unless defined $user;
+    $user->{name} ||= "";
+    $user->{name} =~ s/\$hostname/$hostname/;
 
     my($name, $passwd, $uid, $gid, $quota, $comment, $gcos, $dir, $shell, $expire) =
       getpwnam($username);
@@ -44,31 +47,31 @@ if (i_should("users")) {
       # Create User
       l "Create user $username";
       command("useradd",
-        ($users{$username}->{uid} ? ("-u", $users{$username}->{uid}, "-o") : ()),
-        ($users{$username}->{gid} ? ("-g", $users{$username}->{gid}) : ()),
-        ($users{$username}->{groups} ? ("-G", join(",", @{$users{$username}->{groups}})) : ()),
-        ($users{$username}->{home} ? ("-d", $users{$username}->{home}, "-m") : ()),
-        ($users{$username}->{password} ? ("-p", $users{$username}->{password}) : ()),
-        ($users{$username}->{name} ? ("-c", $users{$username}->{name}) : ()),
-        ($users{$username}->{shell} ? ("-s", $users{$username}->{shell}) : ()),
+        ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
+        ($user->{gid} ? ("-g", $user->{gid}) : ()),
+        ($user->{groups} ? ("-G", join(",", @{$user->{groups}})) : ()),
+        ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
+        ($user->{password} ? ("-p", $user->{password}) : ()),
+        ($user->{name} ? ("-c", $user->{name}) : ()),
+        ($user->{shell} ? ("-s", $user->{shell}) : ()),
         $username
       );
     } else {
       # User exists
-      delete $users{$username}->{force_password} unless i_should("force_password");
+      delete $user->{force_password} unless i_should("force_password");
       my $modify = 0;
-      $modify++ if $users{$username}->{uid} && $users{$username}->{uid} != $uid;
-      $modify++ if $users{$username}->{home} && ($users{$username}->{home} ne $dir || !-d $dir);
-      $modify++ if $users{$username}->{password} && $users{$username}->{password} ne $passwd
-                   && $users{$username}->{force_password};
-      $modify++ if $users{$username}->{shell} && $users{$username}->{shell} ne $shell;
-      $modify++ if $users{$username}->{name} && $users{$username}->{name} ne $gcos;
-      if ($users{$username}->{groups}) {
-        foreach (@{$users{$username}->{groups}}) {
+      $modify++ if $user->{uid} && $user->{uid} != $uid;
+      $modify++ if $user->{home} && ($user->{home} ne $dir || !-d $dir);
+      $modify++ if $user->{password} && $user->{password} ne $passwd
+                   && $user->{force_password};
+      $modify++ if $user->{shell} && $user->{shell} ne $shell;
+      $modify++ if $user->{name} && $user->{name} ne $gcos;
+      if ($user->{groups}) {
+        foreach (@{$user->{groups}}) {
           my($gname,$gpasswd,$ggid,$gmembers) = getgrnam($_);
           if ($gname) {
             if (!grep({ $_ eq $name } split(/ /, $gmembers))) {
-              v "$name should be in ". join(" ", @{$users{$username}->{groups}}). ", but isn't in all";
+              v "$name should be in ". join(" ", @{$user->{groups}}). ", but isn't in all";
               $modify++;
             }
           }
@@ -77,23 +80,44 @@ if (i_should("users")) {
       if ($modify) {
         l "Updating user $username";
         command("usermod",
-          ($users{$username}->{uid} ? ("-u", $users{$username}->{uid}, "-o") : ()),
-          ($users{$username}->{gid} ? ("-g", $users{$username}->{gid}) : ()),
-          ($users{$username}->{groups} ? ("-a", "-G", join(",", @{$users{$username}->{groups}})) : ()),
-          ($users{$username}->{home} ? ("-d", $users{$username}->{home}, "-m") : ()),
-          ($users{$username}->{password} && $users{$username}->{force_password}
-            ? ("-p", $users{$username}->{password}) : ()),
-          ($users{$username}->{name} ? ("-c", $users{$username}->{name}) : ()),
-          ($users{$username}->{shell} ? ("-s", $users{$username}->{shell}) : ()),
+          ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
+          ($user->{gid} ? ("-g", $user->{gid}) : ()),
+          ($user->{groups} ? ("-a", "-G", join(",", @{$user->{groups}})) : ()),
+          ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
+          ($user->{password} && $user->{force_password}
+            ? ("-p", $user->{password}) : ()),
+          ($user->{name} ? ("-c", $user->{name}) : ()),
+          ($user->{shell} ? ("-s", $user->{shell}) : ()),
           $username
         );
       }
     }
 
-    dir_check(-dir => $users{$username}->{home}, -mode => 0750,
-              -uid => $users{$username}->{uid} || 0,
-              -gid => $users{$username}->{gid} || 0)
-      if $users{$username}->{home};
+    dir_check(-dir => $user->{home}, -mode => 0750, -uid => $user->{uid} || 0,
+              -gid => $user->{gid} || 0)
+      if $user->{home};
   }
 }
+
+
+# Remove users and groups that are not required
+if (i_should("users")) {
+  my %users = flatten_hash(c("$hostname/users"));
+  while (my($username, $user) = each(%users)) {
+    next if defined $user;
+    next unless my $uid = getpwnam($username);
+    l "Delete user $username";
+    command("userdel", $username);
+  }
+}
+
+if (i_should("groups")) {
+  while (my($name, $group) = each(%groups)) {
+    next if defined $group;
+    next unless my $gid = getgrnam($name);
+    l "Delete group $name";
+    command("groupdel", $name);
+  }
+}
+
 
