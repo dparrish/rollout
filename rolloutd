@@ -252,7 +252,7 @@ sub handle_request {
     foreach (@{$self->{allow}}) {
       $found++ if $_->match($self->{peer}->[0]);
     }
-    return $self->error_response(403, undef, print "Not allowed to access $path\r\n")
+    return $self->error_response(403, undef, "Not allowed to access $path\r\n")
       if !$found || $path eq '/';
   }
 
@@ -389,7 +389,6 @@ sub usage {
 }
 
 usage() unless $server_allow && $server_base && $server_listen;
-$chroot = 1 if $daemon;
 
 # Check for an existing rolloutd process
 if (open(LOCKFILE, ">/var/lock/rolloutd.lock")) {

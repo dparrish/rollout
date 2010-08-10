@@ -7,6 +7,7 @@ LISTEN_ADDRESS="127.0.0.1"
 LISTEN_PORT=80
 ROLLOUTD="/usr/local/sbin/rolloutd"
 PIDFILE="/var/run/rolloutd.pid"
+LISTEN_SSL=""
 USER=nobody
 GROUP=daemon
 
@@ -25,15 +26,17 @@ case "$1" in
     [ -z ${RUN_ON_STARTUP} -o ${RUN_ON_STARTUP} != 1 ] && exit 0
     [ -d ${BASEDIR} ] || mkdir -p "${BASEDIR}"
     echo "Starting Rollout"
+    cd `dirname ${ROLLOUTD}`
     ${ROLLOUTD} \
       --daemon \
       --pidfile "${PIDFILE}" \
-      --chroot \
       --base "${BASEDIR}" \
       --allow "${ALLOW}" \
       --listen "${LISTEN_ADDRESS}:${LISTEN_PORT}" \
+      ${LISTEN_SSL} \
       --user "${USER}" \
-      --group "${GROUP}"
+      --group "${GROUP}" \
+      >> /var/log/rolloutd.log 2>&1
     ;;
   stop)
     check_status && exit 0

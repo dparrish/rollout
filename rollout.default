@@ -15,9 +15,12 @@ ALLOW="127.0.0.0/24"
 LISTEN_ADDRESS="127.0.0.1"
 LISTEN_PORT=8000
 
+# Undefine this option to disable SSL (not recommended)
+LISTEN_SSL=--ssl
+
 # Choose a user and group to run as. By default this is nobody, but should be changed for security
 USER=nobody
 GROUP=daemon
 
 # This is the Rollout binary server that is run.
-ROLLOUTD="/usr/local/sbin/rollout"
+ROLLOUTD="/usr/local/sbin/rolloutd"
