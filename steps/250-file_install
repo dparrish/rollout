@@ -48,8 +48,8 @@ while (my($dest, $src) = each %symlinks)
   if (ref $src eq 'ARRAY')
   {
     my @list = uniq(@$src);
-    fatal "You have multiple symlink_check definitions for $dest, you must only have one."
-      if @list > 1;
+    validate("You have multiple symlink_check definitions for $dest, you must only have one.",
+             @list == 1);
     $src = $list[0];
   }
   symlink_check($src, $dest);

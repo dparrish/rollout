@@ -1,0 +1,65 @@
+[req_distinguished_name]
+countryName = Country Name (2 letter code)
+countryName_default = AU
+organizationalUnitName = Organizational Unit Name (eg, section)
+organizationalUnitName_default = Rollout Server
+commonName = Client Name
+commonName_max = 64
+commonName_default = rollout_server
+
+[ca]
+default_ca = Rolloutd
+
+[Rolloutd]
+dir = .
+RANDFILE = $dir/private/.rand
+cert_opt = ca_default
+certificate = $dir/private/cacert.pem
+certs = $dir/certs
+crl = $dir/crl.pem
+crl_dir = $dir/crl
+crlnumber = $dir/crlnumber
+database = $dir/index.txt
+default_crl_days= 30
+default_days = 365
+default_md = sha1
+name_opt = ca_default
+new_certs_dir = $dir/newcerts
+policy = policy_match
+preserve = no
+private_key = $dir/private/ca.key
+serial = $dir/serial
+unique_subject = no
+
+[policy_match]
+commonName = supplied
+countryName = match
+emailAddress = optional
+organizationName = optional
+organizationalUnitName = optional
+stateOrProvinceName = optional
+
+[req]
+default_bits = 1024
+distinguished_name = req_distinguished_name
+
+[server_cert]
+basicConstraints = CA:FALSE
+nsCertType = server
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+nsComment = "Rollout Server Certificate"
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+
+[client_cert]
+basicConstraints = CA:FALSE
+nsCertType = client
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+nsComment = "Rollout Client Certificate"
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+
+[ca_cert]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints = CA:true

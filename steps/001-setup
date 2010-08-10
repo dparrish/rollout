@@ -29,60 +29,75 @@ my $global_safe_mode = $safe_mode;
 # This first step has to be done without safe mode
 local $safe_mode = 0;
 
-my $machines_data = http_file "rollout.cfg";
-carp "Can't retrieve rollout configuration rollout.cfg: $@" unless $machines_data;
+# Retreive and parse configuration {{{
+try {
+  my $machines_data = http_file "rollout.cfg";
+  eval $machines_data;
+  die "Can't parse rollout configuration rollout.cfg: $@" unless keys %m;
+} catch HttpException with {
+  fatal "Can't retrieve rollout configuration rollout.cfg: ". shift;
+} catch Error with {
+  fatal shift;
+};
 
-eval $machines_data;
-die "Can't parse rollout configuration rollout.cfg: $@" unless keys %m;
+try {
+  get_fragments("fragments");
+} catch HttpException with {
+  fatal "Error retrieving fragments: ". shift;
+};
 
-get_fragments("fragments"); #{{{
 sub get_fragments {
   my ($location) = @_;
   my @fragments = http_index $location;
-  foreach my $fragment (sort @fragments) {
+  foreach (sort { $a->{filename} cmp $b->{filename} } @fragments) {
+    my $fragment = $_->{filename};
     if ($fragment =~ /\/$/) {
       # making the output look pretty in verbose
       $fragment =~ s/\/$//;
       get_fragments("$location/$fragment");
     } else {
       v "fragment: $location/$fragment";
-      my $text = http_file "$location/$fragment";
-      if (!defined($text)) {
-        w "Empty config fragment \"$location/$fragment\"";
-        next;
-      }
-      eval $text;
-      if ($@) {
-        fatal "Config fragment \"$location/$fragment\" failed: $@";
-      }
+      try {
+        my $text = http_file "$location/$fragment";
+        w "Empty config fragment \"$location/$fragment\"" and next unless $text;
+        eval $text;
+        if ($@) {
+          fatal "Config fragment \"$location/$fragment\" failed: $@";
+        }
+      } catch HttpException with {
+        w "Error retrieving config fragment $location/$fragment: ". shift;
+      };
     }
   }
 }
-#}}}
 
 v "Evaluated Rollout config: ". scalar(grep /^[a-z]/, keys %m). " devices, ".
   scalar(grep /^[A-Z]/, keys %m). " classes";
 fatal "Can't find configuration entry for $hostname" unless $m{$hostname};
 
+# }}}
 # Install rollout locally, keeping the rollout URL parameter permanently {{{
-if (i_should("local_install")) {
-  my $rollout = http_file "/rollout";
-  fatal "Can't download rollout to install locally" unless $rollout;
+if (i_should("local_install") && !$safe_mode) {
+  try {
+    my $rollout = http_file "/rollout";
 
-  $rollout =~ s/^\$rollout_url = ".+?";/\$rollout_url = "$rollout_url";/m;
-  my($rc, @output) = compile_perl($rollout);
-  if ($rc) {
-    l map { "$_\n" } @output;
-    fatal "The rollout script could be not correctly parsed, and won't be installed";
-    exit;
-  }
+    my($rc, @output) = compile_perl($rollout);
+    if ($rc) {
+      l map { "$_\n" } @output;
+      fatal "The rollout script could be not correctly parsed, and won't be installed";
+      exit;
+    }
 
-  if (text_install(-file => "/usr/local/sbin/rollout", -text => $rollout, -mode => 0750,
-                   -uid => 0, -group => 0 )) {
-    # rollout has been updated, switch to it
-    l "rollout has been updated, re-executing";
-    exec("/usr/local/sbin/rollout", @original_argv);
-  }
+    my $dest = $0;
+    $dest = "/usr/local/sbin/rollout" unless $dest =~ /^\//;
+    if (text_install(-file => $dest, -text => $rollout, -mode => 0750, -uid => 0, -group => 0 )) {
+      # rollout has been updated, switch to it
+      l "Rollout has been installed to $dest, re-executing";
+      exec($dest, @ARGV);
+    }
+  } catch HttpException with {
+    fatal "Can't download rollout to install locally: ". shift;
+  };
 }
 
 # }}}

@@ -1,0 +1,452 @@
+#!/usr/bin/perl -w
+# vim:tw=100 sw=2 expandtab ft=perl
+
+package RolloutServer;
+
+use strict;
+use Digest::MD5;
+use Fcntl qw( :mode :flock );
+use File::Basename;
+use File::Spec::Functions qw( canonpath );
+use IO::Dir;
+use IO::Socket;
+use Net::Netmask;
+use POSIX qw( strftime );
+use URI::Escape;
+
+my $mime;
+eval {
+  require MIME::Types;
+  $mime = new MIME::Types;
+};
+
+my $magic;
+eval {
+  require File::MMagic;
+  $magic = new File::MMagic;
+};
+
+sub new {
+  my($class, $listen, $allow, $ssl) = @_;
+
+  my $self = bless {}, $class;
+
+  $self->{allow} = [];
+  $self->{ssl} = $ssl;
+  $self->{cached_checksums} = {};
+  foreach (split /,/, $allow) {
+    my $net = new Net::Netmask $_;
+    push @{$self->{allow}}, $net;
+  }
+
+  my($address, $port) = split /:/, $listen;
+  $self->{listen_address} = $address;
+  $self->{listen_port} = $port;
+  $self->{checksum_file_fields} = ["filename", "checksum", "inode", "size", "mtime"];
+
+  require IO::Socket::SSL if $self->{ssl};
+  $self->{sock} = new IO::Socket::INET
+    Listen => 5,
+    LocalAddr => $address,
+    LocalPort => $port,
+    Proto     => 'tcp',
+    ReuseAddr => 1
+  or die "Unable to create socket: ". IO::Socket::INET::errstr();
+
+  return $self;
+}
+
+sub run {
+  my($self) = @_;
+  while (my($sock, $peer) = $self->{sock}->accept) {
+    my($port, $packed_ipaddr) = sockaddr_in($peer);
+    my $ipaddr = inet_ntoa($packed_ipaddr);
+    next if fork();
+
+    if ($self->{ssl}) {
+      $sock = IO::Socket::SSL->start_SSL($sock,
+        SSL_server => 1,
+        SSL_error_trap => sub {
+          my($sock, $error) = @_;
+          print "SSL error on $sock: $error\n";
+        },
+        SSL_use_cert => 1,
+        SSL_ca_file => 'rolloutd.ca/cacert.crt',
+        SSL_cert_file => 'rolloutd.ca/certs/rolloutd.pem',
+        SSL_key_file  => 'rolloutd.ca/certs/rolloutd.key',
+        SSL_verify_mode => 0x01 | 0x02) or exit;
+
+      my $peer_cert = $sock->get_peer_certificate;
+      print "SSL connection from ". ($peer_cert->subject_name || ""). ", issued by ". ($peer_cert->issuer_name || ""). "\n";
+    }
+
+    binmode $sock, ':raw';
+    $self->{peer} = [$ipaddr, $port];
+    close($self->{sock});
+    $self->{sock} = $sock;
+    $self->handle_client;
+    $sock->close;
+    exit(0);
+  }
+}
+
+sub error_response {
+  my($self, $code, $label, $data) = @_;
+  my %responses = (
+    400 => [ "Bad Request", "The client sent a request that was not understood by the server\r\n" ],
+    403 => [ "Not Allowed", "Access Denied\r\n" ],
+    404 => [ "Not Found", "The requested URL was not found on this server\r\n" ],
+    500 => [ "Internal Server Error", "There was an internal error in the server\r\n" ],
+  );
+  $label ||= $responses{$code}->[0];
+  $data ||= $responses{$code}->[1];
+  $self->{response_code} = "$code $label";
+  $self->{response_headers} = {'Content-Type' => 'text/plain', 'Content-Length' => length($data)};
+  $self->send_headers;
+  $self->write($data);
+}
+
+sub send_headers {
+  my($self) = @_;
+
+  $self->{_responded} = 1;
+  $self->{response_headers}{"Content-Type"} ||= "text/plain";
+  $self->{response_headers}{"Server"} ||= "Rolloutd/1.2.0";
+  $self->{response_headers}{"Date"} ||= strftime("%a, %d %b %Y %T %Z", localtime(time));
+
+  if ($self->{protocol} || 'HTTP/1.0' eq 'HTTP/1.1') {
+    $self->{response_headers}{'Connection'} ||= 'close' unless $self->{keepalive};
+  } else {
+    $self->{response_headers}{'Connection'} ||= 'Keep-Alive' if $self->{keepalive};
+  }
+
+  $self->{sock}->write("$self->{protocol} $self->{response_code}\r\n");
+  $self->{sock}->write("$_: $self->{response_headers}{$_}\r\n")
+    foreach sort keys %{$self->{response_headers}};
+  $self->{sock}->write("\r\n");
+
+  my($code) = ($self->{response_code} =~ /^(\d\d\d).*/);
+
+  printf STDERR "%s %s %s [%s] \"%s %s %s\" %s %s\n",
+    $self->{peer}->[0], "-", "-", scalar(localtime()), $self->{method},
+    $self->{uri}, $self->{protocol}, $code, $self->{response_headers}{'Content-Length'} || 0;
+}
+
+sub handle_client {
+  my($self) = @_;
+  my $sock = $self->{sock};
+
+  for (;;) {
+    $self->{proto} = "HTTP/1.0";
+    $self->{request_headers} = {};
+    $self->{_responded} = 0;
+    $self->{response_code} = "200 OK";
+    $self->{response_headers} = {};
+    $self->{keepalive} = 0;
+
+    my $req = <$sock>;
+    return unless defined $req;
+
+    ($self->{method}, $self->{uri}, $self->{protocol}) =
+      ($req =~ m/^(\w+)\s+(\S+)(?:\s+(\S+))?\r?$/);
+    return $self->error_response(400, undef, "Invalid request") unless
+      $self->{method} && $self->{uri} && $self->{protocol} &&
+        $self->{protocol} =~ /^HTTP\/\d+\.\d+$/;
+    return $self->error_response(400, undef, "Unsupported method") unless $self->{method} eq 'GET';
+    ($self->{file}, $self->{query_string}) = ($self->{uri} =~ /([^?]*)(?:\?(.*))?/s);   # split at ?
+
+    my $last_header;
+    while (<$sock>) {
+      s/(^\s*|[\s\r\n]+$)//g;
+      last unless $_;
+      if (/^([^:]+):\s*(.*)$/) {
+        $self->{request_headers}{$1} = $2;
+      } else {
+        if (!$last_header) {
+          print "Invalid header line \"$_\"\n";
+          return $self->error_response(400);
+        }
+        my $value = $2;
+        $value =~ s/^\s+//;
+        $self->{request_headers}{$last_header} .= " $2";
+      }
+    }
+
+    if ($self->{protocol} eq 'HTTP/1.1') {
+      $self->{keepalive} = 1 unless ($self->{request_headers}{Connection} || "") =~ /close/i;
+    } else {
+      $self->{keepalive} = 1 if ($self->{request_headers}{Connection} || "") =~ /Keep-Alive/i;
+    }
+
+    # Got a request, now do something with it
+    eval { $self->handle_request; };
+    print STDERR "Error processing $self->{uri}: $@\n" if $@;
+    return $self->error_response(500, undef,
+      "There was an internal error processing your request.\r\n$@") if $@;
+
+    return $self->error_response(500, undef, "No data was received from the callback\r\n")
+      unless $self->{_responded};
+
+    return unless $self->{keepalive};
+  }
+}
+
+sub write {
+  my($self, @data) = @_;
+  $self->{_responded} = 1;
+  $self->{sock}->write($_) foreach @data;
+}
+
+sub print {
+  my($self, @data) = @_;
+  $self->write("$_\r\n") foreach @data;
+}
+
+sub read_checksums {
+  my($self, $dir) = @_;
+  # Read in any cached checksums for this directory
+  if (my $fh = new IO::File "$dir/.rolloutd_checksums", "<") {
+    flock($fh, LOCK_EX);
+    $fh->seek(0, 0);
+    $self->{cached_checksums} = {};
+    while (<$fh>) {
+      chomp;
+      my %e;
+      @e{@{$self->{checksum_file_fields}}} = split /\//;
+      # Skip checksums for any files that have been changed
+      next unless $e{filename} && $e{size};
+      next unless my @stat = stat("$dir/$e{filename}");
+      next unless $stat[1] == $e{inode} && $stat[9] == $e{mtime} && $stat[7] == $e{size};
+      $self->{cached_checksums}{"$dir/$e{filename}"} = \%e;
+    }
+    $fh->close;
+  }
+}
+
+sub write_checksums {
+  my($self, $dir) = @_;
+  # Write out any cached checksums for this directory
+  return unless $self->{cached_checksums} && keys %{$self->{cached_checksums}};
+  my $oldfh;
+  flock($oldfh, LOCK_EX) if $oldfh = new IO::File "$dir/.rolloutd_checksums", "<";
+
+  my $fh = new IO::File "$dir/.rolloutd_checksums.new", ">" or return;
+  foreach my $filename (keys %{$self->{cached_checksums}}) {
+    next unless $filename =~ /^$dir\//;
+    my %d = %{$self->{cached_checksums}{$filename}};
+    print $fh join("/", @d{@{$self->{checksum_file_fields}}}). "\n";
+  }
+  $fh->close;
+  rename("$dir/.rolloutd_checksums.new", "$dir/.rolloutd_checksums");
+
+  $oldfh->close if $oldfh;
+}
+
+sub handle_request {
+  my($self, $cgi) = @_;
+  my $path = canonpath("./". uri_unescape($self->{uri}));
+
+  if ($self->{allow}) {
+    # Basic IP matching for some security
+    my $found = 0;
+    foreach (@{$self->{allow}}) {
+      $found++ if $_->match($self->{peer}->[0]);
+    }
+    return $self->error_response(403, undef, print "Not allowed to access $path\r\n")
+      if !$found || $path eq '/';
+  }
+
+  my $localpath = canonpath(uri_unescape($path));
+  if (-d $localpath) {
+    # Return a directory listing
+    my @fields = qw( filename type size mtime checksum );
+    my @entries;
+
+    my $dir = new IO::Dir $localpath;
+    $self->read_checksums($localpath);
+    foreach (sort $dir->read()) {
+      next if /^\./;
+      my %entry = map { $_ => undef } @fields;
+      $entry{filename} = $_;
+      my @stat = stat("$localpath/$_");
+      $entry{size} = $stat[7];
+      $entry{type} = S_ISDIR($stat[2]) ? "directory" : "file";
+      $entry{mtime} = $stat[9];
+      $entry{inode} = $stat[1];
+      $entry{checksum} = $self->{cached_checksums}{"$localpath/$_"}{checksum} || "";
+      push @entries, \%entry;
+    }
+
+    my $text = "<html><body><h1>Rolloutd File Listing</h1>\n";
+    $text .= "<table width='100%'>\n";
+    $text .= "<tr id='header'>";
+    $text .= join("", map { "<th>$_</th>" } @fields);
+    $text .= "</tr>\n";
+    foreach my $entry (@entries) {
+      $text .= "<tr class='file'>". join("", map { "<td>$entry->{$_}</td>" } @fields). "</tr>\n";
+    }
+    $text .= "</table>\n";
+    $text .= "</body></html>\n";
+    $self->{response_headers}{'Content-Type'} = 'text/html';
+    $self->{response_headers}{'Content-Length'} = length($text);
+    $self->send_headers();
+    $self->write($text);
+    return;
+  }
+
+  if (!-f $localpath) {
+    return $self->error_response(404, undef,
+      "The requested URL $self->{uri} was not found on this server.\r\n");
+  }
+
+  # Serve a local file
+  $self->{response_headers}{'Content-Type'} = '';
+  $self->{response_headers}{'Content-Length'} = -s $localpath;
+  if ($mime) {
+    my $mimeobj = $mime->mimeTypeOf($localpath);
+    if ($mimeobj) {
+      $self->{response_headers}{'Content-Type'} = $mimeobj->type;
+    } elsif ($magic) {
+      if ($self->{response_headers}{'Content-Length'}) {
+        my $fh = new IO::File $localpath, "r" or return $self->error_response(500);
+        my $contents;
+        sysread($fh, $contents, 512);
+        $self->{response_headers}{'Content-Type'} = $magic->checktype_contents($contents);
+      }
+    }
+  }
+
+  $self->read_checksums(dirname($localpath));
+  my $fh = new IO::File $localpath, "r" or return $self->error_response(500);
+  $self->send_headers;
+  my $md5 = new Digest::MD5;
+  my $data;
+  while (1) {
+    my $len = $fh->read($data, 4096) or last;
+    $self->write($data);
+    $md5->add($data);
+  }
+  $fh->close;
+  my @stat = stat($localpath);
+  $self->{cached_checksums}{$localpath} = {
+    checksum => $md5->hexdigest,
+    filename => basename($localpath),
+    inode => $stat[1],
+    mtime => $stat[9],
+    size => $stat[7],
+  };
+  $self->write_checksums(dirname($localpath));
+}
+
+package main;
+
+use strict;
+use Carp;
+use English;
+use Fcntl ':flock';
+use Getopt::Long;
+use IO::File;
+use POSIX;
+
+my $server_base;
+my $server_allow = "127.0.0.0/8";
+my $server_listen = "0.0.0.0:80";
+my $pidfile;
+my $daemon = 0;
+my $chroot = 0;
+my $user;
+my $group;
+my $ssl;
+my $logfile = "/dev/null";
+
+GetOptions(
+  "allow=s"       => \$server_allow,
+  "base=s"        => \$server_base,
+  "listen=s"      => \$server_listen,
+  "pidfile=s"     => \$pidfile,
+  "daemon|d"      => \$daemon,
+  "chroot|c"      => \$chroot,
+  "user=s"        => \$user,
+  "group=s"       => \$group,
+  "logfile=s"     => \$logfile,
+  "ssl"           => \$ssl,
+  "help|?"        => \&usage,
+) or usage();
+
+sub usage {
+  print "Command line arguments are:\n";
+  print " allow   A comma-separated list of netmasks to allow access\n";
+  print " base    The base of the directory tree served by rollout server\n";
+  print " listen  The ip:port combo to listen on\n";
+  print " daemon  Fork and become a background process\n";
+  print " pidfile Write process ID to this file after backgrounding\n";
+  print " chroot  Chroot to the base directory\n";
+  print " user    Become this user after backgrounding\n";
+  print " group   Become this group after backgrounding\n";
+  print " ssl     Use SSL for communication\n";
+  print "\n";
+  exit;
+}
+
+usage() unless $server_allow && $server_base && $server_listen;
+$chroot = 1 if $daemon;
+
+# Check for an existing rolloutd process
+if (open(LOCKFILE, ">/var/lock/rolloutd.lock")) {
+  die "There is already an instance of the Rollout server running\n"
+    unless flock(LOCKFILE, LOCK_EX | LOCK_NB);
+}
+
+my $server = new RolloutServer($server_listen, $server_allow, $ssl);
+
+# Prepare to write out the process ID, potentially after forking
+my $pidfh = new IO::File $pidfile, "w" or die "Unable to write to $pidfile: $!"
+  if $pidfile;
+chdir($server_base) or die "Couldn't chdir to $server_base: $!";
+
+# Resolve user and group to drop privileges
+my($uid, $gid) = ($user, $group);
+$uid = getpwnam($user) if $user && $user !~ /^\d+$/;
+$gid = getgrnam($user) if $group && $group !~ /^\d+$/;
+die "Could not find user $user\n" if $user && !defined($uid);
+die "Could not find group $group\n" if $group && !defined($uid);
+
+if ($daemon) {
+  # Become a daemon
+  defined(my $pid = fork()) or die "Couldn't fork: $!";
+  exit if $pid;
+  $SIG{HUP} = 'IGNORE';
+  setsid or die "Couldn't start a new session: $!";
+  open STDIN, "/dev/null";
+  open STDOUT, ">>$logfile";
+  open STDERR, ">>$logfile";
+  umask 0;
+  exit if fork();
+}
+
+# Drop privilieges
+chroot($server_base) if $chroot;
+$UID = $EUID = $uid if $user;
+$GID = $EGID = $gid if $group;
+
+# Write out process ID
+if ($pidfile) {
+  print $pidfh "$$\n";
+  $pidfh->close;
+}
+
+# Handle kill signals gracefully
+$SIG{INT} = $SIG{QUIT} = sub {
+  close(LOCKFILE);
+  unlink("/var/lock/rolloutd.lock");
+  unlink($pidfile) if $pidfile;
+  exit 0;
+};
+
+# By this point, we should have dropped all extra privileges and be ready to run as a daemon
+$server->run();
+
+# Should never get to here, but clean up just in case
+close(LOCKFILE);
+unlink("/var/lock/rolloutd.lock");
+unlink($pidfile) if $pidfile;

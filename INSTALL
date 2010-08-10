@@ -1,16 +1,41 @@
-Rollout Server installation instructions:
+Rollout Server installation instructions
 
-1. Install apache or some other web server.
 
-2. Extract rollout into a directory accessable to the web server
+Server Installation:
 
-3. Configure the access list in .htaccess to allow your IP ranges.
- ^ THIS IS THE ONLY SECURITY ROLLOUT HAS (so far), SO GET IT RIGHT ^
+1. After extaction, run the following as root:
 
-4. Run rollout on a client, using something like the following:
-   URL=http://rollout.domain; wget -O- $URL/rollout | perl - -s -u $URL
+   cp rolloutd /usr/local/sbin/rolloutd
+   cp rollout.init /etc/init.d/rollout
+   cp rollout.default /etc/default/rollout
+   mkdir /usr/local/rollout
+   chmod 750 /usr/local/sbin/rolloutd
+   chmod 755 /etc/init.d/rollout
+   chmod 600 /etc/default/rollout
+   chown nobody:daemon /usr/local/rollout
 
-   Replace "rollout.domain" with the hostname or IP of your rollout server. You
-   also may need to add a path to the URL if rollout isn't in the root
-   directory of the domain.
+2. Edit /etc/default/rollout to configure your server
+
+3. Add required symlinks to /etc/rc?.d/S??rollout to /etc/init.d/rollout:
+   ln -s /etc/init.d/rollout /etc/rc1.d/K20rollout
+   ln -s /etc/init.d/rollout /etc/rc3.d/S70rollout
+   ln -s /etc/init.d/rollout /etc/rc2.d/S70rollout
+
+4. Copy the default configuration or your own configuration into
+   /usr/local/rollout. The required files from the source are:
+   rollout
+   rollout.cfg
+   steps/*
+   fragments/*
+
+5. Start the server with /etc/init.d/rollout start
+
+
+
+Client Installation:
+
+1. Run rollout on a client, using something like the following:
+   URL=http://rollout.domain:port; wget -O- $URL/rollout | perl - -s -u $URL -o setup
+
+   Replace "rollout.domain" with the hostname or IP of your rollout server.
 

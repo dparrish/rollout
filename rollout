@@ -20,87 +20,97 @@
 #
 
 use strict;
-use Net::HTTP;
 use Carp;
-use Sys::Hostname;
 use Data::Dumper;
+use Digest::MD5 'md5_hex';
+use English;
+use Error ':try';
+use Fcntl ':flock';
+use File::Basename;
+use Getopt::Long;
 use IO::File;
 use IO::Select;
-use Digest::MD5 qw( md5_hex );
-use Getopt::Long;
-use POSIX qw( setsid );
-use File::Temp qw/ tempfile tempdir /;
-use Fcntl ':flock';
-use English;
+use POSIX 'setsid';
 use Socket;
+use Sys::Hostname;
+eval {
+  require Memoize;
+  import Memoize;
+};
 
-use vars qw( $rollout_url $verbosity $safe_mode @skip_steps @force_dangerous
-             %networks @only_steps $server_mode $server_allow $server_base
-             $server_listen $rollout_comment $start_time );
-$rollout_url = "http://rollout.domain";
+use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
+             $rollout_comment $start_time $configfile $configdir $VERSION %m $no_step_labels );
+$VERSION = "1.2.0";
 $verbosity = 1;
 $safe_mode = 0;
-$server_mode = 0;
-$server_base = undef;
-$server_allow = "127.0.0.0/8";
-$server_listen = "0.0.0.0:80";
+$configdir = "/etc/rollout";
+$no_step_labels = 0;
+$config = {
+  # This is the default configuration
+  base_url => "http://rollout.domain",
+  client_certificate => "cert.pem",
+  client_certificate_key => "cert.key",
+  ca_certificate => "cacert.crt",
+};
 my $hostname = hostname;
-my @original_argv = @ARGV;
 
-GetOptions(
-  "verbose|v"       => sub { $verbosity++ },
+# Parse some initial options
+Getopt::Long::Configure(qw( default bundling auto_version pass_through ));
+Getopt::Long::GetOptionsFromArray([@ARGV],
+  "configdir=s"     => \$configdir,
+  "configfile=s"    => \$configfile,
   "quiet|q"         => sub { $verbosity = 0 },
-  "safe_mode|s"     => \$safe_mode,
-  "url|u=s"         => \$rollout_url,
-  "skip_step|k=s"   => \@skip_steps,
-  "hostname|h=s"    => \$hostname,
-  "only|o=s"        => \@only_steps,
-  "help|?"          => \&usage,
-  "force|f=s"       => \@force_dangerous,
-  "server"          => \$server_mode,
-  "server_allow=s"  => \$server_allow,
-  "server_base=s"   => \$server_base,
-  "server_listen=s" => \$server_listen,
-) or usage();
-
-sub usage {
-  print "Command line arguments are:\n";
-  print " verbose|v      Increase verbosity\n";
-  print " quiet|q        Don't print anything except fatal errors\n";
-  print " safe_mode|s    Show what will be changed, but don't actually do anything\n";
-  print " url|u          Set the base Rollout HTTP url\n";
-  print " skip_step|k=s  Specify a step to be skipped, may be specified multiple times\n";
-  print " hostname|h=s   Rollout configuration for a different host. If -f network is provided, ".
-                         "the hostname will be changed\n";
-  print " only|o=s       Only run a specific step (can be specified multiple times)\n";
-  print " force|f=s      Force a dangerous step to be run\n";
-  print " server         Enable server mode. Specify --server_allow and --server_base\n";
-  print " server_allow   A comma-separated list of netmasks to allow access\n";
-  print " server_base    The base of the directory tree served by rollout server\n";
-  print " server_listen  The ip:port combo to listen on.\n";
-  print "\n";
-  print "Steps which are considered dangerous are always run in safe mode, unless the -f ".
-        "parameter is specified with a step name as argument.\n";
-  print "Any additional arguments will be combined to form the 'comment' which will be logged. ".
-        "This should be used to describe the reason for running rollout, ".
-        "i.e. a change tracking number or authorization\n";
-  print "\n";
-  exit;
-}
+  "verbose|v"       => sub { $verbosity++ },
+);
 
 # Global variables
 $hostname =~ s/\..*//;
 my(@all_steps, $steps, %steps_code, $current_step);
-use vars qw( %m );
+$configfile ||= "$configdir/rollout.cfg";
+$configfile = "$configdir/$configfile" unless $configfile =~ /^\//;
 my $log = "";
 $rollout_comment = join(" ", @ARGV) || "No comment specified";
 $rollout_comment =~ s/(^['"]|['"]$)//g;
 my $pid = $$;
 
+# Exceptions {{{
+
+package RolloutException;
+use base 'Error';
+use overload ('""' => 'stringify');
+sub new {
+  my($self) = shift;
+  my $text = "". shift;
+  my @args = ();
+  local $Error::Depth = $Error::Depth + 1;
+  local $Error::Debug = 1;
+  $self->SUPER::new(-text => $text, @args);
+}
+1;
+
+package HttpException;
+use base 'RolloutException';
+1;
+
+package LocalFileException;
+use base 'RolloutException';
+1;
+
+package ConfigException;
+use base 'RolloutException';
+1;
+
+package SafeModeException;
+use base 'RolloutException';
+1;
+
+package main;
+
+# }}}
 # Logging wrappers {{{
 sub l(@) {
   my($text, $indent) = @_;
-  return unless $verbosity;
+  return unless $verbosity && defined $text;
   $indent = 2 unless defined $indent;
   $indent = " " x $indent;
   my $newtext = $text;
@@ -112,28 +122,141 @@ sub l(@) {
 
 sub w(@) {
   my($text, $indent) = @_;
-  return unless $text;
-
+  return 1 unless $text;
   $indent = 2 unless defined $indent;
   $indent = " " x $indent;
   my $newtext = $text;
   $newtext =~ s/^/${indent}WARNING: /mg;
   print "$newtext\n";
   $log .= "$text\n";
-
-  return 0;
 }
 
 sub fatal(@) {
   print "------ FATAL ERROR ------\n";
-  print "$_\n" foreach (@_);
+  if ($verbosity >= 3) {
+    carp "$_\n" foreach (grep { defined $_ } @_);
+  } else {
+    print "$_\n" foreach (grep { defined $_ } @_);
+  }
   print "Current Step: $current_step\n" if $current_step;
   exit 1 if $current_step;
+  return 1;
 }
 
-sub d($) { return v(Dumper(@_)) }
-sub v(@) { l(@_) if $verbosity > 1; return 1 }
+sub d($) { return v(Dumper(@_)) if $verbosity >= 3; return 1 };
+sub v(@) { l(@_) if $verbosity >= 2; return 1 }
 
+# }}}
+# RolloutHTTP package {{{
+
+package RolloutHTTP;
+
+use Net::HTTP;
+use Net::SSLeay;
+
+use vars qw( $ua %per_host_certs $done_setup $use_lwp );
+
+sub _setup {
+  return if $done_setup;
+  $done_setup = 1;
+  eval {
+    # See if LWP is supported (for HTTPS)
+    require LWP::UserAgent;
+    require LWP::ConnCache;
+    require HTTP::Request;
+
+    *LWP::Protocol::https::_extra_sock_opts = sub {
+      my($self, $host, $port) = @_;
+      return SSL_ca_file => "$::configdir/$::config->{ca_certificate}",
+          %{$per_host_certs{"$host:$port"} || {}};
+    };
+
+    if (!$ua) {
+      $ua = new LWP::UserAgent;
+      $ua->conn_cache(new LWP::ConnCache);
+      $ua->agent("Rollout/$::VERSION");
+    }
+    $use_lwp = 1;
+  };
+  ::w "Error loading the LWP modules. SSL is disabled. Consider installing LWP.\n" if $@;
+}
+
+sub add_client_cert {
+  my($self, $host, $port, $cert_file, $key_file) = @_;
+  $per_host_certs{"$host:$port"} = {
+    SSL_cert_file => $cert_file,
+    SSL_key_file => $key_file,
+  };
+}
+
+sub new {
+  my($class) = @_;
+  _setup();
+  my $self = bless {}, $class;
+  return $self;
+}
+
+sub get {
+  my($self, $url, $data_cb) = @_;
+  my $len = 0;
+  if ($use_lwp) {
+    my $req = new HTTP::Request('GET', $url);
+    my $res = $ua->request($req, sub {
+      my($chunk, $res, $proto) = @_;
+      $self->{res} = $res;
+      $self->{code} = $res->code;
+      $self->{message} = $res->message;
+      $data_cb->($chunk);
+      $len += length($chunk);
+    });
+    if (!$res || !$res->is_success) {
+      $self->{message} = $res->status_line;
+      throw HttpException($res->status_line);
+    } else {
+      $self->{message} = "OK";
+    }
+  } else {
+    my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
+    ::fatal("HTTPS is not supported without the LWP module") if $protocol eq 'https';
+    my $req = new Net::HTTP Host => $host, PeerPort => $port || 80, Protocol => $protocol;
+    if (!$req) {
+      $self->{message} = $@;
+      throw HttpException($@);
+    }
+
+    $req->write_request(GET => $path, 'User-Agent' => "Rollout/$::VERSION");
+    ($self->{code}, $self->{message}) = $req->read_response_headers;
+    my $buf;
+    while (1) {
+      my $n = $req->read_entity_body($buf, 4096);
+      last unless $n;
+      $data_cb->($buf);
+      $len += $n;
+    }
+  }
+  return $len;
+}
+
+sub error_message {
+  my($self) = @_;
+  if ($use_lwp) {
+    return undef if $self->{res} && $self->{res}->is_success();
+    return $self->{message};
+  } else {
+    return $self->{message};
+  }
+}
+
+sub is_success {
+  my($self) = @_;
+  if ($use_lwp) {
+    return $self->{res}->is_success();
+  } else {
+    return $self->{code} =~ /^2../;
+  }
+}
+
+package main;
 # }}}
 sub named_params(\@$) { #{{{
   my($params, $defaults) = @_;
@@ -179,50 +302,50 @@ sub http_file(@) {
   my $file = $p->{-url};
   return undef unless $file;
 
-  my $url = $file =~ /^http:\/\// ? $file : "$rollout_url/$file";
-  my($host, $port, $path) = $url =~ /^(?:http:\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
-  my $s = Net::HTTP->new(Host => $host, PeerPort => $port || 80) || fatal $@;
+  my $url = $file =~ /^https?:\/\// ? $file : "$config->{base_url}/$file";
 
-  $s->write_request(GET => $path, 'User-Agent' => "Rollout/1.0");
-  my($code, $mess, %h) = $s->read_response_headers;
-
-  w "GET $url returned $code" and return undef unless $code =~ /^2../;
+  my $req = new RolloutHTTP;
+  my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
+  if ($protocol eq 'https') {
+    $req->add_client_cert($host, $port, "$::configdir/$::config->{client_certificate}",
+                          "$::configdir/$::config->{client_certificate_key}");
+  }
 
   my $fh;
-  if ($p->{-dest}) {
-    v "Writing to $p->{-dest}.$$";
-    if (!($fh = new IO::File ">$p->{-dest}.$$")) {
-      w "Can't write to $p->{-dest}.$$: $!";
-      return undef;
-    }
-  }
-
+  my $first = 1;
   my $res = "";
-  while (1) {
-    my $buf;
-    my $n = $s->read_entity_body($buf, 1024);
-    fatal "Read failed: $!" unless defined $n;
-    last unless $n;
+  $req->get($url, sub {
+    my($chunk) = @_;
+    if ($first) {
+      throw HttpException "GET $url returned $req->{code}" unless $req->is_success;
+      if ($p->{-dest}) {
+        v "Writing to $p->{-dest}.$$";
+        if (!($fh = new IO::File ">$p->{-dest}.$$")) {
+          throw HttpException "Can't write to $p->{-dest}.$$: $!";
+        }
+      }
+      $first = 0;
+    }
     if ($fh) {
-      if (syswrite($fh, $buf, $n) < $n) {
-        fatal "Error writing to $p->{-dest}.$$: $!";
+      if (!$fh->write($chunk)) {
         $fh->close;
         unlink("$p->{-dest}.$$");
+        throw LocalFileException "Error writing to $p->{-dest}.$$: $!";
       }
-      $res += $n;
+      $res += length($chunk);
     } else {
-      $res .= $buf;
+      $res .= $chunk;
     }
-  }
+    return $res;
+  });
 
-  if ($p->{-dest}) {
+  if ($p->{-dest} && $fh) {
     $fh->close;
     if (-f $p->{-dest} && -s $p->{-dest} && !-s "$p->{-dest}.$$") {
-      w "Not overwriting existing file with nothing";
       unlink "$p->{-dest}.$$";
-      return undef;
+      throw HttpException "Not overwriting existing file with nothing";
     }
-    w "Unable to rename $p->{-dest}.$$ to $p->{-dest}" unless
+    throw LocalFileException "Unable to rename $p->{-dest}.$$ to $p->{-dest}" unless
       rename("$p->{-dest}.$$", $p->{-dest});
   }
 
@@ -240,10 +363,31 @@ sub http_index(@) {
   return () unless $html;
 
   my @files;
-  while ($html =~ /^(?:<tr><td valign="top">)?<img src="[^"]+" alt="[^"]+">(?:<\/td><td>| )?<a href="([^"]+)">(.+?)<\/a>(?:<\/td>| )/mg) {
-    my($filename, $name) = ($1, $2);
-    next if !$filename || $name =~ /Parent Directory/i || $filename =~ /\?/;
-    push @files, $filename;
+  if ($html =~ /Rolloutd File Listing/) {
+    # Internal rolloutd listing format
+    fatal "Invalid file list format from $p->{-url}" unless
+      $html =~ /<tr id='header'><th>(.*?)<\/th><\/tr>/;
+    my @fields = split /<\/th><th>/, $1;
+    while ($html =~ /<tr class='file'><td>(.*?)<\/td><\/tr>/mg) {
+      my @values = split /<\/td><td>/, $1;
+      my %entry = map { $fields[$_] => $values[$_] } 0..$#fields;
+      $entry{size} = int($entry{size} || 0);
+      $entry{mtime} = int($entry{mtime} || 0);
+      push @files, \%entry;
+    }
+  } else {
+    # Look for Apache style directory listing
+    while ($html =~ /^(?:<tr><td valign="top">)?<img src="[^"]+" alt="[^"]+">(?:<\/td><td>| )?<a href="([^"]+)">(.+?)<\/a>(?:<\/td>| )/mg) {
+      my($filename, $name) = ($1, $2);
+      next if !$filename || $name =~ /Parent Directory/i || $filename =~ /\?/;
+      push @files, {
+        filename => $filename,
+        type => ($filename =~ /\/$/) ? "directory" : "file",
+        size => 0,
+        mtime => 0,
+        checksum => "",
+      }
+    }
   }
   return @files;
 }
@@ -260,43 +404,61 @@ sub dir_install {
     $p->{-dir_flags}{-$_} ||= $p->{-$_} if $p->{-$_};
     $p->{-flags}{-$_} ||= $p->{-$_} if $p->{-$_};
   }
-  dir_check(-dir => $p->{-dest}, %{$p->{-dir_flags}});
 
   return w "No source specified" unless $p->{-src};
   return w "No destination specified" unless $p->{-dest};
 
-  $p->{-src} =~ s/^rollout:/$rollout_url/;
-  my $restart = 0;
-  if ($p->{-src} =~ /^http:\/\//) {
-    my @files = http_index $p->{-src};
-    return w "Couldn't retrieve index $p->{-src}" unless @files;
-    foreach my $filename (@files) {
-      if ($filename =~ /\/$/) {
+  $p->{-src} =~ s/^rollout:/$config->{base_url}/;
+  my $changed = 0;
+  d($p);
+  if ($p->{-src} =~ /^https?:\/\//) {
+    my @files;
+    try {
+      @files = http_index $p->{-src};
+    } catch HttpException with {
+      return w "Couldn't retrieve index $p->{-src}: ". shift();
+    };
+    return w "Empty index $p->{-src}" unless @files;
+    foreach (@files) {
+      my $filename = $_->{filename};
+      if ($_->{type} eq 'directory') {
         # It's a directory
         $filename =~ s/\/$//;
-        if (!$p->{-flags}->{no_recurse}) {
+        if (!$p->{-flags}{no_recurse}) {
           v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
           dir_install(-src => "$p->{-src}/$filename",
                       -dest => "$p->{-dest}/$filename",
                       -flags => $p->{-flags},
-                      -dir_flags => $p->{-dir_flags}) && $restart++;
+                      -dir_flags => $p->{-dir_flags}) && $changed++;
         }
       } else {
-        v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
-        my $file = http_file -url => "$p->{-src}/$filename";
-        if (defined($file)) {
-          text_install(-file => "$p->{-dest}/$filename", -text => $file, -flags => $p->{-flags})
-            && $restart++;
-          set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}}) && $restart++;
-        } else {
-          w "Error retrieving $p->{-src}/$filename";
+        my @stat = stat("$p->{-dest}/$filename");
+        if (@stat && $_->{mtime} <= $stat[9] && $_->{size} == $stat[7]) {
+          # Same file size and newer locally, check the checksum to see if it should be skipped
+          if (@stat && $_->{checksum}) {
+            my $md5 = Digest::MD5->new->add(slurp_file("$p->{-dest}/$filename"))->hexdigest;
+            if ($md5 && $_->{checksum} && $_->{checksum} eq $md5) {
+              v "Skipping $p->{-src}/$filename -> $p->{-dest}/$filename, it's the same";
+              $changed += set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}});
+              next;
+            }
+          }
         }
+        v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
+        try {
+          my $file = http_file -url => "$p->{-src}/$filename";
+          text_install(-file => "$p->{-dest}/$filename", -text => $file, -flags => $p->{-flags},
+                       -skip_checksum => 1, -flags => $p->{-flags})
+            && $changed++;
+        } catch HttpException with {
+          w "Error retrieving $p->{-src}/$filename: ". shift();
+        };
       }
     }
   }
 
-  command($p->{-cmd}) if $restart && $p->{-cmd};
-  return $restart ? 1 : 0;
+  command($p->{-cmd}) if $changed && $p->{-cmd};
+  return $changed ? 1 : 0;
 }
 
 #}}}
@@ -325,6 +487,7 @@ sub i_has {
   i_iterate($class, sub { $ret = $_[1]; return undef });
   return $ret;
 }
+eval { memoize('i_has') };
 
 sub _i_in {
   my($grep) = @_;
@@ -334,14 +497,17 @@ sub _i_in {
 sub i_immutable_file {
   return i_iterate("immutable_file", _i_in($_[0]), $_[1]);
 }
+eval { memoize('i_immutable_file') };
 
 sub i_unsafe_file {
   return i_iterate("unsafe_file", _i_in($_[0]), $_[1]);
 }
+eval { memoize('i_unsafe_file') };
 
 sub i_unsafe_dir {
   return i_iterate("unsafe_dir", _i_in($_[0]), $_[1]);
 }
+eval { memoize('i_unsafe_dir') };
 
 sub i_should {
   my($item, $m) = @_;
@@ -353,6 +519,7 @@ sub i_should {
   });
   return !$should_not;
 }
+eval { memoize('i_should') };
 
 sub i_isa {
   my($class, $m) = @_;
@@ -367,6 +534,7 @@ sub i_isa {
   }
   return 0;
 }
+eval { memoize('i_isa') };
 
 sub i_isa_fetchall {
   my($class, $m) = @_;
@@ -374,15 +542,7 @@ sub i_isa_fetchall {
   i_iterate($class, sub { push @list, $_[1] }, $m);
   return @list;
 }
-
-sub add_isa {
-  my($class, $m) = @_;
-
-  $m ||= $hostname;
-  return 0 unless $m{$m};
-  $m{$m}->{ISA} ||= {};
-  $m{$m}->{ISA}{$class} ||= 1;
-}
+eval { memoize('i_isa_fetchall') };
 
 sub i_isa_classes {
   my($class) = @_;
@@ -401,6 +561,7 @@ sub i_isa_classes {
 
   return keys %list;
 }
+eval { memoize('i_isa_classes') };
 
 sub i_ip {
   my($host) = @_;
@@ -414,6 +575,7 @@ sub i_ip {
   }
   return undef;
 }
+eval { memoize('i_ip') };
 
 # }}}
 # Configuration lookup functions {{{
@@ -440,6 +602,7 @@ sub c {
   }
   return wantarray ? @ret : ($ret[0] || $default);
 }
+eval { memoize('c') };
 
 sub uniq {
   my(@input) = @_;
@@ -569,7 +732,6 @@ sub update {
 }
 
 package main;
-# }}}
 
 sub queue_step {
   my($step) = @_;
@@ -581,24 +743,37 @@ sub queue_step {
   $steps->insert($x, 0);
 }
 
+my $errors = 0;
 sub run_step {
   my($filename) = @_;
+  validate("Attempt to run a step with no filename", $filename);
   $current_step = $filename;
-  l $filename, 0;
-  $steps_code{$filename} ||= http_file -url => "steps/$filename";
-  w "Can't retrieve step $filename" and next unless $steps_code{$filename};
-
-  eval $steps_code{$filename};
-  exit unless $pid == $$;
-  if ($@) {
-    l "------ FATAL ERROR ------";
-    l "$_" foreach ($@);
-    my($step, $last_step);
-    while (($step = $steps->pop())) {
-      $last_step = $step;
+  l $filename, 0 unless $no_step_labels;
+  try {
+    $steps_code{$filename} ||= http_file -url => "steps/$filename";
+  } catch HttpException with {
+    w "Can't retrieve step $filename: ". shift();
+    return;
+  };
+  try {
+    eval $steps_code{$filename};
+    $@->throw if $@;
+  } catch ConfigException with {
+    $errors++;
+    w "Configuration error in step $filename:\n". shift();
+  } catch Error with {
+    if ($@) {
+      l "------ FATAL ERROR ------";
+      l "$_" foreach ($@);
+      my($step, $last_step);
+      while (($step = $steps->pop())) {
+        $last_step = $step;
+      }
+      $steps->insert($last_step, 0) if $last_step;
     }
-    $steps->insert($last_step, 0) if $last_step;
-  }
+  } finally {
+    exit unless $pid == $$;
+  };
 }
 
 # Adds a command to be run just before completion
@@ -617,13 +792,14 @@ sub queue_code {
   $steps->insert($sub, $prio);
 }
 
+# }}}
 # File & Directory modification #{{{
 
 sub slurp_file($) {
   my $file = shift;
   local $/;
 
-  my $fh = IO::File->new($file) or return w "Can't open file $file: $!";
+  my $fh = IO::File->new($file) or throw LocalFileException "Can't open file $file: $!";
   return <$fh>;
 }
 
@@ -642,13 +818,15 @@ sub file_append {
   $firstline =~ s/\n.*$/\n/s;
 
   unless (-f $p->{-file}) {
+    # Touch file.
     return w "$p->{-file} does not exist!" if $safe_mode;
-    IO::File->new(">$p->{-file}")->close if $p->{-create}; # Touch file.
+    IO::File->new(">$p->{-file}")->close
+      or throw LocalFileException "Unable to create $p->{-file}: $!" if $p->{-create};
   }
 
   my $t = '';
   my $added = 0;
-  my $fh = IO::File->new($p->{-file}) or return w "$p->{-file} unable to be opened: $!";
+  my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
 
   while (<$fh>) {
     if ($p->{-match} and /$p->{-match}/) {
@@ -691,7 +869,7 @@ sub file_modify {
 
   (-f $p->{-file}) or return l "$p->{-file} does not exist!";
 
-  my $fh = IO::File->new($p->{-file}) or return l "$p->{-file} unable to be opened: $!";
+  my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
 
   my($changes, $f, %c);
   while (<$fh>) {
@@ -764,29 +942,56 @@ sub safe_write_file {
 
   return 1 if $safe_mode;
 
-  my $fh = IO::File->new(">$file.$$") or fatal "Unable to open $file: $!";
+  my $fh = new IO::File("$file.$$", "w") or throw LocalFileException "Unable to open $file: $!";
 
   # If the argument is a filehandle, use that.
   if (ref $p->{-file} and defined fileno $p->{-file}) {
     local ($_, $!);
     my $in = $p->{-file};
-    $fh->print($_) while <$in>;
-    fatal "Unable to write $file: $!" if $!;
+    while (<$in>) {
+      $fh->print($_) or throw LocalFileException "Unable to write $file: $!";
+    }
   } else {
-    $fh->print($p->{-text}) or fatal "Unable to write to $file: $!";
+    $fh->print($p->{-text}) or throw LocalFileException "Unable to write to $file: $!";
   }
 
-  $fh->close or fatal "Unable to write to $file: $!";
+  $fh->close or throw LocalFileException "Unable to close $file: $!";
 
-  rename("$file.$$", $file) or fatal "Unable to rename $file.$$: $!";
+  rename("$file.$$", $file) or throw LocalFileException "Unable to rename $file.$$: $!";
 }
+
+sub lookup_user {
+  my($user) = @_;
+  local $^W = 0;
+  return unless defined $user;
+  return $user if int($user) eq $user;
+  if (defined(my $uid = getpwnam $user)) {
+    return $uid
+  }
+  w "Can't find user $user";
+  return undef;
+}
+eval { memoize('lookup_user') };
+
+sub lookup_group {
+  my($group) = @_;
+  local $^W = 0;
+  return unless defined $group;
+  return $group if int($group) eq $group;
+  if (defined(my $uid = getgrnam $group)) {
+    return $uid
+  }
+  w "Can't find group $group";
+  return undef;
+}
+eval { memoize('lookup_group') };
 
 sub set_attr {
   my $p = named_params @_, [ -file => undef, -mode => undef, -uid => undef, -gid => undef,
-                             -owner => undef, -group => undef];
+                             -owner => undef, -group => undef, -flags => {}];
   $p->{-file} ||= $p->{-dir};
-  return w "No filename given to set_attr" unless $p->{-file};
-
+  $p->{$_} ||= $p->{-flags}{$_} foreach keys %{$p->{-flags}};
+  validate("set_attr called with no filename",  $p->{-file});
   my($mode, $uid, $gid);
 
   for ($p->{-mode}) {
@@ -804,112 +1009,96 @@ sub set_attr {
         $shift--;
       }
     } else {
-      fatal "Invalid mode for $p->{-file}: $_";
+      throw ConfigException "Invalid mode for $p->{-file}: $_";
     }
   }
 
-  for ($p->{-owner} || $p->{-uid}) {
-    last unless defined;
-    if (/^\d+$/) {
-      $uid = $_;
-    } else {
-      unless (defined ($uid = getpwnam $_)) {
-        w "Can't find user $_";
-        $uid = -1;
-      }
-    }
-  }
-
-  for ($p->{-group} || $p->{-gid}) {
-    last unless defined;
-    if (/^\d+$/) {
-      $gid = $_;
-    } else {
-      unless (defined ($gid = getgrnam $_)) {
-        w "Can't find group $_";
-        $gid = -1;
-      }
-    }
-  }
+  $uid = lookup_user($p->{-owner} || $p->{-uid});
+  $gid = lookup_group($p->{-group} || $p->{-gid});
 
   return 0 unless defined $mode or defined $uid or defined $gid;
 
   my @stat = stat $p->{-file};
   unless (@stat) {
     # May not exist yet
-    w "Can't stat $p->{-file}: $!" unless $safe_mode;
-    return 0;
+    throw LocalFileException "Can't stat $p->{-file}: $!" unless $safe_mode;
+    @stat = (-1, -1, -1, -1, -1, -1);
   }
 
-  my $changed = 0;
-  if (defined $mode and ($stat[2] & 07777) != $mode) {
-    l sprintf("Changing mode of %s to %o", $p->{-file}, $mode);
-    $changed++;
-    unless ($safe_mode) {
-      chmod $mode, $p->{-file} or
-        w sprintf("chmod %o %s failed: $!", $mode, $p->{-file});
-    }
-  }
-
+  my @changes;
   if (defined $uid and $stat[4] != $uid) {
-    l "Changing owner of $p->{-file} to $uid";
-    $changed++;
+    push @changes, "owner=$uid";
   } else {
-    $uid = -1;
+    $uid = $stat[4];
   }
 
   if (defined $gid and $stat[5] != $gid) {
-    l "Changing group of $p->{-file} to $gid";
-    $changed++;
+    push @changes, "group=$gid";
   } else {
-    $gid = -1;
+    $gid = $stat[5];
   }
 
-  if ($uid != -1 or $gid != -1 && !$safe_mode) {
-    chown $uid, $gid, $p->{-file} or
-      w sprintf("chown %d:%d %s failed: $!", $uid, $gid, $p->{-file});
+  if (defined $mode and ($stat[2] & 07777) != $mode) {
+    push @changes, sprintf("mode=0%o", $mode);
   }
 
-  return $changed;
+  if (@changes) {
+    l "Changing attributes of $p->{-file}: ". join(", ", @changes);
+    unless ($safe_mode) {
+      if (defined $mode and ($stat[2] & 07777) != $mode) {
+        chmod $mode, $p->{-file} or
+          throw LocalFileException sprintf("chmod %o %s failed: $!", $mode, $p->{-file});
+      }
+      if ($uid != $stat[4] or $gid != $stat[5]) {
+        chown $uid, $gid, $p->{-file} or
+          throw LocalFileException sprintf("chown %d:%d %s failed: $!", $uid, $gid, $p->{-file})
+          unless $safe_mode;
+      }
+    }
+  }
+
+  return scalar @changes;
 }
 
 sub text_install {
-  my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {} ];
+  my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {},
+                             -skip_checksum => undef ];
+  validate("text_install called with no filename" => $p->{-file});
+  validate("text_install called without text for $p->{-file}", defined $p->{-text});
+
   my $changed = 1;
 
   # Create containing directory if it doesn't exist
-
-  (my $path = $p->{-file}) =~ s,/[^/]+$,,;
-  command("mkdir -p $path") if $path and $path ne $p->{-file} and ! -d $path;
+  my $path = dirname($p->{-file});
+  dir_check(-dir => $path) if $path and $path ne $p->{-file} and ! -d $path;
 
   $p->{-flags}->{srcfn} ||= "text";
 
   # If they are the same, don't bother ..
   #   and they can't have the same md5 if they're different sizes ..
 
-  if (-f $p->{-file} and -s _ == length($p->{-text})) {
+  if (!$p->{-skip_checksum} and -f $p->{-file} and -s _ == length($p->{-text})) {
     my $src_md5 = Digest::MD5->new->add($p->{-text})->hexdigest;
     my $dst_md5 = Digest::MD5->new->add(slurp_file $p->{-file})->hexdigest;
     $changed = 0 if $src_md5 eq $dst_md5;
   }
 
   if ($changed) {
-    my $ref = ref $p->{-flags}->{srcfn};
-    if ($ref eq "ARRAY") {
-      fatal "Multiple sources for \"$p->{-file}\":\n" . join("\n", @{$p->{-flags}->{srcfn}}) . "\n";
-    } else {
-      l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
-    }
-    if ($safe_mode) {
-      v $p->{-text};
-    } else {
+    throw ConfigException "Multiple sources for \"$p->{-file}\":\n".
+                          join("\n", @{$p->{-flags}->{srcfn}})
+      if ref($p->{-flags}->{srcfn}) eq 'ARRAY';
+    l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
+    d $p->{-text};
+    try {
       safe_write(-file => $p->{-file}, -text => $p->{-text})
-      or return w "Unable to install $p->{-file}: $!";
-    }
+    } catch LocalFileException with {
+      my $ex = shift;
+      $ex->throw("Unable to install $p->{-file}: ". $ex);
+    };
   }
 
   $changed += set_attr($p);
-  if ($changed and defined $p->{-cmd} and !$safe_mode) {
+  if ($changed and defined $p->{-cmd}) {
     l "Running $p->{-cmd} to finish install of $p->{-file}";
     command($p->{-cmd});
   }
@@ -921,20 +1110,23 @@ sub file_install {
   my $p = named_params @_, [ -file => undef, -src => undef, -cmd => undef, -flags => {},
                              -modify => [] ];
   my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
-  my $srctext = '';
+  my $srctext;
 
-  $p->{-src} =~ s/^rollout:/$rollout_url/;
-  if ($p->{-src} =~ /^http:\/\//) {
-    local $_;
-    $_ = http_file -url => $p->{-src};
-    return w "Couldn't retrieve $p->{-src}" unless $_;
-    foreach my $e (@expr) {
-      eval $e;
-    }
-    $srctext = $_;
+  $p->{-src} =~ s/^rollout:/$config->{base_url}/;
+  if ($p->{-src} =~ /^https?:\/\//) {
+    try {
+      local $_;
+      $_ = http_file -url => $p->{-src};
+      foreach my $e (@expr) {
+        eval $e;
+      }
+      $srctext = $_;
+    } catch HttpException with {
+      w "Couldn't retrieve $p->{-src}: ". shift();
+    };
   } elsif (-s $p->{-src}) {
     if (@expr) {
-      my $fh = IO::File->new($p->{-src}) or fatal "can't open $p->{-src}: $!";
+      my $fh = new IO::File $p->{-src} or throw LocalFileException "Unable to read $p->{-src}: $!";
       local $_;
       while (<$fh>) {
         foreach my $e (@expr) {
@@ -949,6 +1141,7 @@ sub file_install {
     }
   }
 
+  return unless defined $srctext;
   $p->{-flags}{srcfn} ||= $p->{-src};
   $p->{-text} = $srctext;
   return text_install($p);
@@ -957,32 +1150,28 @@ sub file_install {
 sub dir_check {
   my $p = named_params @_, [ -dir => undef, -mode => undef, -uid => undef, -gid => undef ];
   my $flags;
-  my $changed;
+  throw LocalFileException "Existing $p->{-dir} is not a directory" if -e $p->{-dir} && ! -d _;
+  return set_attr($p) if -d _;
 
-  unless (-e $p->{-dir}) {
-    # make parent if required
-    (my $parent = $p->{-dir}) =~ s/\/[^\/]+$//;
-    if ($parent && !-e $parent) {
-      my $x = $p;
-      $x->{-dir} = $parent;
-      dir_check($p);
-    }
-    $p->{-mode} ||= 0755;
-
-    l sprintf("Creating directory %s with mode 0%03o", $p->{-dir}, $p->{-mode});
-    return 1 if $safe_mode;
-
-    my $mask = umask 0;
-    mkdir $p->{-dir}, $p->{-mode} or fatal "Can't create directory $p->{-dir}: $!";
-    umask $mask;
-
-    $changed++;
-  } else {
-    fatal "$p->{-dir} is not a directory" unless -d _;
+  # make parent if required
+  (my $parent = $p->{-dir}) =~ s/\/[^\/]+$//;
+  if ($parent && !-e $parent) {
+    my $x = {%$p};
+    $x->{-dir} = $parent;
+    dir_check($x);
   }
+  $p->{-mode} ||= 0755;
 
-  return (set_attr($p)) || $changed;
+  l sprintf("Creating directory %s with mode 0%o", $p->{-dir}, $p->{-mode});
+  return 1 if $safe_mode;
+
+  my $mask = umask 0;
+  mkdir $p->{-dir}, $p->{-mode}
+    or throw LocalFileException "Can't create directory $p->{-dir}: $!";
+  umask $mask;
+  return 1;
 }
+eval { memoize('dir_check') };
 
 sub symlink_check {
   my $p = named_params @_, [ -src => undef, -dest => undef ];
@@ -990,17 +1179,19 @@ sub symlink_check {
     return 0 if (readlink $p->{-dest}) eq $p->{-src};
     l "Changing target of symlink $p->{-dest} to $p->{-src}";
     unless ($safe_mode) {
-      unlink $p->{-dest} or fatal "Can't unlink $p->{-dest}: $!";
-      symlink $p->{-src}, $p->{-dest} or fatal "Can't symlink $p->{-src} to $p->{-dest}: $!";
+      unlink $p->{-dest} or throw LocalFileException "Can't unlink $p->{-dest}: $!";
+      symlink $p->{-src}, $p->{-dest}
+        or throw LocalFileException "Can't symlink $p->{-src} to $p->{-dest}: $!";
     }
 
     return 1
   }
 
-  w "$p->{-dest} is not a symlink" or return 0 if -e _;
+  throw LocalFileException "$p->{-dest} is not a symlink" if -e _;
   unless ($safe_mode) {
     l "Creating symlink from $p->{-src} to $p->{-dest}";
-    symlink $p->{-src}, $p->{-dest} or fatal "Can't symlink $p->{-src} to $p->{-dest}: $!";
+    symlink $p->{-src}, $p->{-dest}
+      or throw LocalFileException "Can't symlink $p->{-src} to $p->{-dest}: $!";
   }
 
   return 1
@@ -1017,9 +1208,7 @@ sub file_comment_spec {
 
   return w "$p->{-file} does not exist!" unless -f $p->{-file};
 
-  my $fh = new IO::File $p->{-file}
-    or return w "$p->{-file} unable to be opened: $!";
-
+  my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
   my($changes, $f, %c);
   while (<$fh>) {
     if (! /^$p->{-pat}/) {
@@ -1035,7 +1224,6 @@ sub file_comment_spec {
 
     $f .= $_;
   }
-
   $fh->close;
   return unless $changes;
 
@@ -1062,9 +1250,7 @@ sub file_uncomment_spec {
 
   return w "$p->{-file} does not exist!" unless -f $p->{-file};
 
-  my $fh = new IO::File $p->{-file}
-    or return w "$p->{-file} unable to be opened: $!";
-
+  my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
   my($changes, $f, %c);
   while (<$fh>) {
     foreach my $r (@regex) {
@@ -1077,7 +1263,6 @@ sub file_uncomment_spec {
     }
     $f .= $_;
   }
-
   $fh->close;
   return unless $changes;
 
@@ -1172,7 +1357,7 @@ sub package_check {
   foreach my $package (@packages) {
     next if $m{$hostname}->{_done_packages}{$package}++;
     next if package_status($package);
-    next if $package =~ /^(http:\/\/|rollout:)/;
+    next if $package =~ /^(https?:\/\/|rollout:)/;
     push @add, $package;
   }
 
@@ -1188,8 +1373,8 @@ sub package_check {
   }
 
   foreach my $url (@packages) {
-    $url =~ s/^rollout:/$rollout_url/;
-    next unless $url =~ /^(http:\/\/[^\/]+).*\/([a-z0-9\._\-]+\.(?:deb|rpm))/i;
+    $url =~ s/^rollout:/$config->{base_url}/;
+    next unless $url =~ /^(https?:\/\/[^\/]+).*\/([a-z0-9\._\-]+\.(?:deb|rpm))/i;
 
     my($package, $filename) = ($2, $2);
     $package =~ s/[_-]\d+.*//;
@@ -1202,14 +1387,12 @@ sub package_check {
     if ($filename =~ /\.rpm$/) {
       command("rpm", "-U", $url) && $changes++;
     } else {
-      my $data = http_file -url => $url;
-      if (!$data) {
-        w "Couldn't retrieve $url";
-        next;
-      }
-      if ((my $fh = new IO::File ">/tmp/$filename")) {
+      try {
+        my $data = http_file -url => $url;
+        my $fh = new IO::File "/tmp/$filename", "w"
+          or throw LocalFileException "Unable to write to /tmp/$filename: $!";
         print $fh $data;
-        close($fh);
+        $fh->close;
 
         if ($filename =~ /\.deb$/) {
           command("dpkg", "-i", "/tmp/$filename") && $changes++;
@@ -1218,10 +1401,9 @@ sub package_check {
         }
 
         unlink("/tmp/$filename");
-      } else {
-        w "Couldn't write to /tmp/$filename: $!";
-        next;
-      }
+      } catch HttpException with {
+        w "Couldn't retrieve package from $url". shift();
+      };
     }
   }
 
@@ -1246,6 +1428,81 @@ sub package_uncheck {
   }
 }
 #}}}
+# Revision Control Systems checkouts {{{
+
+sub cvs_checkout {
+  my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef,
+                             -cmd => undef ];
+  validate("Not enough parameters specified to cvs_checkout",
+           $p->{-dest}, $p->{-module}, $p->{repo});
+
+  v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
+  if (-d $p->{-dest} && !-d "$p->{-dest}/CVS") {
+    w "$p->{-dest} exists but is not a CVS checkout";
+    return 0;
+  }
+  if (-d $p->{-dest}) {
+    chdir $p->{-dest};
+    command("cvs", "-q", "update", "-dPA", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
+    command($p->{-cmd}) if $p->{-cmd};
+    return 1;
+  } else {
+    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
+    validate("Can't parse dir $p->{-dest}", $base, $newdir);
+    try {
+      dir_check($base);
+    } catch LocalFileException with {
+      my($ex) = @_;
+      $ex->throw("Checkout to $p->{-dest} failed: ". $ex);
+    }
+    chdir $base;
+    command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
+            ($p->{-rev} ? ("-r", $p->{-rev}) : ()), "-d", $newdir, $p->{-module});
+    chdir $p->{-module} && command($p->{-cmd}) if $p->{-cmd};
+    return 1;
+  }
+  return 0;
+}
+
+sub svn_checkout {
+  my $p = named_params @_, [ -dest => undef, -url => undef, -rev => undef, -cmd => undef ];
+  validate("Not enough parameters specified to svn_checkout", $p->{-dest}, $p->{-url});
+
+  v "svn checkout $p->{-dest}:". ($p->{-rev} || "HEAD");
+  if (-d $p->{-dest} && !-d "$p->{-dest}/.svn") {
+    w "$p->{-dest} exists but is not a svn checkout";
+    return 0;
+  }
+  if (-d $p->{-dest}) {
+    chdir $p->{-dest};
+    command("svn", "update", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
+    command($p->{-cmd}) if $p->{-cmd};
+    return 1;
+  } else {
+    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
+    validate("Can't parse dir $p->{-dest}", $base, $newdir);
+    try {
+      dir_check($base);
+    } catch LocalFileException with {
+      my($ex) = @_;
+      $ex->throw("Checkout to $p->{-dest} failed: ". $ex);
+    }
+    chdir $base;
+    command("svn", "checkout", ($p->{-rev} ? ("-r", $p->{-rev}) : ()), $p->{-url}, $newdir);
+    chdir $newdir && command($p->{-cmd}) if $p->{-cmd};
+    return 1;
+  }
+  return 0;
+}
+
+# }}}
+
+sub validate($@) {
+  my($message, @checks) = @_;
+  foreach (@checks) {
+    throw ConfigException $message unless $_;
+  }
+}
 
 # An optional hashref as the last argument can set custom messages:
 #   failure - print this if command fails.
@@ -1334,63 +1591,6 @@ sub command {
   return $?;
 }
 
-sub cvs_checkout {
-  my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef,
-                             -cmd => undef ];
-  return w "Not enough parameters specified to cvs_checkout"
-    unless $p->{-dest} && $p->{-module} && $p->{repo};
-
-  v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
-  if (-d $p->{-dest} && !-d "$p->{-dest}/CVS") {
-    w "$p->{-dest} exists but is not a CVS checkout";
-    return 0;
-  }
-  if (-d $p->{-dest}) {
-    chdir $p->{-dest};
-    command("cvs", "-q", "update", "-dPA", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
-    command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  } else {
-    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
-    dir_check($base);
-    return w "Checkout to $p->{-dest} failed" unless -d $base;
-    chdir $base;
-    command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
-            ($p->{-rev} ? ("-r", $p->{-rev}) : ()), "-d", $newdir, $p->{-module});
-    chdir $p->{-module} && command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  }
-  return 0;
-}
-
-sub svn_checkout {
-  my $p = named_params @_, [ -dest => undef, -url => undef, -rev => undef, -cmd => undef ];
-  return w "Not enough parameters specified to svn_checkout" unless $p->{-dest} && $p->{-url};
-
-  v "svn checkout $p->{-dest}:". ($p->{-rev} || "HEAD");
-  if (-d $p->{-dest} && !-d "$p->{-dest}/.svn") {
-    w "$p->{-dest} exists but is not a svn checkout";
-    return 0;
-  }
-  if (-d $p->{-dest}) {
-    chdir $p->{-dest};
-    command("svn", "update", ($p->{-rev} ? ("-r", $p->{-rev}) : ()));
-    command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  } else {
-    my($base, $newdir) = $p->{-dest} =~ /(.+)\/(.+)/;
-    return w "Can't parse dir $p->{-dest}" unless $base && $newdir;
-    dir_check($base);
-    return w "Checkout to $p->{-dest} failed" unless -d $base;
-    chdir $base;
-    command("svn", "checkout", ($p->{-rev} ? ("-r", $p->{-rev}) : ()), $p->{-url}, $newdir);
-    chdir $newdir && command($p->{-cmd}) if $p->{-cmd};
-    return 1;
-  }
-  return 0;
-}
-
 sub expand_network($) {
   my($network) = @_;
   return () unless $network;
@@ -1399,16 +1599,25 @@ sub expand_network($) {
   return @{$networks{$network} || []};
 }
 
-if ($server_mode) {
-  die "You must specify --server_base and --server_allow\n" unless $server_base && $server_allow;
-  require RolloutServer;
-  import RolloutServer;
-
-  my $server = new RolloutServer($server_listen, $server_allow, $server_base);
-  $server->run();
-  exit 0;
+sub read_config {
+  my $fh = new IO::File $configfile
+    or throw LocalFileException "Unable to read config $configfile: $!";
+  my $newconfig = {%$config};
+  while (<$fh>) {
+    s/[\r\n]+$//;
+    next if /^\s*#/;
+    my($key, $value) = split /\s*=\s*/, $_, 2;
+    next unless $key && $value;
+    $newconfig->{$key} = $value;
+  }
+  $fh->close;
+  return $config = $newconfig;
 }
 
+sub write_config {
+  text_install(-file => $configfile,
+               -text => join("", map { "$_ = $config->{$_}\n" } keys %$config));
+ }
 
 if (open(LOCKFILE, ">/var/run/rollout.lock")) {
   die "There is already an instance of rollout running"
@@ -1416,16 +1625,45 @@ if (open(LOCKFILE, ">/var/run/rollout.lock")) {
 }
 
 $start_time = time;
-@all_steps = http_index "steps";
-fatal "Can't find any steps to execute" unless @all_steps;
+read_config();
+
+sub usage {
+  require Pod::Usage;
+  Pod::Usage::pod2usage(-exitval => 1, -verbose => 99, -sections => "NAME|SYNOPSIS|OPTIONS");
+}
+
+# Read the rest of the options
+Getopt::Long::Configure(qw( default bundling auto_version ));
+Getopt::Long::GetOptionsFromArray([@ARGV],
+  "configdir=s"     => \$configdir,
+  "configfile=s"    => \$configfile,
+  "force|f=s"       => \@force_dangerous,
+  "hostname|h=s"    => \$hostname,
+  "only|o=s"        => \@only_steps,
+  "quiet|q"         => sub {},
+  "safe_mode|s"     => \$safe_mode,
+  "skip_step|k=s"   => \@skip_steps,
+  "url|u=s"         => \$config->{base_url},
+  "verbose|v"       => sub {},
+  "no_step_labels"  => \$no_step_labels,
+  "help|?"          => \&usage,
+) or usage();
+
+try {
+  @all_steps = http_index "steps";
+} catch HttpException with {
+  fatal("Can't find any steps to execute: ". shift());
+  exit(1);
+};
 unshift @only_steps, "setup", "os-detection" if @only_steps;
 push @only_steps, "complete" if @only_steps;
 v "Only running steps: " . join(", ", @only_steps) if @only_steps;
 
 $steps = new PriorityQueue;
 foreach (@all_steps) {
-  next unless /^(\d+)-(.*)/;
-  $steps->insert($_, int($1));
+  next if $_->{type} eq 'directory';
+  next unless $_->{filename} =~ /^(\d+)-(.*)/;
+  $steps->insert($_->{filename}, int($1));
 }
 
 # Run the first step (001-setup)
@@ -1453,6 +1691,132 @@ while ((my $step = $steps->pop())) {
   }
 }
 
+write_config();
 close(LOCKFILE);
 unlink("/var/run/rollout.lock");
+
+exit $errors;
+
+__END__
+=head1 NAME
+
+rollout - Rollout is a tool designed to automate system administration on UNIX servers.
+
+=head1 SYNOPSIS
+
+rollout [options] <message>
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--help -?>
+
+Brief help message
+
+=item B<--verbose -v>
+
+Increase verbosity
+
+=item B<--quiet -q>
+
+Don't print anything except fatal errors
+
+=item B<--safe_mode -s>
+
+Show what will be changed, but don't actually do anything
+
+=item B<--url -u> <url>
+
+Set the base Rollout HTTP url
+
+=item B<--skip_step -k> <step>
+
+Specify a step to be skipped, may be specified multiple times
+
+=item B<--hostname -h> <hostname>
+
+Rollout configuration for a different host. If -f network is provided, the
+hostname will be changed
+
+=item B<--only -o> <step>
+
+Only run a specific step (can be specified multiple times)
+
+=item B<--force -f> <step>
+
+Force a dangerous step to be run
+
+=item B<--configdir> <path>
+
+Directory to store configuration files
+
+=item B<--configfile> <filename>
+
+File to store configuration (inside configdir unless full path)
+
+=item B<--no_step_labels>
+
+Don't print the filename of each step as it's run.
+
+=back
+
+Steps which are considered dangerous are always run in safe mode, unless the -f
+parameter is specified with a step name as argument.
+
+Any additional arguments will be combined to form the 'comment' which will be
+logged.  This should be used to describe the reason for running rollout, i.e. a
+change tracking number or authorization
+
+=head1 DESCRIPTION
+
+Rollout is a system developed to automate system administration on UNIX servers.
+It is primarily focused towards Linux, but could be adapted to Solaris, HP-UX,
+AIX, etc.
+
+It is written purely in Perl, and the configuration is also a Perl source file.
+Some Perl knowledge is required to edit the configuration, but copy-and-paste
+may suffice.
+
+System Administration can generally be reduced to a set of steps, which must be
+completed in order.  Some example steps include:
+
+=over 4
+
+=item * Copy files, create symlinks
+
+=item * Edit configuration files
+
+=item * Start / stop services
+
+=item * Add / modify users & groups
+
+=item * Install applications
+
+=back
+
+The idea behind Rollout is to automate all these steps in a configurable way.
+Rollout is by design idempotent - it can be run many times on a single server
+and produce the same results.
+
+=head1 SEE ALSO
+
+=head1 COPYRIGHT
+
+Copyright 2007 David Parrish
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place, Suite 330, Boston, MA  02111-1307  USA
+
+=cut
 

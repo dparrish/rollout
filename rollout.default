@@ -1,0 +1,23 @@
+# Configuration file for the Rollout server
+
+# Change this to "1" to make the Rollout server run on startup
+RUN_ON_STARTUP=0
+
+# Choose the directory that Rollout will serve configuration from
+BASEDIR="/usr/local/rollout"
+
+# Rollout will only serve to addresses in this list. Use CIDR notation
+# (1.2.3.4/24) and separate multiple networks with comma (,)
+ALLOW="127.0.0.0/24"
+
+# Choose the IP address and port that Rollout will listen on. Use 0.0.0.0 to
+# listen on any address.
+LISTEN_ADDRESS="127.0.0.1"
+LISTEN_PORT=8000
+
+# Choose a user and group to run as. By default this is nobody, but should be changed for security
+USER=nobody
+GROUP=daemon
+
+# This is the Rollout binary server that is run.
+ROLLOUTD="/usr/local/sbin/rollout"
