@@ -6,6 +6,32 @@
 #  root_keys - Update root's ssh authorized_keys
 #  user_keys - Update individual users's ssh authorized_keys
 
+validate_step_config {
+  users => {
+    type => "hash",
+    key => {
+      help => "Username",
+      type => "string",
+    },
+    value => {
+      type => [ "options", "undef" ],
+      options => {
+        ssh_keys => {
+          help => "List of SSH keys to add to the user's authorized_keys",
+          type => "list",
+          items => { type => "string" },
+        },
+      },
+      fail_on_unknown => 0,
+    },
+  },
+  ssh_keys_add => {
+    help => "List of SSH keys to add to root's authorized_keys",
+    type => "list",
+    items => { type => "string" },
+  },
+};
+
 return unless i_has("user") || i_has("ssh_keys_add");
 
 my %keys;
@@ -26,7 +52,7 @@ try {
 if (i_should("user_keys")) {
   my %users = flatten_hash(c("$hostname/users"));
   while (my($username, $user) = each(%users)) {
-    next unless defined $user;
+    next unless $user && $username;
     $keys{$username} ||= { $username => 1 };
     $keys{$username}->{$_}++ foreach (@{$user->{ssh_keys} || []});
   }
@@ -44,7 +70,7 @@ foreach (keys %keys) {
   v "Checking keys for $_ -> ". join(", ", keys %{$keys{$_}});
   foreach (keys %{$keys{$_}}) {
     throw ConfigException "Missing key \"$_\" for user $name, should be in authorized_keys"
-      unless $all_keys{$_};
+      if (!$all_keys{$_} && $_ ne $name);
   }
   v "No keys found for $_" and next unless
     my $text = join("", grep defined, map { $all_keys{$_} } keys %{$keys{$_}});
