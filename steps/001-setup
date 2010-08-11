@@ -1,27 +1,43 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
-# Retrieve the configuration and install rollout locally.
-#
-# Example global configuration:
-# rollout => {
-#   require_reason => 1,               # A reason for running rollout must be given on the command line
-#   logfile => "/var/log/rollout.log", # Log each run to this file
-#   reorder_steps => [                 # Change the order of steps
-#     "240-dir_check" => 140,
-#     "060-ssh_keys" => 170,
-#   ],
-#   copy_steps => [                    # Run a step multiple times during the run
-#     "800-file_append" => 850,
-#     "800-file_append" => 880,
-#   ],
-# },
-# command => [
-#   200 => 'ls /tmp',
-#   210 => sub { l "Hello world" },
-# ],
-#
-# Available skip_steps items:
-#  local_install - Install rollout locally (in /usr/local/sbin)
+=head1 setup
+
+Retrieve the configuration and install rollout locally.
+
+=head1 EXAMPLE
+
+  rollout => {
+    require_reason => 1,               # A reason for running rollout must be given on the command line
+    logfile => "/var/log/rollout.log", # Log each run to this file
+    reorder_steps => [                 # Change the order of steps
+      "240-dir_check" => 140,
+      "060-ssh_keys" => 170,
+    ],
+    copy_steps => [                    # Run a step multiple times during the run
+      "800-file_append" => 850,
+      "800-file_append" => 880,
+    ],
+  },
+  command => [
+    200 => 'ls /tmp',
+    210 => sub { l "Hello world" },
+  ],
+
+=head1 SKIPPABLE STEPS
+
+=over
+
+=item local_install
+
+Install rollout locally (in /usr/local/sbin)
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 use vars qw( %networks );
 
@@ -76,6 +92,74 @@ v "Evaluated Rollout config: ". scalar(grep /^[a-z]/, keys %m). " devices, ".
 fatal "Can't find configuration entry for $hostname" unless $m{$hostname};
 
 # }}}
+
+validate_step_config {
+  command => {
+    help => "List of commands to run at set priorities",
+    type => "hash_list",
+    key => {
+      type => "int",
+      help => "Step number",
+      range => [1, 998],
+    },
+    value => {
+      type => [ "string", "code" ],
+      help => [ "Command to run", "Perl code to run" ],
+    },
+  },
+  rollout => {
+    type => "options",
+    options => {
+      reorder_steps => {
+        help => "Change the ordering of steps",
+        type => "hash_list",
+        key => {
+          type => "string",
+          help => "Step",
+          regex => qr/^\d+-[\w_\-.]+$/,
+        },
+        value => {
+          type => "int",
+          help => "Destination step number",
+          range => [1, 998],
+        },
+      },
+      copy_steps => {
+        help => "Make a step run at multiple priorities",
+        type => "hash_list",
+        key => {
+          type => "string",
+          help => "Step",
+          regex => qr/^\d+-[\w_\-.]+$/,
+        },
+        value => {
+          type => "int",
+          help => "Destination step number",
+          range => [1, 998],
+        },
+      },
+      require_reason => {
+        type => "boolean",
+        help => "Require a reason string for each run",
+      },
+      logfile => {
+        type => "path",
+        absolute => 1,
+        help => "File to log rollout run information to",
+      },
+    },
+  },
+  skip_steps => {
+    help => "List of steps to skip",
+    type => "list",
+    items => {
+      type => "string",
+      help => "Step",
+      regex => qr/^(\d+-)?[\w_\-.]+$/,
+    },
+  },
+};
+
 # Install rollout locally, keeping the rollout URL parameter permanently {{{
 if (i_should("local_install") && !$safe_mode) {
   try {
@@ -200,3 +284,4 @@ sub compile_perl { # {{{
   return wantarray ? ($?, @output) : $?;
 }
 # }}}
+
