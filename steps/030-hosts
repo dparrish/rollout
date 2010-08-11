@@ -7,6 +7,30 @@
 #       network - Add entries for every machine in the local network
 #       hosts_append - Add custom hosts_append entries
 
+validate_step_config {
+  domain_name => {
+    help => "Domain name to append to the hostname",
+    type => "domainname",
+  },
+  network => {
+    help => "List of networks this host should join",
+    type => "list",
+    items => { type => "string" },
+  },
+  hosts_append => {
+    help => "Entries to append to local hosts config",
+    type => "hash",
+    key => {
+      help => "IP address of host",
+      type => "ip",
+    },
+    value =>{
+      help => "Space separated list of hostnames for the IP, canonical name first",
+      type => "string",
+    },
+  },
+};
+
 if (i_should("localhost")) {
   my $domain = (flatten_list(c("$hostname/domain_name")))[0] || "localdomain";
   file_append(-file => "/etc/hosts",
