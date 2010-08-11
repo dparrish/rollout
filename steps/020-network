@@ -63,6 +63,64 @@
 #  domain_name - Set local domain name
 #  iftab - Add mac address <-> interface name mapping
 
+validate_step_config {
+  interfaces => {
+    help => "Configuration for all network interfaces",
+    type => "hash",
+    key => {
+      help => "Interface name",
+      type => "string",
+    },
+    value => {
+      help => "Interface configuration",
+      type => "options",
+      options => {
+        bond => { type => "list" },
+        dhcp => { type => "boolean" },
+        disabled => { type => "boolean" },
+        family => { type => "string" },
+        gateway => { type => "ip" },
+        hostname => { type => "string" },
+        ip => { type => "ip" },
+        ipv6 => { type => "int" },
+        mac => { type => "string", regex => qr/^([0-9a-f][0-9a-f]:){5}[0-9a-f][0-9a-f]$/i },
+        method => { type => "string" },
+        multicast => { type => "string" },
+        netmask => { type => "ip" },
+        primary => { type => "boolean" },
+        provider => { type => "string" },
+        routes => { type => "hash_list" },
+        stp => { type => "string" },
+      },
+      fail_on_unknown => 1,
+    },
+  },
+  resolver => {
+    type => "options",
+    options => {
+      timeout => {
+        help => "Timeout for the system resolver in seconds",
+        type => "int",
+        range => [0, 300],
+      },
+      attempts => {
+        help => "Number of attempts for each dns server",
+        type => "int",
+        range => [0, 100],
+      },
+    },
+  },
+  nameservers => {
+    help => "List of IP addresses of local name servers",
+    type => "list",
+    items => { type => "ip" },
+  },
+  domain_name => {
+    help => "Domain name to append to the hostname",
+    type => "domainname",
+  },
+};
+
 local $safe_mode = grep(/^network$/, @force_dangerous) ? 0 : 1;
 
 my $changes = 0;
