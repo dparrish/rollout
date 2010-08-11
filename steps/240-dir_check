@@ -6,4 +6,14 @@
 #  [ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],
 # ],
 
+validate_step_config {
+  dir_check => {
+    type => "list",
+    items => {
+      type => [ "list", "hash_list" ],
+      items => { type => "string" }
+    },
+  },
+};
+
 dir_check(@$_) foreach flatten_list(c("$hostname/dir_check"));
