@@ -53,6 +53,7 @@ $config = {
   ca_certificate => "cacert.crt",
 };
 my $hostname = hostname;
+my @step_help;
 
 # Parse some initial options
 my @oldargv = @ARGV;
@@ -99,6 +100,14 @@ use base 'RolloutException';
 1;
 
 package ConfigException;
+use base 'RolloutException';
+1;
+
+package StepHelpException;
+use base 'RolloutException';
+1;
+
+package ConfigValidationException;
 use base 'RolloutException';
 1;
 
@@ -763,6 +772,8 @@ sub run_step {
   } catch ConfigException with {
     $errors++;
     w "Configuration error in step $filename:\n". shift();
+  } catch StepHelpException with {
+    step_help($filename, 1);
   } catch Error with {
     if ($@) {
       l "------ FATAL ERROR ------";
@@ -776,6 +787,26 @@ sub run_step {
   } finally {
     exit unless $pid == $$;
   };
+}
+
+sub step_help {
+  my($filename, $indent) = @_;
+  validate("Attempt to run a step with no filename", $filename);
+  try {
+    $steps_code{$filename} ||= http_file -url => "steps/$filename";
+  } catch HttpException with {
+    w "Can't retrieve step $filename: ". shift();
+    return;
+  };
+  eval {
+    require Pod::Text;
+  };
+  fatal "Could not load Pod::Text module, step help is unavailable: $@" if $@;
+  my $parser = new Pod::Text;
+  my $output;
+  $parser->output_string(\$output);
+  $parser->parse_string_document($steps_code{$filename});
+  l $output, $indent;
 }
 
 # Adds a command to be run just before completion
@@ -1506,6 +1537,13 @@ sub validate($@) {
   }
 }
 
+sub validate_step_config($) {
+  eval { require RolloutConfigValidator };
+  w($@) and return if $@;
+  my $validator = new RolloutConfigValidator;
+  $validator->validate_config($_[0], $hostname);
+}
+
 # An optional hashref as the last argument can set custom messages:
 #   failure - print this if command fails.
 #   success - print this if command succeeds and produces output. (quiet otherwise)
@@ -1653,6 +1691,7 @@ Getopt::Long::GetOptions(
   "verbose|v"       => sub {},
   "no_step_labels"  => \$no_step_labels,
   "help|?"          => \&usage,
+  "step_help|H=s"   => \@step_help,
 ) or usage();
 @ARGV = @oldargv;
 
@@ -1671,6 +1710,16 @@ foreach (@all_steps) {
   next if $_->{type} eq 'directory';
   next unless $_->{filename} =~ /^(\d+)-(.*)/;
   $steps->insert($_->{filename}, int($1));
+}
+
+if (@step_help) {
+  # Show help for some steps
+  while ((my $step = $steps->pop())) {
+    next unless grep { $step =~ /^\d*-?$_$/ } @step_help;
+    step_help($step, 0);
+    print "\n";
+  }
+  exit(0);
 }
 
 # Run the first step (001-setup)
