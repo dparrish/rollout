@@ -11,6 +11,18 @@
 # },
 #
 
+validate_step_config {
+  file_comment => {
+    type => "hash",
+    key => { type => "path", help => "File to comment out lines in" },
+    value => { type => "string", help => "Regex for each line to comment out" },
+  },
+  file_uncomment => {
+    type => "hash",
+    key => { type => "path", help => "File to uncomment lines in" },
+    value => { type => "string", help => "Regex for each line to uncomment" },
+  },
+};
 
 my %comment = flatten_hash(c("$hostname/file_comment"));
 while (my($file, $regex) = each(%comment)) {
