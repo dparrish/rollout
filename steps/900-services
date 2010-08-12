@@ -3,6 +3,25 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 use IO::Dir;
 
+validate_step_config {
+  service => {
+    type => "hash",
+    key => {
+      help => "Service name (and startup script in /etc/init.d)",
+      type => "string",
+    },
+    value => {
+      type => [ "boolean", "options" ],
+      help => [ "Run service?", "Service options" ],
+      options => {
+        proc => { type => "string", help => "Process name" },
+        status => { type => "boolean", help => "Run service?" },
+        check => { type => "string", help => "Script to check process status" },
+      },
+    },
+  },
+};
+
 my %services = flatten_hash(c("$hostname/service"));
 while (my($service, $s) = each(%services)) {
   v "Checking service $service";
