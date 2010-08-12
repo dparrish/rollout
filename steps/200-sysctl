@@ -2,6 +2,21 @@
 # Add entries to /etc/sysctl.conf
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  sysctl => {
+    type => "hash",
+    key => {
+      help => "Sysctl name",
+      type => "string",
+      regex => qr/^[\w_\-]+.[\w_\-.]+$/,
+    },
+    value => {
+      help => "Sysctl value",
+      type => "string",
+    },
+  },
+};
+
 my $changed = 0;
 my %sysctl = flatten_hash(c("$hostname/sysctl"));
 while (my($item, $value) = each(%sysctl)) {
