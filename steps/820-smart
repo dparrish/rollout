@@ -2,6 +2,20 @@
 # Configure S.M.A.R.T.
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  smart_disks => {
+    type => "hash_list",
+    key => {
+      type => "string",
+      help => "Disk name",
+    },
+    value => {
+      type => "string",
+      help => "SMART Driver",
+    },
+  },
+};
+
 return if i_has('no_smart');
 return unless i_has("smart_disks");
 
