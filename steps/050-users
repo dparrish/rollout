@@ -40,6 +40,7 @@ validate_step_config {
         shell => { type => "path" },
         ssh_keys => { type => "list", items => { type => "string" } },
         uid => { type => "int" },
+        homedir_mode => { type => "int", range => [0, 07777], help => "Mode for home directory" },
       },
     },
   },
@@ -77,6 +78,7 @@ if (i_should("users")) {
     next unless defined $user;
     $user->{name} ||= "";
     $user->{name} =~ s/\$hostname/$hostname/;
+    $user->{homedir_mode} ||= 0750;
 
     my($name, $passwd, $uid, $gid, $quota, $comment, $gcos, $dir, $shell, $expire) =
       getpwnam($username);
@@ -129,9 +131,11 @@ if (i_should("users")) {
           $username
         );
       }
+      $user->{uid} ||= $uid;
+      $user->{gid} ||= $gid;
     }
 
-    dir_check(-dir => $user->{home}, -mode => 0750, -uid => $user->{uid} || 0,
+    dir_check(-dir => $user->{home}, -mode => $user->{homedir_mode}, -uid => $user->{uid} || 0,
               -gid => $user->{gid} || 0)
       if $user->{home};
   }
