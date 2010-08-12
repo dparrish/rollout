@@ -2,6 +2,30 @@
 # Set up /etc/rsyncd.conf
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  rsync => {
+    type => "hash",
+    key => {
+      help => "Module name (see rsyncd.conf(5))",
+      type => "string",
+    },
+    value => {
+      type => "options",
+      options => {
+        allow => { type => "string", help => "List of hosts to allow access" },
+        chroot => { type => "string" },
+        comment => { type => "string" },
+        gid => { type => "string" },
+        password => { type => "string", help => "Auth password" },
+        path => { type => "string" },
+        readonly => { type => "string" },
+        uid => { type => "string" },
+        user => { type => "string", help => "Auth user" },
+      },
+    },
+  },
+};
+
 return unless i_has('rsync');
 package_check("rsync");
 
