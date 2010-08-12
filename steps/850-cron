@@ -9,6 +9,34 @@
 #   ],
 # },
 
+validate_step_config {
+  crontab => {
+    help => "Create crontab.d files",
+    type => "hash",
+    key => {
+      help => "Crontab filename",
+      type => "string",
+    },
+    value => {
+      help => "Crontab entry",
+      type => "list",
+      items => { type => "string" },
+    },
+  },
+  crontab_include => {
+    help => "Append entries to /etc/crontab (deprecated)",
+    type => "hash",
+    key => {
+      help => "Crontab entry",
+      type => "string",
+    },
+    value => {
+      help => "Regular expression to replace lines",
+      type => "string",
+    },
+  }
+};
+
 my %crontab = flatten_hash(c("$hostname/crontab"));
 map { text_install("/etc/cron.d/$_", join("\n", @{$crontab{$_}}). "\n") } keys %crontab;
 
