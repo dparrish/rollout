@@ -13,6 +13,40 @@
 #   '/r2' => { path => 'fileserver:/r2', options => [ 'sync' ] },
 # },
 
+validate_step_config {
+  nfs_share => {
+    help => "Local paths to share by NFS",
+    type => "hash",
+    key => {
+      help => "Local path to share",
+      type => "path",
+    },
+    value => {
+      type => "hash",
+      key => {
+        help => "Network group to share this path to",
+        type => "string",
+      },
+      value => {
+        help => "NFS options for this share (see man exports(5))",
+        type => "string",
+      },
+    },
+  },
+  nfs_mount => {
+    help => "Network NFS shares to mount locally",
+    type => "hash",
+    key => {
+      help => "Local path to mount NFS share at",
+      type => "path",
+    },
+    value => {
+      help => "NFS share to mount (<hostname>:<path>)",
+      type => "string",
+    },
+  },
+};
+
 my %shares = flatten_hash(c("$hostname/nfs_share"));
 if (%shares) {
   # Install NFS server packages
