@@ -2,6 +2,26 @@
 # Add ports to /etc/services
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  port_check => {
+    help => "List of ports to add to /etc/services",
+    type => "hash_list",
+    key => {
+      help => "Service name",
+      type => "string",
+    },
+    value => {
+      help => "Port number",
+      type => [ "string", "options" ],
+      regex => qr/^\d+(\/(?:tcp|udp))?$/,
+      options => {
+        comment => { type => "string" },
+        port => { type => "string", regex => qr/^\d+(\/(?:tcp|udp))?$/ },
+      },
+    },
+  },
+};
+
 my @ports = flatten_list(c("$hostname/port_check"));
 for (my $i = 0; $i < @ports; $i += 2) {
   my($name, $port, $comment) = ($ports[$i], $ports[$i + 1], undef);
