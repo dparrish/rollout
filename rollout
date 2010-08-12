@@ -1204,7 +1204,6 @@ sub dir_check {
   umask $mask;
   return 1;
 }
-eval { memoize('dir_check') };
 
 sub symlink_check {
   my $p = named_params @_, [ -src => undef, -dest => undef ];
@@ -1485,9 +1484,8 @@ sub cvs_checkout {
     try {
       dir_check($base);
     } catch LocalFileException with {
-      my($ex) = @_;
-      $ex->throw("Checkout to $p->{-dest} failed: ". $ex);
-    }
+      throw LocalFileException "Checkout to $p->{-dest} failed: ". shift;
+    };
     chdir $base unless $safe_mode;
     command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
             ($p->{-rev} ? ("-r", $p->{-rev}) : ()), "-d", $newdir, $p->{-module});
@@ -1517,9 +1515,8 @@ sub svn_checkout {
     try {
       dir_check($base);
     } catch LocalFileException with {
-      my($ex) = @_;
-      $ex->throw("Checkout to $p->{-dest} failed: ". $ex);
-    }
+      throw LocalFileException "Checkout to $p->{-dest} failed: ". shift;
+    };
     chdir $base;
     command("svn", "checkout", ($p->{-rev} ? ("-r", $p->{-rev}) : ()), $p->{-url}, $newdir);
     chdir $newdir && command($p->{-cmd}) if $p->{-cmd};
