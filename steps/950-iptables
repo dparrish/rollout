@@ -2,6 +2,30 @@
 # Build and activate firewall rules
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  firewall_accept => {
+    help => "List of source addresses and destination ports to accept",
+    type => "list",
+    items => {
+      type => "string",
+    },
+  },
+  firewall_drop => {
+    help => "List of source addresses and destination ports to reject",
+    type => "list",
+    items => {
+      type => "string",
+    },
+  },
+  firewall_append => {
+    help => "List of iptables rules to inject at the end of the ruleset (before drop)",
+    type => "list",
+    items => {
+      type => "string",
+    },
+  },
+};
+
 return if i_has("skip_firewall");
 return unless i_has("firewall_accept") || i_has("firewall_drop") || i_has("firewall_append");
 
