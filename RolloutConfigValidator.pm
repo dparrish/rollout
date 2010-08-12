@@ -48,8 +48,6 @@ sub _validate_config_item {
     unless $config->{type};
   my @types = (ref $config->{type} eq 'ARRAY') ? @{$config->{type}} : $config->{type};
   my @helps = (ref $config->{help} eq 'ARRAY') ? @{$config->{help}} : $config->{help};
-  throw ConfigValidationException "Error in step configuration, wrong number of types and helps"
-    unless scalar @types == scalar @helps;
 
   my $ex;
   for (my $i = 0; $i < @types; $i++) {
@@ -57,23 +55,25 @@ sub _validate_config_item {
     my $help = $helps[$i] || "";
 
     my %all_types = (
-      'hash' => sub { ref $_[0] eq 'HASH' },
-      'options' => sub { ref $_[0] eq 'HASH' },
-      'list' => sub { ref $_[0] eq 'ARRAY' },
-      'hash_list' => sub { ref $_[0] eq 'ARRAY' },
+      'boolean' => sub { $_[0] =~ /^[01]$/ },
       'code' => sub { ref $_[0] eq 'CODE' },
+      'domainname' => sub { $_[0] =~ /^[a-z][a-z0-9\-.]+$/i },
+      'hash' => sub { ref $_[0] eq 'HASH' },
+      'hash_list' => sub { ref $_[0] eq 'ARRAY' },
       'int' => sub { $_[0] =~ /^\d+$/ },
       'ip' => sub { $_[0] =~ /^((([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\.){3}([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])|[0-9:a-f]+)$/ },
-      'boolean' => sub { $_[0] =~ /^[01]$/ },
-      'domainname' => sub { $_[0] =~ /^[a-z][a-z0-9\-.]+$/i },
+      'list' => sub { ref $_[0] eq 'ARRAY' },
+      'options' => sub { ref $_[0] eq 'HASH' },
+      'path' => sub { $_[0] =~ /^[a-z0-9_.\-:\/]/i },
       'string' => sub { defined($_[0]) && !ref $_[0] },
+      'undef' => sub { 1 },
     );
 
     throw ConfigValidationException "Error in step configuration, unknown type '$type'"
       unless $all_types{$type};
 
     if (!$all_types{$type}->($value)) {
-      my $text = "Expected type [". join(", ", @types).  "], got '$value'";
+      my $text = "Expected type [". join(", ", @types).  "], got '". ($value || ""). "'";
       $text .= "\nHelp: $help" if $help;
       $ex = new ConfigValidationException $text;
       next;
@@ -92,19 +92,28 @@ sub _validate_config_item {
         unless $config->{options};
       while (my($xkey, $xvalue) = each(%$value)) {
         if (!$config->{options}{$xkey}) {
-          next unless $config->{fail_on_unknown};
+          next if defined $config->{fail_on_unknown} && !$config->{fail_on_unknown};
           throw ConfigValidationException "'$xkey' is an unknown option for $key";
         }
         $self->_validate_config_item("$key/$xkey", $config->{options}{$xkey}, $hostname, $xvalue);
       }
       return;
     } elsif ($type eq 'boolean') {
-      # TODO(dparrish): list validation
+      # Always return true
+      return;
+    } elsif ($type eq 'undef') {
+      # Always return true
       return;
     } elsif ($type eq 'list') {
       # TODO(dparrish): list validation
       $self->_validate_config_item("$key/$_", $config->{items}, $hostname, $_)
         foreach @$value;
+      return;
+    } elsif ($type eq 'path') {
+      if ($config->{absolute} && $value !~ /^\//) {
+        $ex = new ConfigValidationException "Path '$value' is required to be asbolute";
+        next;
+      }
       return;
     } elsif ($type eq 'hash_list') {
       for (my $i = 0; $i < @{$value}; $i += 2) {
@@ -129,6 +138,12 @@ sub _validate_config_item {
       return;
     } elsif ($type eq 'string') {
       # TODO(dparrish): string validation
+      if ($config->{regex}) {
+        my $text = "'$value' does not match regex /$config->{regex}/";
+        $text .= "\nHelp: $help" if $help;
+        $ex = new ConfigValidationException $text and next
+          unless $value =~ /$config->{regex}/;
+      }
       return;
     }
   }
