@@ -727,7 +727,7 @@ sub delete {
 
 sub update {
   my($self, $payload, $new_prio) = @_;
-  my $old_prio = $self->{prios}->{$payload};
+  my $old_prio = $self->{prios}->{$payload} || 0;
   my $old_pos = $self->delete($payload);
   my($upper, $lower);
   if ($new_prio - $old_prio > 0) {
@@ -1525,6 +1525,32 @@ sub svn_checkout {
 
 # }}}
 
+my %_done_remote_require;
+sub remote_require($;$) {
+  my($module, $optional) = @_;
+  my $filename = $module =~ /\.pm$/ ? $module : "$module.pm";
+  if (!$_done_remote_require{$filename}) {
+    $_done_remote_require{$filename} = 1;
+    my $text;
+    try {
+      $text = http_file($filename);
+    } catch HttpException with {
+      return 0 if $optional;
+      fatal "Can't load module $module: ". shift;
+    };
+    if (!$text) {
+      return 0 if $optional;
+      fatal "Can't load module $module: empty module code";
+    }
+    eval($text);
+    if ($@) {
+      return 0 if $optional;
+      fatal "Can't load module $module: $@";
+    }
+  }
+  return 1;
+}
+
 sub validate($@) {
   my($message, @checks) = @_;
   foreach (@checks) {
@@ -1533,8 +1559,7 @@ sub validate($@) {
 }
 
 sub validate_step_config($) {
-  eval { require RolloutConfigValidator };
-  w($@) and return if $@;
+  remote_require "RolloutConfigValidator" or return;
   my $validator = new RolloutConfigValidator;
   $validator->validate_config($_[0], $hostname);
 }
