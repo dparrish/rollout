@@ -13,6 +13,29 @@
 #   },
 # },
 
+validate_step_config {
+  dir_install => {
+    type => "hash",
+    key => {
+      help => "Local path to install to",
+      type => "path",
+    },
+    value => {
+      type => "options",
+      options => {
+        command => { type => "string" },
+        dir_mode => { type => "int", range => [0, 07777], help => "Mode for directories" },
+        gid => { type => "int", range => [0, 65535] },
+        group => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
+        mode => { type => "int", range => [0, 07777], help => "Mode for files" },
+        owner => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
+        source => { type => "string" },
+        uid => { type => "int", range => [0, 65535] },
+      },
+    },
+  },
+};
+
 my %dir_install = flatten_hash(c("$hostname/dir_install"));
 while (my($dest, $src) = each(%dir_install)) {
   next unless i_should($dest);
