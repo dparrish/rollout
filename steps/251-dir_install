@@ -13,7 +13,7 @@
 #   },
 # },
 
-validate_step_config {
+validate_config {
   dir_install => {
     type => "hash",
     key => {

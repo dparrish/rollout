@@ -63,7 +63,7 @@
 #  domain_name - Set local domain name
 #  iftab - Add mac address <-> interface name mapping
 
-validate_step_config {
+validate_config {
   interfaces => {
     help => "Configuration for all network interfaces",
     type => "hash",

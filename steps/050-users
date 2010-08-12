@@ -7,7 +7,7 @@
 #  groups - Create and update group entries
 #  force_password - Reset user's passwords if they have changed them
 
-validate_step_config {
+validate_config {
   group => {
     type => "hash",
     key => {

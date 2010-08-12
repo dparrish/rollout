@@ -9,7 +9,7 @@
 #   ],
 # },
 
-validate_step_config {
+validate_config {
   crontab => {
     help => "Create crontab.d files",
     type => "hash",

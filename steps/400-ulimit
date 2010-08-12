@@ -16,7 +16,7 @@
 
 use strict;
 
-validate_step_config {
+validate_config {
   ulimit => {
     type => "hash",
     key => {

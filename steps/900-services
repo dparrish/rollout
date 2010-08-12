@@ -3,7 +3,7 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 use IO::Dir;
 
-validate_step_config {
+validate_config {
   service => {
     type => "hash",
     key => {

@@ -13,7 +13,7 @@
 #   '/r2' => { path => 'fileserver:/r2', options => [ 'sync' ] },
 # },
 
-validate_step_config {
+validate_config {
   nfs_share => {
     help => "Local paths to share by NFS",
     type => "hash",

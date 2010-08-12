@@ -2,7 +2,7 @@
 # Update /etc/motd
 # vim:tw=100 sw=2 expandtab ft=perl
 
-validate_step_config {
+validate_config {
   motd => {
     help => "Message of the day",
     type => "string",

@@ -10,7 +10,7 @@
 #   ],
 # ],
 
-validate_step_config {
+validate_config {
   file_modify => {
     type => "hash_list",
     key => {
