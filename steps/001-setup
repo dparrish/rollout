@@ -144,7 +144,6 @@ validate_step_config {
       },
       logfile => {
         type => "path",
-        absolute => 1,
         help => "File to log rollout run information to",
       },
     },

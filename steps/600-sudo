@@ -11,7 +11,7 @@ validate_step_config {
     value => {
       help => "List of commands to allow",
       type => "list",
-      items => { type => [ "path", "string" ], absolute => 1, regex => qr/^ALL$/ },
+      items => { type => [ "path", "string" ], regex => qr/^ALL$/ },
     },
   },
 };

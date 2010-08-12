@@ -110,7 +110,7 @@ sub _validate_config_item {
         foreach @$value;
       return;
     } elsif ($type eq 'path') {
-      if ($config->{absolute} && $value !~ /^\//) {
+      if ((!defined($config->{absolute} || $config->{absolute}) && $value !~ /^\//)) {
         $ex = new ConfigValidationException "Path '$value' is required to be asbolute";
         next;
       }
