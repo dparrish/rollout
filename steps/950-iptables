@@ -2,7 +2,7 @@
 # Build and activate firewall rules
 # vim:tw=100 sw=2 expandtab ft=perl
 
-validate_step_config {
+validate_config {
   firewall_accept => {
     help => "List of source addresses and destination ports to accept",
     type => "list",

@@ -11,7 +11,7 @@
 # Example:
 # packages => [ 'package1', 'package2' ],
 
-validate_step_config {
+validate_config {
   packages => {
     help => "Packages to install",
     type => "list",

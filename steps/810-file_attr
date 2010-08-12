@@ -8,7 +8,7 @@
 #   '/tmp/foobar2' => { mode => 0644, uid => 0, gid => 0 },
 # },
 
-validate_step_config {
+validate_config {
   file_attr => {
     type => "hash_list",
     key => {

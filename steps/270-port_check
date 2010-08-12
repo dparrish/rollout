@@ -2,7 +2,7 @@
 # Add ports to /etc/services
 # vim:tw=100 sw=2 expandtab ft=perl
 
-validate_step_config {
+validate_config {
   port_check => {
     help => "List of ports to add to /etc/services",
     type => "hash_list",

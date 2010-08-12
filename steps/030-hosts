@@ -7,7 +7,7 @@
 #       network - Add entries for every machine in the local network
 #       hosts_append - Add custom hosts_append entries
 
-validate_step_config {
+validate_config {
   domain_name => {
     help => "Domain name to append to the hostname",
     type => "domainname",

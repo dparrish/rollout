@@ -20,7 +20,7 @@
 #   '/tmp/dest' => '/tmp/source',
 # },
 
-validate_step_config {
+validate_config {
   file_install => {
     type => "hash",
     key => {

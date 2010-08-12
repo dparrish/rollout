@@ -1558,7 +1558,7 @@ sub validate($@) {
   }
 }
 
-sub validate_step_config($) {
+sub validate_config($) {
   remote_require "RolloutConfigValidator" or return;
   my $validator = new RolloutConfigValidator;
   $validator->validate_config($_[0], $hostname);

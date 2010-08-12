@@ -6,7 +6,7 @@
 #  root_keys - Update root's ssh authorized_keys
 #  user_keys - Update individual users's ssh authorized_keys
 
-validate_step_config {
+validate_config {
   users => {
     type => "hash",
     key => {

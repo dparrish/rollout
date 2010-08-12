@@ -15,7 +15,7 @@
 #   ],
 # ],
 
-validate_step_config {
+validate_config {
   file_append => {
     type => "list",
     items => {

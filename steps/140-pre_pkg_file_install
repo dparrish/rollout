@@ -15,7 +15,7 @@
 #   '/tmp/dest_file' => { text => 'This is some text\n' },
 # },
 
-validate_step_config {
+validate_config {
   pre_pkg_file_install => {
     type => "hash",
     key => {

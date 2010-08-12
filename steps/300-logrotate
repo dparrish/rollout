@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
 
-validate_step_config {
+validate_config {
   logrotate => {
     type => "hash",
     key => { type => "string", help => "Logrotate configuration name" },

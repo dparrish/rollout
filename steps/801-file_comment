@@ -11,7 +11,7 @@
 # },
 #
 
-validate_step_config {
+validate_config {
   file_comment => {
     type => "hash",
     key => { type => "path", help => "File to comment out lines in" },

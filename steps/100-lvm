@@ -3,7 +3,7 @@
 
 use strict;
 
-validate_step_config {
+validate_config {
   lvm => {
     type => "hash",
     key => {
