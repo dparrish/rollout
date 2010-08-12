@@ -20,6 +20,43 @@
 #   '/tmp/dest' => '/tmp/source',
 # },
 
+validate_step_config {
+  file_install => {
+    type => "hash",
+    key => {
+      help => "Destination path",
+      type => "path",
+      absolute => 1,
+    },
+    value => {
+      type => "options",
+      options => {
+        command => { type => "string" },
+        gid => { type => "int", range => [0, 65535] },
+        group => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
+        mode => { type => "int", range => [0, 07777] },
+        owner => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
+        source => { type => "string" },
+        text => { type => "string" },
+        uid => { type => "int", range => [0, 65535] },
+      },
+    },
+  },
+  symlink_check => {
+    type => "hash",
+    key => {
+      help => "Symlink source (create this)",
+      type => "path",
+      absolute => 1,
+    },
+    value => {
+      help => "Symlink destination (symlink points to this)",
+      type => "path",
+      absolute => 1,
+    },
+  },
+};
+
 my %done_files;
 my %files = flatten_hash(c("$hostname/file_install"));
 while (my($dest, $f) = each(%files)) {

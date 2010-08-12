@@ -15,6 +15,30 @@
 #   '/tmp/dest_file' => { text => 'This is some text\n' },
 # },
 
+validate_step_config {
+  pre_pkg_file_install => {
+    type => "hash",
+    key => {
+      help => "Destination path",
+      type => "path",
+      absolute => 1,
+    },
+    value => {
+      type => "options",
+      options => {
+        command => { type => "string" },
+        gid => { type => "int", range => [0, 65535] },
+        group => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
+        mode => { type => "int", range => [0, 07777] },
+        owner => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
+        source => { type => "string" },
+        text => { type => "string" },
+        uid => { type => "int", range => [0, 65535] },
+      },
+    },
+  },
+};
+
 my %done_files;
 my %files = flatten_hash(c("$hostname/pre_pkg_file_install"));
 while (my($dest, $f) = each(%files)) {
