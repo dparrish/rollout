@@ -11,6 +11,35 @@
 # Example:
 # packages => [ 'package1', 'package2' ],
 
+validate_step_config {
+  packages => {
+    help => "Packages to install",
+    type => "list",
+    items => {
+      help => "Package name",
+      type => "string",
+    },
+  },
+  packages_remove => {
+    help => "Packages to remove",
+    type => "list",
+    items => {
+      help => "Package name",
+      type => "string",
+    },
+  },
+  apt_base => {
+    help => "List of apt sources to add to /etc/apt/sources.list.d/rollout.list",
+    type => "list",
+    items => { type => "string" },
+  },
+  deb_options => {
+    help => "List of options to run through debconf-set-selections",
+    type => "list",
+    items => { type => "string" },
+  },
+};
+
 return unless -d "/etc/apt" && -f "/usr/bin/apt-get";
 
 if (i_should("deb_options") && i_has("deb_options") && -f "/usr/bin/debconf-set-selections") {
