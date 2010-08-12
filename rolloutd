@@ -257,6 +257,8 @@ sub handle_request {
   }
 
   my $localpath = canonpath(uri_unescape($path));
+  return $self->error_response(403, undef, "Not allowed to access $localpath\r\n")
+    if $localpath =~ /rolloutd\.ca/;
   if (-d $localpath) {
     # Return a directory listing
     my @fields = qw( filename type size mtime checksum );
