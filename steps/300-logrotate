@@ -1,6 +1,31 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  logrotate => {
+    type => "hash",
+    key => { type => "string", help => "Logrotate configuration name" },
+    value => {
+      type => "options",
+      options => {
+        compress => { type => "boolean" },
+        create => { type => "string", help => "<mode> <owner> <group>" },
+        daily => { type => "boolean" },
+        delaycompress => { type => "boolean" },
+        missingok => { type => "boolean" },
+        monthly => { type => "boolean" },
+        notifempty => { type => "boolean" },
+        postrotate => { type => "string", help => "Shell script to run after rotation" },
+        prerotate => { type => "string", help => "Shell script to run before rotation" },
+        rotate => { type => "int", range => [1, 1000], help => "Number of log files to keep" },
+        sharedscripts => { type => "string", help => "Only run scripts once, not per log file" },
+        weekly => { type => "boolean" },
+        yearly => { type => "boolean" },
+      },
+    },
+  },
+};
+
 my $text;
 my %logrotate = flatten_hash(c("$hostname/logrotate"));
 while (my($file, $l) = each(%logrotate)) {
