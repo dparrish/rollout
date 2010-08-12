@@ -10,5 +10,19 @@
 #   ],
 # ],
 
+validate_step_config {
+  file_modify => {
+    type => "hash_list",
+    key => {
+      type => "path",
+    },
+    value => {
+      help => "List of regex style replaces to run on the file",
+      type => "list",
+      items => { type => "string" },
+    },
+  },
+};
+
 my @list = flatten_list(c("$hostname/file_modify"));
 file_modify(-file => shift @list, -modify => shift @list) while @list;
