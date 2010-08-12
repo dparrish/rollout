@@ -3,11 +3,33 @@
 
 use strict;
 
+validate_step_config {
+  lvm => {
+    type => "hash",
+    key => {
+      help => "Volume name",
+      type => "string",
+      regex => qr/^[a-z0-9_-]+$/,
+    },
+    value => {
+      type => "options",
+      options => {
+        size => { type => "string", help => "Volume size" },
+        vg => { type => "string", help => "Volume Group name" },
+        filesystem => { type => "string", help => "Filesystem type (man filesystems(5))" },
+        mountpoint => { type => "path" },
+        mkfsoptions => { type => "string", help => "Extra options to mkfs" },
+        mount_options => { type => "string" },
+        mount_order => { type => "int", help => "Order for fsck in /etc/fstab (default 2)" },
+      },
+    },
+  },
+};
+
 foreach (i_isa_fetchall("lvm")) {
   while (my($part, $l) = each(%$_)) {
     w "No size specified for volume $part" and next unless $l->{size};
     w "No volume group specified for volume $part" and next unless $l->{vg};
-    w "Invalid volume" and next unless $part =~ /^[a-z0-9_-]+$/;
 
     system("lvdisplay /dev/$l->{vg}/$part > /dev/null 2>/dev/null");
     if ($? == 0) {
