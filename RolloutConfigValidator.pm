@@ -21,7 +21,6 @@ sub new {
 sub validate_config {
   my($self, $val, $hostname) = @_;
   foreach my $global_config_key (keys %$val) {
-    v("Starting validation for $hostname/$global_config_key");
     next unless my @config = c("$hostname/$global_config_key");
     foreach my $frag (@config) {
       eval {
@@ -38,7 +37,6 @@ sub validate_config {
         throw ConfigValidationException $text;
       };
     }
-    v("Validation successful");
   }
 }
 
@@ -64,6 +62,7 @@ sub _validate_config_item {
       'ip' => sub { $_[0] =~ /^((([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\.){3}([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])|[0-9:a-f]+)$/ },
       'list' => sub { ref $_[0] eq 'ARRAY' },
       'options' => sub { ref $_[0] eq 'HASH' },
+      'options_list' => sub { ref $_[0] eq 'ARRAY' },
       'path' => sub { $_[0] =~ /^[a-z0-9_.\-:\/]/i },
       'string' => sub { defined($_[0]) && !ref $_[0] },
       'undef' => sub { 1 },
@@ -91,6 +90,18 @@ sub _validate_config_item {
       throw ConfigValidationException "Error in step configuration, no options"
         unless $config->{options};
       while (my($xkey, $xvalue) = each(%$value)) {
+        if (!$config->{options}{$xkey}) {
+          next if defined $config->{fail_on_unknown} && !$config->{fail_on_unknown};
+          throw ConfigValidationException "'$xkey' is an unknown option for $key";
+        }
+        $self->_validate_config_item("$key/$xkey", $config->{options}{$xkey}, $hostname, $xvalue);
+      }
+      return;
+    } elsif ($type eq 'options_list') {
+      throw ConfigValidationException "Error in step configuration, no options"
+        unless $config->{options};
+      for (my $i = 0; $i < @$value; $i++) {
+        my($xkey, $xvalue) = ($value->[$i], $value->[$i + 1]);
         if (!$config->{options}{$xkey}) {
           next if defined $config->{fail_on_unknown} && !$config->{fail_on_unknown};
           throw ConfigValidationException "'$xkey' is an unknown option for $key";
