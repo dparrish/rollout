@@ -2,6 +2,13 @@
 # Update /etc/motd
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  motd => {
+    help => "Message of the day",
+    type => "string",
+  },
+};
+
 my $text = `uname -a`;
 
 my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
