@@ -2,6 +2,18 @@
 # Configure snmpd by building a snmpd.conf file
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  snmp => {
+    type => "options_list",
+    options => {
+      community => { type => "string" },
+      trap => { type => "string" },
+      disk => { type => "string" },
+    },
+    fail_on_unknown => 0,
+  },
+};
+
 return unless i_has("snmp");
 
 my @options = (
