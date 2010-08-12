@@ -2,6 +2,23 @@
 # Extract tarballs
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  file_extract => {
+    type => "hash",
+    key => {
+      type => "string",
+      help => "Source tarball",
+    },
+    value => {
+      type => "options",
+      options => {
+        dest => { type => "path", help => "Destination path to extract to (default /)" },
+        check => { type => "path", help => "Skip extract if this path exists" },
+      },
+    },
+  },
+};
+
 my %file_extract = flatten_hash(c("$hostname/file_extract"));
 while (my($source, $f) = each(%file_extract)) {
   next unless i_should($source);
