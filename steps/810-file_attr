@@ -8,6 +8,26 @@
 #   '/tmp/foobar2' => { mode => 0644, uid => 0, gid => 0 },
 # },
 
+validate_step_config {
+  file_attr => {
+    type => "hash_list",
+    key => {
+      type => "path",
+    },
+    value => {
+      type => [ "int", "options" ],
+      help => [ "Mode", "Hash of attributes" ],
+      options => {
+        gid => { type => "int", range => [0, 65535] },
+        group => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
+        mode => { type => "int", range => [0, 07777] },
+        owner => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
+        uid => { type => "int", range => [0, 65535] },
+      },
+    },
+  },
+};
+
 my %attr = flatten_hash(c("$hostname/file_attr"));
 while (my($file, $attr) = each %attr) {
   $attr = { -mode => $attr } unless ref $attr eq 'HASH';
