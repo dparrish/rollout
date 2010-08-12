@@ -7,6 +7,44 @@
 #  groups - Create and update group entries
 #  force_password - Reset user's passwords if they have changed them
 
+validate_step_config {
+  group => {
+    type => "hash",
+    key => {
+      help => "Group name",
+      type => "string",
+    },
+    value => {
+      help => "Group definition",
+      type => [ "options", "undef" ],
+      options => {
+        gid => { type => "int" },
+      },
+    },
+  },
+  users => {
+    type => "hash",
+    key => {
+      help => "Username",
+      type => "string",
+    },
+    value => {
+      type => [ "options", "undef" ],
+      options => {
+        force_password => { type => "boolean" },
+        gid => { type => "int" },
+        groups => { type => "list", items => { type => "string" } },
+        home => { type => "path" },
+        name => { type => "string" },
+        password => { type => "string" },
+        shell => { type => "path" },
+        ssh_keys => { type => "list", items => { type => "string" } },
+        uid => { type => "int" },
+      },
+    },
+  },
+};
+
 my %groups = flatten_hash(c("$hostname/group"));
 my %users = flatten_hash(c("$hostname/users"));
 
