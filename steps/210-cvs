@@ -17,6 +17,35 @@
 #   },
 # },
 
+validate_step_config {
+  cvapass => {
+    type => "hash",
+    key => {
+      help => "CVSROOT",
+      type => "string",
+    },
+    value => {
+      help => "Encoded password",
+      type => "string",
+    },
+  },
+  cvs => {
+    type => "hash",
+    key => {
+      type => "path",
+    },
+    value => {
+      type => "options",
+      options => {
+        module => { type => "string", help => "CVS module name" },
+        rev => { type => "string", help => "Revision to check out" },
+        repository => { type => "string", help => "CVSROOT" },
+        cmd => { type => "string", help => "Post checkout command to run (in checked out dir)" },
+      },
+    },
+  },
+};
+
 return unless i_has('cvs');
 
 my %cvspass = flatten_hash(c("$hostname/cvspass"));
