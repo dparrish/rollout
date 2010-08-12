@@ -2,6 +2,24 @@
 # svn checkout
 # vim:tw=100 sw=2 expandtab ft=perl
 
+validate_step_config {
+  svn => {
+    type => "hash",
+    key => {
+      help => "Destination path",
+      type => "path",
+    },
+    value => {
+      type => "options",
+      options => {
+        url => { type => "string", help => "SVN repository URL" },
+        rev => { type => "string", help => "Revision to check out" },
+        post_cmd => { type => "string", help => "Post checkout command to run" },
+      },
+    },
+  },
+};
+
 return unless my %svn = flatten_hash(c("$hostname/svn"));
 package_check("subversion");
 
