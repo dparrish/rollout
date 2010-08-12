@@ -16,6 +16,53 @@
 
 use strict;
 
+validate_step_config {
+  ulimit => {
+    type => "hash",
+    key => {
+      help => "User name or group name (prepended with @)",
+      type => "string",
+      regex => qr/^\@?[\w_.\-]+$/,
+    },
+    value => {
+      type => "options",
+      options => {
+        "-c" => { type => [ "int", "hash" ] },
+        "-d" => { type => [ "int", "hash" ] },
+        "-e" => { type => [ "int", "hash" ] },
+        "-f" => { type => [ "int", "hash" ] },
+        "-i" => { type => [ "int", "hash" ] },
+        "-l" => { type => [ "int", "hash" ] },
+        "-m" => { type => [ "int", "hash" ] },
+        "-n" => { type => [ "int", "hash" ] },
+        "-q" => { type => [ "int", "hash" ] },
+        "-r" => { type => [ "int", "hash" ] },
+        "-s" => { type => [ "int", "hash" ] },
+        "-t" => { type => [ "int", "hash" ] },
+        "-u" => { type => [ "int", "hash" ] },
+        "-v" => { type => [ "int", "hash" ] },
+        "-x" => { type => [ "int", "hash" ] },
+        as => { type => [ "int", "hash" ] },
+        core => { type => [ "int", "hash" ] },
+        cpu => { type => [ "int", "hash" ] },
+        data => { type => [ "int", "hash" ] },
+        fsize => { type => [ "int", "hash" ] },
+        locks => { type => [ "int", "hash" ] },
+        memlock => { type => [ "int", "hash" ] },
+        msgqueue => { type => [ "int", "hash" ] },
+        nofile => { type => [ "int", "hash" ] },
+        nproc => { type => [ "int", "hash" ] },
+        priority => { type => [ "int", "hash" ] },
+        rss => { type => [ "int", "hash" ] },
+        rtprio => { type => [ "int", "hash" ] },
+        sigpending => { type => [ "int", "hash" ] },
+        stack => { type => [ "int", "hash" ] },
+        maxlogins => { type => [ "int", "hash" ] },
+      },
+    },
+  },
+};
+
 return unless -f "/etc/security/limits.conf";
 return unless i_isa_fetchall("ulimit");
 
