@@ -1465,7 +1465,7 @@ sub cvs_checkout {
   my $p = named_params @_, [ -dest => undef, -module => undef, -rev => undef, -repo => undef,
                              -cmd => undef ];
   validate("Not enough parameters specified to cvs_checkout",
-           $p->{-dest}, $p->{-module}, $p->{repo});
+           $p->{-dest}, $p->{-module}, $p->{-repo});
 
   v "CVS checkout $p->{-dest}:". ($p->{-rev} || "notag");
   if (-d $p->{-dest} && !-d "$p->{-dest}/CVS") {
@@ -1486,10 +1486,10 @@ sub cvs_checkout {
       my($ex) = @_;
       $ex->throw("Checkout to $p->{-dest} failed: ". $ex);
     }
-    chdir $base;
+    chdir $base unless $safe_mode;
     command("cvs", "-d", $p->{-repo}, "-q", "checkout", "-P",
             ($p->{-rev} ? ("-r", $p->{-rev}) : ()), "-d", $newdir, $p->{-module});
-    chdir $p->{-module} && command($p->{-cmd}) if $p->{-cmd};
+    chdir $p->{-module} && command($p->{-cmd}) if $p->{-cmd} && !$safe_mode;
     return 1;
   }
   return 0;
