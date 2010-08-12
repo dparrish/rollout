@@ -21,7 +21,6 @@ validate_step_config {
     key => {
       help => "Destination path",
       type => "path",
-      absolute => 1,
     },
     value => {
       type => "options",

@@ -26,7 +26,6 @@ validate_step_config {
     key => {
       help => "Destination path",
       type => "path",
-      absolute => 1,
     },
     value => {
       type => "options",
@@ -47,12 +46,10 @@ validate_step_config {
     key => {
       help => "Symlink source (create this)",
       type => "path",
-      absolute => 1,
     },
     value => {
       help => "Symlink destination (symlink points to this)",
       type => "path",
-      absolute => 1,
     },
   },
 };
