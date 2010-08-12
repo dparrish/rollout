@@ -15,4 +15,15 @@
 #   ],
 # ],
 
+validate_step_config {
+  file_append => {
+    type => "list",
+    items => {
+      type => [ "list", "options" ],
+      # TODO(dparrish): Do some proper validation of each entry here
+      items => { type => "string" },
+    },
+  },
+};
+
 file_append(@$_) foreach flatten_list(c("$hostname/file_append"));
