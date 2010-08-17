@@ -21,7 +21,7 @@ validate_config {
     items => {
       type => [ "list", "options" ],
       # TODO(dparrish): Do some proper validation of each entry here
-      items => { type => "string" },
+      items => { type => [ "string", "regex" ] },
     },
   },
 };
