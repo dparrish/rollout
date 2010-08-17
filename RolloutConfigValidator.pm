@@ -67,6 +67,7 @@ sub _validate_config_item {
       'path' => sub { $_[0] =~ /^[a-z0-9_.\-:\/]/i },
       'string' => sub { defined($_[0]) && !ref $_[0] },
       'undef' => sub { 1 },
+      'regex' => sub { ref($_[0]) eq 'Regexp' },
     );
 
     throw ConfigValidationException "Error in step configuration, unknown type '$type'"
@@ -116,6 +117,8 @@ sub _validate_config_item {
       return;
     } elsif ($type eq 'undef') {
       # Always return true
+      return;
+    } elsif ($type eq 'regex') {
       return;
     } elsif ($type eq 'list') {
       # TODO(dparrish): list validation
