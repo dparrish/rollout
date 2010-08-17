@@ -39,7 +39,8 @@ eval {
 };
 
 use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
-             $rollout_comment $start_time $configfile $configdir $VERSION %m $no_step_labels );
+             $rollout_comment $start_time $configfile $configdir $VERSION %m $no_step_labels
+             $validate_mode );
 $VERSION = "1.2.0";
 $verbosity = 1;
 $safe_mode = 0;
@@ -106,6 +107,10 @@ use base 'RolloutException';
 1;
 
 package ConfigValidationException;
+use base 'RolloutException';
+1;
+
+package ValidationCompleteException;
 use base 'RolloutException';
 1;
 
@@ -772,6 +777,8 @@ sub run_step {
     w "Configuration error in step $filename:\n". shift();
   } catch StepHelpException with {
     step_help($filename, 1);
+  } catch ValidationCompleteException with {
+    return;
   } catch Error with {
     if ($@) {
       l "------ FATAL ERROR ------";
@@ -1561,7 +1568,18 @@ sub validate($@) {
 sub validate_config($) {
   remote_require "RolloutConfigValidator" or return;
   my $validator = new RolloutConfigValidator;
-  $validator->validate_config($_[0], $hostname);
+  if ($validate_mode) {
+    eval {
+      $validator->validate_config($_[0], $hostname);
+    };
+    if ($@) {
+      l $@;
+      $errors++;
+    }
+    throw ValidationCompleteException "Validation OK" if $validate_mode;
+  } else {
+    $validator->validate_config($_[0], $hostname);
+  }
 }
 
 # An optional hashref as the last argument can set custom messages:
@@ -1708,6 +1726,7 @@ Getopt::Long::GetOptionsFromArray([@ARGV],
   "no_step_labels"  => \$no_step_labels,
   "help|?"          => \&usage,
   "step_help|H=s"   => \@step_help,
+  "validate"        => sub { $safe_mode = 1; $validate_mode = 1; $no_step_labels = 1 },
 ) or usage();
 
 try {
@@ -1796,6 +1815,11 @@ Don't print anything except fatal errors
 =item B<--safe_mode -s>
 
 Show what will be changed, but don't actually do anything
+
+=item B<--validate>
+
+Run the configuration validation part of each step, but don't actually do anything. Implies
+L<--safe_mode> and L<--no_step_labels>.
 
 =item B<--url -u> <url>
 

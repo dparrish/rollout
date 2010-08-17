@@ -20,24 +20,25 @@ sub new {
 
 sub validate_config {
   my($self, $val, $hostname) = @_;
+  my $text = "";
   foreach my $global_config_key (keys %$val) {
     next unless my @config = c("$hostname/$global_config_key");
     foreach my $frag (@config) {
-      eval {
+      try {
         $self->_validate_config_item($global_config_key, $val->{$global_config_key}, $hostname,
                                      $frag);
-      };
-      if ($@) {
+      } catch ConfigValidationException with {
         my $d = new Data::Dumper [$frag], [qw( frag )];
         $d->Indent(0);
         $d->Terse(1);
-        my $text = "Validation Error in configuration for $hostname\n";
+        $text .= "\n" if $text;
+        $text .= "Validation Error in configuration for $hostname\n";
         $text .= "Error: $@\n";
-        $text .= "Config: $global_config_key => ".  $d->Dump();
-        throw ConfigValidationException $text;
+        $text .= "Config: $global_config_key => ". $d->Dump(). "\n";
       };
     }
   }
+  throw ConfigValidationException $text if $text;
 }
 
 sub _validate_config_item {
@@ -72,7 +73,8 @@ sub _validate_config_item {
       unless $all_types{$type};
 
     if (!$all_types{$type}->($value)) {
-      my $text = "Expected type [". join(", ", @types).  "], got '". ($value || ""). "'";
+      my $text = "Expected type ". (@types > 1 ? "[" : "").  join(", ", map { "'$_'" } @types).
+                 (@types > 1 ? "]" : ""). ", got '". ($value || ""). "'";
       $text .= "\nHelp: $help" if $help;
       $ex = new ConfigValidationException $text;
       next;
