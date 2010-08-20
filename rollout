@@ -55,13 +55,15 @@ $config = {
 my $hostname = hostname;
 
 # Parse some initial options
+my @oldargv = @ARGV;
 Getopt::Long::Configure(qw( default bundling auto_version pass_through ));
-Getopt::Long::GetOptionsFromArray([@ARGV],
+Getopt::Long::GetOptions(
   "configdir=s"     => \$configdir,
   "configfile=s"    => \$configfile,
   "quiet|q"         => sub { $verbosity = 0 },
   "verbose|v"       => sub { $verbosity++ },
 );
+@ARGV = @oldargv;
 
 # Global variables
 $hostname =~ s/\..*//;
@@ -1634,7 +1636,7 @@ sub usage {
 
 # Read the rest of the options
 Getopt::Long::Configure(qw( default bundling auto_version ));
-Getopt::Long::GetOptionsFromArray([@ARGV],
+Getopt::Long::GetOptions(
   "configdir=s"     => \$configdir,
   "configfile=s"    => \$configfile,
   "force|f=s"       => \@force_dangerous,
@@ -1648,6 +1650,7 @@ Getopt::Long::GetOptionsFromArray([@ARGV],
   "no_step_labels"  => \$no_step_labels,
   "help|?"          => \&usage,
 ) or usage();
+@ARGV = @oldargv;
 
 try {
   @all_steps = http_index "steps";
