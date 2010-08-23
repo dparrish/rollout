@@ -179,7 +179,7 @@ validate_config {
     items => {
       type => "string",
       help => "Step",
-      regex => qr/^(\d+-)?[\w_\-.]+$/,
+      regex => qr/^(\d+-)?[\w_\-.]+(?::[\w]+|\*)?$/,
     },
   },
 };
