@@ -21,9 +21,10 @@ if (i_should("deb_options") && i_has("deb_options") && -f "/usr/bin/debconf-set-
   }
 }
 
-my $apt = join("\n", uniq(flatten_list(c("$hostname/apt_base")))). "\n";
-text_install(-file => "/etc/apt/sources.list.d/rollout.list", -text => $apt, -mode => 0644,
-             -uid => 0, -gid => 0) if $apt && i_should("apt_sources");
+my @apt = uniq(flatten_list(c("$hostname/apt_base")));
+text_install(-file => "/etc/apt/sources.list.d/rollout.list",
+             -text => join("", map { "$_\n" } @apt), -mode => 0644, -uid => 0, -gid => 0)
+    if @apt && i_should("apt_sources");
 
 package_check(map { s/\.32bit$//; $_ } grep { i_should("add-$_") }
               uniq(flatten_list(c("$hostname/packages")))) if i_should("install");
