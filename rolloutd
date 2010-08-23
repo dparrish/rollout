@@ -10,7 +10,6 @@ use File::Basename;
 use File::Spec::Functions qw( canonpath );
 use IO::Dir;
 use IO::Socket;
-use Net::Netmask;
 use POSIX qw( strftime );
 use URI::Escape;
 
@@ -34,9 +33,12 @@ sub new {
   $self->{allow} = [];
   $self->{ssl} = $ssl;
   $self->{cached_checksums} = {};
-  foreach (split /,/, $allow) {
-    my $net = new Net::Netmask $_;
-    push @{$self->{allow}}, $net;
+  if ($allow) {
+    foreach (split /,/, $allow) {
+      require Net::Netmask;
+      my $net = new Net::Netmask $_;
+      push @{$self->{allow}}, $net;
+    }
   }
 
   my($address, $port) = split /:/, $listen;
