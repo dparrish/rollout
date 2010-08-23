@@ -16,7 +16,7 @@
 #     text => 'This is some text\n',
 #   },
 # },
-# symlink_check => {
+# symlink => {
 #   '/tmp/dest' => '/tmp/source',
 # },
 
@@ -41,8 +41,20 @@ validate_config {
       },
     },
   },
+  symlink => {
+    type => "hash",
+    key => {
+      help => "Symlink source (create this)",
+      type => "path",
+    },
+    value => {
+      help => "Symlink destination (symlink points to this)",
+      type => "path",
+    },
+  },
   symlink_check => {
     type => "hash",
+    deprecated => "symlink",
     key => {
       help => "Symlink source (create this)",
       type => "path",
@@ -76,13 +88,14 @@ while (my($dest, $f) = each(%files)) {
   }
 }
 
-my %symlinks = flatten_hash(c("$hostname/symlink_check"));
+my %symlinks = flatten_hash(c("$hostname/symlink_check"), c("$hostname/symlink"));
 while (my($dest, $src) = each %symlinks)
 {
+  print "Creating symlink from $src to $dest\n";
   if (ref $src eq 'ARRAY')
   {
     my @list = uniq(@$src);
-    validate("You have multiple symlink_check definitions for $dest, you must only have one.",
+    validate("You have multiple symlink definitions for $dest, you must only have one.",
              @list == 1);
     $src = $list[0];
   }
