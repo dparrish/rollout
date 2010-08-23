@@ -1627,7 +1627,11 @@ if (open(LOCKFILE, ">/var/run/rollout.lock")) {
 }
 
 $start_time = time;
-read_config();
+try {
+  read_config();
+} catch LocalFileException with {
+  w shift();
+};
 
 sub usage {
   require Pod::Usage;
