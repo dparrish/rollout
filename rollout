@@ -168,7 +168,6 @@ sub v(@) { l(@_) if $verbosity >= 2; return 1 }
 package RolloutHTTP;
 
 use Net::HTTP;
-use Net::SSLeay;
 
 use vars qw( $ua %per_host_certs $done_setup $use_lwp );
 
@@ -180,6 +179,7 @@ sub _setup {
     require LWP::UserAgent;
     require LWP::ConnCache;
     require HTTP::Request;
+    require Net::SSLeay;
 
     *LWP::Protocol::https::_extra_sock_opts = sub {
       my($self, $host, $port) = @_;
