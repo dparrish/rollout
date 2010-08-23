@@ -1,0 +1,21 @@
+Rollout is a system developed to automate system administration on UNIX servers.
+It is primarily focused towards Linux, but could be adapted to Solaris, HP-UX,
+AIX, etc.
+
+It is written purely in Perl, and the configuration is also a Perl source file.
+Some Perl knowledge is required to edit the configuration, but copy-and-paste
+may suffice.
+
+System Administration can generally be reduced to a set of steps, which must be
+completed in order.  Some example steps include:
+
+   * Copy files, create symlinks
+   * Edit configuration files
+   * Start / stop services
+   * Add / modify users & groups
+   * Install applications
+
+The idea behind Rollout is to automate all these steps in a configurable way.
+Rollout is by design idempotent - it can be run many times on a single server
+and produce the same results.
+
