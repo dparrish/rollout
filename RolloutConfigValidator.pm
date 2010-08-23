@@ -99,18 +99,28 @@ sub _validate_config_item {
         }
         $self->_validate_config_item("$key/$xkey", $config->{options}{$xkey}, $hostname, $xvalue);
       }
+      while (my($xkey, $xvalue) = each(%{$config->{options}})) {
+        throw ConfigValidationException "'$xkey' is required for $key"
+          if $config->{options}{$xkey}{required} && !$value->{$xkey};
+      };
       return;
     } elsif ($type eq 'options_list') {
       throw ConfigValidationException "Error in step configuration, no options"
         unless $config->{options};
-      for (my $i = 0; $i < @$value; $i++) {
+      my %seen;
+      for (my $i = 0; $i < @$value; $i += 2) {
         my($xkey, $xvalue) = ($value->[$i], $value->[$i + 1]);
+        $seen{$xkey}++;
         if (!$config->{options}{$xkey}) {
           next if defined $config->{fail_on_unknown} && !$config->{fail_on_unknown};
           throw ConfigValidationException "'$xkey' is an unknown option for $key";
         }
         $self->_validate_config_item("$key/$xkey", $config->{options}{$xkey}, $hostname, $xvalue);
       }
+      while (my($xkey, $xvalue) = each(%{$config->{options}})) {
+        throw ConfigValidationException "'$xkey' is required for $key"
+          if $config->{options}{$xkey}{required} && !$seen{$xkey};
+      };
       return;
     } elsif ($type eq 'boolean') {
       # Always return true
