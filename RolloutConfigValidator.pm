@@ -11,6 +11,7 @@ use vars qw( @EXPORT_OK );
 
 *c = *::c;
 *v = *::v;
+*w = *::w;
 
 sub new {
   my($class) = @_;
@@ -79,6 +80,13 @@ sub _validate_config_item {
       $text .= "\nHelp: $help" if $help;
       $ex = new ConfigValidationException $text;
       next;
+    }
+
+    if ($config->{deprecated}) {
+      my $text = "$key is deprecated in configuration.";
+      $text .= " Consider using $config->{deprecated} instead."
+        unless $config->{deprecated} eq '1';
+      w($text);
     }
 
     if ($type eq 'hash') {
