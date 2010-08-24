@@ -330,10 +330,13 @@ if (i_should("hostname")) {
 }
 
 if (i_should("resolvconf")) {
-  file_append(-file => "/etc/resolv.conf",
-              -add => "options timeout:". c("$hostname/resolver/timeout", 5).
-                      " attempts:". c("$hostname/resolver/attempts", 2),
-              -match => qr/^options/) && $changes++;
+  my @options;
+  push @options, "timeout:". c("$hostname/resolver/timeout") if c("$hostname/resolver/timeout");
+  push @options, "attempts:". c("$hostname/resolver/attempts") if c("$hostname/resolver/attempts");
+  if (@options) {
+    file_append(-file => "/etc/resolv.conf", -add => "options ". join(" ", @options),
+                -match => qr/^options/) && $changes++;
+  }
   file_append(-file => "/etc/resolv.conf", -add => "nameserver $_", -match => qr/^nameserver $_/)
     && $changes++ foreach uniq(flatten_list(c("$hostname/nameservers")));
 }
