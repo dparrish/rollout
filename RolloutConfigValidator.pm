@@ -29,13 +29,19 @@ sub validate_config {
         $self->_validate_config_item($global_config_key, $val->{$global_config_key}, $hostname,
                                      $frag);
       } catch ConfigValidationException with {
-        my $d = new Data::Dumper [$frag], [qw( frag )];
-        $d->Indent(0);
-        $d->Terse(1);
         $text .= "\n" if $text;
         $text .= "Validation Error in configuration for $hostname\n";
         $text .= "Error: $@\n";
-        $text .= "Config: $global_config_key => ". $d->Dump(). "\n";
+        eval {
+          require Data::Dumper;
+          my $d = new Data::Dumper [$frag], [qw( frag )];
+          $d->Indent(0);
+          $d->Terse(1);
+          $text .= "Config: $global_config_key => ". $d->Dump(). "\n";
+        };
+        if ($@) {
+          $text .= "Unable to print config fragment, install Data::Dumper\n";
+        }
       };
     }
   }

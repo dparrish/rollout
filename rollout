@@ -21,9 +21,6 @@
 
 use strict;
 use Carp;
-use Data::Dumper;
-use Digest::MD5 'md5_hex';
-use English;
 use Error ':try';
 use Fcntl ':flock';
 use File::Basename;
@@ -159,7 +156,13 @@ sub fatal(@) {
   return 1;
 }
 
-sub d($) { return v(Dumper(@_)) if $verbosity >= 3; return 1 };
+sub d($) {
+  eval {
+    require Data::Dumper;
+    return v(Data::Dumper::Dumper(@_)) if $verbosity >= 3;
+  };
+  return 1;
+};
 sub v(@) { l(@_) if $verbosity >= 2; return 1 }
 
 # }}}
@@ -452,12 +455,14 @@ sub dir_install {
         if (@stat && $_->{mtime} <= $stat[9] && $_->{size} == $stat[7]) {
           # Same file size and newer locally, check the checksum to see if it should be skipped
           if (@stat && $_->{checksum}) {
-            my $md5 = Digest::MD5->new->add(slurp_file("$p->{-dest}/$filename"))->hexdigest;
-            if ($md5 && $_->{checksum} && $_->{checksum} eq $md5) {
-              v "Skipping $p->{-src}/$filename -> $p->{-dest}/$filename, it's the same";
-              $changed += set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}});
-              next;
-            }
+            eval {
+              my $md5 = Digest::MD5->new->add(slurp_file("$p->{-dest}/$filename"))->hexdigest;
+              if ($md5 && $_->{checksum} && $_->{checksum} eq $md5) {
+                v "Skipping $p->{-src}/$filename -> $p->{-dest}/$filename, it's the same";
+                $changed += set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}});
+                next;
+              }
+            };
           }
         }
         v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
@@ -1117,11 +1122,13 @@ sub text_install {
   # If they are the same, don't bother ..
   #   and they can't have the same md5 if they're different sizes ..
 
-  if (!$p->{-skip_checksum} and -f $p->{-file} and -s _ == length($p->{-text})) {
-    my $src_md5 = Digest::MD5->new->add($p->{-text})->hexdigest;
-    my $dst_md5 = Digest::MD5->new->add(slurp_file $p->{-file})->hexdigest;
-    $changed = 0 if $src_md5 eq $dst_md5;
-  }
+  eval {
+    if (!$p->{-skip_checksum} and -f $p->{-file} and -s _ == length($p->{-text})) {
+      my $src_md5 = Digest::MD5->new->add($p->{-text})->hexdigest;
+      my $dst_md5 = Digest::MD5->new->add(slurp_file $p->{-file})->hexdigest;
+      $changed = 0 if $src_md5 eq $dst_md5;
+    }
+  };
 
   if ($changed) {
     throw ConfigException "Multiple sources for \"$p->{-file}\":\n".
@@ -1697,7 +1704,12 @@ sub read_config {
 sub write_config {
   text_install(-file => $configfile,
                -text => join("", map { "$_ = $config->{$_}\n" } keys %$config));
- }
+}
+
+# Load some optional modules
+eval { require Digest::MD5 };
+w "Digest::MD5 is not installed, file checksums cannot be calculated." if $@;
+
 
 if (open(LOCKFILE, ">/var/run/rollout.lock")) {
   die "There is already an instance of rollout running"
