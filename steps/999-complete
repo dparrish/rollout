@@ -4,14 +4,6 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 
 if (!$safe_mode) {
-  my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
-  if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
-    $host = $1 || "127.0.0.1";
-    $port = $2 || 0;
-    my $x = `host $host` || "";
-    $host = $1 if $x =~ /domain name pointer (.*)\./;
-  }
-
   my $end_time = time;
   my $duration = abs($end_time - $start_time);
 
@@ -19,6 +11,14 @@ if (!$safe_mode) {
   my $fn = c("$hostname/rollout/logfile");
   if ($fn && (my $fh = new IO::File ">>$fn"))
   {
+    my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
+    if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
+      $host = $1 || "127.0.0.1";
+      $port = $2 || 0;
+      my $x = `host $host` || "";
+      $host = $1 if $x =~ /domain name pointer (.*)\./;
+    }
+
     print $fh "-------------------------------------------------\n";
     print $fh "START: ". localtime($start_time). "\n";
     print $fh "DURATION: $duration\n";

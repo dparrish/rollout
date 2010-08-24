@@ -1710,7 +1710,6 @@ sub write_config {
 eval { require Digest::MD5 };
 w "Digest::MD5 is not installed, file checksums cannot be calculated." if $@;
 
-
 if (open(LOCKFILE, ">/var/run/rollout.lock")) {
   die "There is already an instance of rollout running"
     unless flock(LOCKFILE, LOCK_EX | LOCK_NB);

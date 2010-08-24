@@ -91,7 +91,6 @@ while (my($dest, $f) = each(%files)) {
 my %symlinks = flatten_hash(c("$hostname/symlink_check"), c("$hostname/symlink"));
 while (my($dest, $src) = each %symlinks)
 {
-  print "Creating symlink from $src to $dest\n";
   if (ref $src eq 'ARRAY')
   {
     my @list = uniq(@$src);

@@ -49,7 +49,7 @@ validate_config {
 my %groups = flatten_hash(c("$hostname/group"));
 my %users = flatten_hash(c("$hostname/users"));
 
-if (i_should("groups")) {
+if (i_should("groups") && %groups) {
   # Deal with groups first
   v "Checking groups: ". join(" ", keys %groups);
   while (my($name, $group) = each(%groups)) {
@@ -71,8 +71,8 @@ if (i_should("groups")) {
 
 
 # Now all the users
-if (i_should("users")) {
-  v "Checking groups: ". join(" ", keys %users);
+if (i_should("users") && %users) {
+  v "Checking users: ". join(" ", keys %users);
 
   while (my($username, $user) = each(%users)) {
     next unless defined $user;
