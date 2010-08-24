@@ -14,6 +14,7 @@ validate_config {
       options => {
         dest => { type => "path", help => "Destination path to extract to (default /)" },
         check => { type => "path", help => "Skip extract if this path exists" },
+        cmd => { type => "string", help => "Shell command to run after extraction" },
       },
     },
   },
@@ -33,28 +34,38 @@ while (my($source, $f) = each(%file_extract)) {
   validate("Unknown filename $source", $fn);
   w "/tmp/$fn already exists, refusing to overwrite" and next if -f "/tmp/$fn";
 
-  if (-x "/usr/bin/wget") {
-    system("/usr/bin/wget", $source, "-O", "/tmp/$fn") unless $safe_mode;
-  } else {
-    try {
-      http_file(-url => $source, -dest => "/tmp/$fn") unless $safe_mode;
-    } catch HttpException with {
-      my($ex) = @_;
-      $ex->throw("Couldn't install $f->{dest} from $source: $ex");
-    };
+  if (!$safe_mode) {
+    if (-x "/usr/bin/wget") {
+      system("/usr/bin/wget", $source, "-O", "/tmp/$fn");
+      next if $?;
+    } elsif (-x "/usr/bin/fetch") {
+      system("/usr/bin/fetch", "-o/tmp/$fn", $source);
+      next if $?;
+    } else {
+      try {
+        http_file(-url => $source, -dest => "/tmp/$fn") or next;
+      } catch HttpException with {
+        my($ex) = @_;
+        $ex->throw("Couldn't install $f->{dest} from $source: $ex");
+      };
+    }
   }
 
   dir_check($f->{dest}) unless $f->{dest} eq '/';
   chdir($f->{dest});
 
   if ($fn =~ /\.tar$/) {
-    command("tar", "xf", "/tmp/$fn");
+    command("tar", "xf", "/tmp/$fn") and next;
   } elsif ($fn =~ /\.tar\.gz$/) {
-    command("tar", "zxf", "/tmp/$fn");
+    command("tar", "zxf", "/tmp/$fn") and next;
   } elsif ($fn =~ /\.tar\.bz2$/) {
-    command("tar", "jxf", "/tmp/$fn");
+    command("tar", "jxf", "/tmp/$fn") and next;
   }
 
   unlink("/tmp/$fn") unless $safe_mode;
+  if ($f->{cmd}) {
+    chdir($f->{dest});
+    command($f->{cmd});
+  }
 }
 
