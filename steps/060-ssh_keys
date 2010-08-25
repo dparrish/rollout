@@ -7,7 +7,7 @@
 #  user_keys - Update individual users's ssh authorized_keys
 
 validate_config {
-  users => {
+  user => {
     type => "hash",
     key => {
       help => "Username",
@@ -35,22 +35,9 @@ validate_config {
 return unless i_has("user") || i_has("ssh_keys_add");
 
 my %keys;
-my %all_keys;
-
-try {
-  my $text = http_file "conf/authorized_keys";
-  foreach (split(/[\r\n]+/, $text)) {
-    my($key, $name) = $_ =~ /(.*) ([\w\@\-_]+)$/;
-    $all_keys{$name} ||= "";
-    $all_keys{$name} .= "$_\n";
-  }
-} catch HttpException with {
-  my($ex) = @_;
-  $ex->throw("Can't get authorized_keys file: $ex");
-};
 
 if (i_should("user_keys")) {
-  my %users = flatten_hash(c("$hostname/users"));
+  my %users = flatten_hash(c("$hostname/user"));
   while (my($username, $user) = each(%users)) {
     next unless $user && $username;
     $keys{$username} ||= { $username => 1 };
@@ -62,6 +49,21 @@ if (i_should("root_keys")) {
   $keys{root} ||= {};
   $keys{root}->{$_}++ foreach uniq(flatten_list(c("$hostname/ssh_keys_add")));
 }
+
+return unless %keys;
+
+my %all_keys;
+try {
+  my $text = http_file "conf/authorized_keys";
+  foreach (split(/[\r\n]+/, $text)) {
+    my($key, $name) = $_ =~ /(.*) ([\w\@\-_]+)$/;
+    $all_keys{$name} ||= "";
+    $all_keys{$name} .= "$_\n";
+  }
+} catch HttpException with {
+  my($ex) = @_;
+  $ex->throw("Can't get authorized_keys file: $ex");
+};
 
 foreach (keys %keys) {
   my($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell,$expire) = getpwnam($_);
