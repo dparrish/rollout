@@ -22,7 +22,7 @@ validate_config {
       },
     },
   },
-  users => {
+  user => {
     type => "hash",
     key => {
       help => "Username",
@@ -47,7 +47,7 @@ validate_config {
 };
 
 my %groups = flatten_hash(c("$hostname/group"));
-my %users = flatten_hash(c("$hostname/users"));
+my %users = flatten_hash(c("$hostname/user"));
 
 if (i_should("groups") && %groups) {
   # Deal with groups first
