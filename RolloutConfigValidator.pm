@@ -88,7 +88,6 @@ sub _validate_config_item {
       next;
     }
 
-<<<<<<< HEAD
     if ($config->{deprecated}) {
       my $text = "$key is deprecated in configuration.";
       $text .= " Consider using $config->{deprecated} instead."
@@ -96,8 +95,6 @@ sub _validate_config_item {
       w($text);
     }
 
-=======
->>>>>>> b11cd18acba527d72b3f8843b0f5ca34901cf4dc
     if ($type eq 'hash') {
       while (my($xkey, $xvalue) = each(%$value)) {
         $self->_validate_config_item("$key/$xkey", $config->{key}, $hostname, $xkey)
