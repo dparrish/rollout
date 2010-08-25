@@ -80,7 +80,9 @@ if (i_should("network") && @networks) {
     next unless @hostnames;
     my $h = "$ip\t". join(" ", @hostnames);
     v "Adding $d:$ip to /etc/hosts (in $in_my_network network)";
-    file_append(-file => "/etc/hosts", -add => $h, -match => qr/(?:^\Q$ip\E\s|\s\Q$d\E)/);
+    my $filename = "/etc/hosts";
+    $filename = "/etc/inet/hosts" if -f "/etc/inet/hosts";
+    file_append(-file => $filename, -add => $h, -match => qr/(?:^\Q$ip\E\s|\s\Q$d\E)/);
   }
 }
 
