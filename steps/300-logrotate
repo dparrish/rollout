@@ -8,7 +8,8 @@ validate_config {
     value => {
       type => "options",
       options => {
-        compress => { type => "boolean" },
+        size => { type => "string", help => "Rotate when file size reaches this value" },
+        compress => { type => "int", help => "Compress all but the latest x log files" },
         create => { type => "string", help => "<mode> <owner> <group>" },
         daily => { type => "boolean" },
         delaycompress => { type => "boolean" },
@@ -28,24 +29,52 @@ validate_config {
 
 my $text;
 my %logrotate = flatten_hash(c("$hostname/logrotate"));
-while (my($file, $l) = each(%logrotate)) {
-  next unless i_should($file);
-  $text .= "$file {\n";
-  $text .= "  weekly\n" if !$l->{daily} && !$l->{weekly} && !$l->{monthly}; # Default frequency
-  $text .= "  daily\n" if $l->{daily};
-  $text .= "  weekly\n" if $l->{weekly};
-  $text .= "  monthly\n" if $l->{monthly};
-  $text .= "  yearly\n" if $l->{yearly};
-  $text .= "  missingok\n" unless defined $l->{missingok} && !$l->{missingok};
-  $text .= "  compress\n" unless defined $l->{compress} && !$l->{compress};
-  $text .= "  delaycompress\n" if $l->{delaycompress};
-  $text .= "  sharedscripts\n" if $l->{sharedscripts};
-  $text .= "  rotate ". ($l->{rotate} || 7). "\n";
-  $text .= "  notifempty\n" if $l->{notifempty};
-  $text .= "  create $l->{create}\n" if $l->{create};
-  $text .= "  prerotate\n$l->{prerotate}\nendscript\n" if $l->{prerotate};
-  $text .= "  postrotate\n$l->{postrotate}\nendscript\n" if $l->{postrotate};
-  $text .= "}\n\n";
-}
+return unless %logrotate;
 
-text_install("/etc/logrotate.d/rollout", $text) if $text;
+if (-f "/etc/logadm.conf") {
+  while (my($file, $l) = each(%logrotate)) {
+    next unless i_should($file);
+    my @opts;
+    push @opts, "-p", "'$l->{postrotate}'" if $l->{postrotate};
+    push @opts, "-p", "'$l->{prerotate}'" if $l->{prerotate};
+    push @opts, "-c", $l->{rotate} || 10;
+    my($mode, $owner, $group) = split / /, $l->{create} || "";
+    push @opts, "-m", $mode if $mode;
+    push @opts, "-g", $group if $group;
+    push @opts, "-o", $owner if $owner;
+    push @opts, "-N" if $l->{missingok};
+    push @opts, "-s", $l->{size} if $l->{size};
+    push @opts, "-z", $l->{compress} if $l->{compress};
+    command("/usr/sbin/logadm", "-w", $file, @opts);
+  }
+
+} elsif (-d "/etc/logrotate.d" || -d "/usr/local/etc/logrotate.d") {
+  my $configfile = -d "/etc/logrotate.d" ? "/etc/logrotate.d/rollout"
+                 : "/usr/local/etc/logrotate.d" ? "/usr/local/etc/logrotate.d/rollout"
+                 : undef;
+  throw ConfigException "Can't work out where to install logrotate config file" unless $configfile;
+  while (my($file, $l) = each(%logrotate)) {
+    next unless i_should($file);
+    $text .= "$file {\n";
+    $text .= "  weekly\n" if !$l->{daily} && !$l->{weekly} && !$l->{monthly}; # Default frequency
+    $text .= "  daily\n" if $l->{daily};
+    $text .= "  weekly\n" if $l->{weekly};
+    $text .= "  monthly\n" if $l->{monthly};
+    $text .= "  yearly\n" if $l->{yearly};
+    $text .= "  missingok\n" unless defined $l->{missingok} && !$l->{missingok};
+    $text .= "  compress\n" unless defined $l->{compress} && !$l->{compress};
+    $text .= "  delaycompress\n" if $l->{delaycompress};
+    $text .= "  sharedscripts\n" if $l->{sharedscripts};
+    $text .= "  rotate ". ($l->{rotate} || 7). "\n";
+    $text .= "  notifempty\n" if $l->{notifempty};
+    $text .= "  create $l->{create}\n" if $l->{create};
+    $text .= "  prerotate\n$l->{prerotate}\nendscript\n" if $l->{prerotate};
+    $text .= "  postrotate\n$l->{postrotate}\nendscript\n" if $l->{postrotate};
+    $text .= "}\n\n";
+  }
+
+  text_install($configfile, $text) if $text;
+
+} else {
+  throw ConfigException "Unable to do logrotation on this Operating System";
+}
