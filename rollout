@@ -922,6 +922,7 @@ sub file_modify {
 
     foreach my $e (@expr) {
       eval $e;
+      throw RolloutException "Regex error in file_modify: $@" if $@;
     }
 
     $changes++ unless $original eq $_;
