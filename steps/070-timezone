@@ -9,18 +9,26 @@ validate_config {
 
 return unless i_has("timezone") && i_should("timezone");
 my $zone = (flatten_list(c("$hostname/timezone")))[0];
-return unless $zone;
+print "No timezone\n" and return unless $zone;
 
-validate("Unknown timezone $zone", -f "/usr/share/zoneinfo/$zone");
+print "Here\n";
+if (i_os("solaris")) {
+  validate("Unknown timezone $zone", -f "/usr/share/lib/zoneinfo/$zone");
+  file_append("/etc/TIMEZONE", "TZ=\"$zone\"", qr/^TZ=/);
+} elsif (i_os("freebsd")) {
+  validate("Unknown timezone $zone", -f "/usr/share/zoneinfo/$zone");
+  file_install("/etc/localtime", "/usr/share/zoneinfo/$zone");
+} else {
+  validate("Unknown timezone $zone", -f "/usr/share/zoneinfo/$zone");
+  text_install("/etc/timezone", "$zone\n");
 
-text_install("/etc/timezone", "$zone\n");
+  if (-f "/etc/sysconfig/clock") {
+    # RedHat specific
+    file_append("/etc/sysconfig/clock", "ZONE=\"$zone\"", qr/^ZONE=/);
+  }
 
-if (-f "/etc/sysconfig/clock") {
-  # RedHat specific
-  file_append("/etc/sysconfig/clock", "ZONE=\"$zone\"", qr/^ZONE=/);
-}
-
-if (-e "/etc/localtime" && -f "/usr/share/zoneinfo/$zone" && !$safe_mode) {
-  unlink("/etc/localtime") unless -l "/etc/localtime";
-  symlink_check("/usr/share/zoneinfo/$zone", "/etc/localtime");
+  if (-e "/etc/localtime" && -f "/usr/share/zoneinfo/$zone" && !$safe_mode) {
+    unlink("/etc/localtime") unless -l "/etc/localtime";
+    symlink_check("/usr/share/zoneinfo/$zone", "/etc/localtime");
+  }
 }
