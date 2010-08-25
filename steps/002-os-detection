@@ -19,14 +19,20 @@ if ($^O eq 'linux') {
   $o->{type} = 'unix';
   $o->{os} = 'linux';
 
-  chomp($o->{distro} = lc `lsb_release -sd` || 'unknown');
-  chomp($o->{version} = lc `lsb_release -sr` || 'unknown');
+  if (-f '/etc/redhat-release') {
+    ($o->{distro}, $o->{version}) = (lc(slurp_file('/etc/redhat-release')) =~ /^(\w+).*?([\d.]+)/);
+  }
 
-  # Specific distribution hacks
-  $o->{distro} = 'ubuntu' if $o->{distro} =~ /^ubuntu/;
-  $o->{distro} = 'centos' if $o->{distro} =~ /^centos/;
-  $o->{distro} = 'redhat' if $o->{distro} =~ /^redhat/;
-  $o->{distro} = 'redhat' if $o->{distro} =~ /^(?:enterprise)?enterprise[ae]s/;
+  if (!$o->{distro} || $o->{distro} eq 'unknown') {
+    chomp($o->{distro} = lc `lsb_release -sd` || 'unknown');
+    chomp($o->{version} = lc `lsb_release -sr` || 'unknown');
+
+    # Specific distribution hacks
+    $o->{distro} = 'ubuntu' if $o->{distro} =~ /^ubuntu/;
+    $o->{distro} = 'centos' if $o->{distro} =~ /^"?centos/;
+    $o->{distro} = 'redhat' if $o->{distro} =~ /^redhat/;
+    $o->{distro} = 'redhat' if $o->{distro} =~ /^(?:enterprise)?enterprise[ae]s/;
+  }
 
 } elsif ($^O eq 'freebsd') {
   $o->{type} = 'unix';
