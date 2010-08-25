@@ -419,6 +419,7 @@ if ($daemon) {
   defined(my $pid = fork()) or die "Couldn't fork: $!";
   exit if $pid;
   $SIG{HUP} = 'IGNORE';
+  $SIG{CHLD} = 'IGNORE';
   setsid or die "Couldn't start a new session: $!";
   open STDIN, "/dev/null";
   open STDOUT, ">>$logfile";
