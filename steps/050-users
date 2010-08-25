@@ -58,12 +58,28 @@ if (i_should("groups") && %groups) {
     if (!$gid) {
       # Create Group
       l("Create group $name");
-      command("groupadd", ($group->{gid} ? ("-g", $group->{gid}, "-f") : ()), $name);
+      if (i_os("linux")) {
+        command("groupadd", ($group->{gid} ? ("-g", $group->{gid}, "-f") : ()), $name);
+      } elsif (i_os("freebsd")) {
+        command("pw", "groupadd", $name, ($group->{gid} ? ("-g", $group->{gid}) : ()));
+      } elsif (i_os("solaris")) {
+        command("groupadd", ($group->{gid} ? ("-g", $group->{gid}) : ()), $name);
+      } else {
+        throw ConfigException "Don't know how to create groups on ". i_os();
+      }
     } else {
       # Group exists
       if ($group->{gid} && $group->{gid} != $gid) {
         l("Update gid for $name");
-        command("groupmod", "-g", $group->{gid}, "-o", $name);
+        if (i_os("linux")) {
+          command("groupmod", "-g", $group->{gid}, "-o", $name);
+        } elsif (i_os("freebsd")) {
+        command("pw", "groupmod", $name, ($group->{gid} ? ("-g", $group->{gid}) : ()));
+        } elsif (i_os("solaris")) {
+          command("groupmod", "-g", $group->{gid}, "-o", $name);
+        } else {
+          throw ConfigException "Don't know how to modify groups on ". i_os();
+        }
       }
     }
   }
@@ -86,23 +102,57 @@ if (i_should("users") && %users) {
     if (!$name) {
       # Create User
       l "Create user $username";
-      command("useradd",
-        ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
-        ($user->{gid} ? ("-g", $user->{gid}) : ()),
-        ($user->{groups} ? ("-G", join(",", @{$user->{groups}})) : ()),
-        ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
-        ($user->{password} ? ("-p", $user->{password}) : ()),
-        ($user->{name} ? ("-c", $user->{name}) : ()),
-        ($user->{shell} ? ("-s", $user->{shell}) : ()),
-        $username
-      );
+      if (i_os("linux")) {
+        command("useradd",
+          ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
+          ($user->{gid} ? ("-g", $user->{gid}) : ()),
+          ($user->{groups} ? ("-G", join(",", @{$user->{groups}})) : ()),
+          ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
+          ($user->{password} ? ("-p", $user->{password}) : ()),
+          ($user->{name} ? ("-c", $user->{name}) : ()),
+          ($user->{shell} ? ("-s", $user->{shell}) : ()),
+          $username
+        );
+      } elsif (i_os("freebsd")) {
+        next if $safe_mode;
+        open(FH, "|adduser -q -f");
+        print FH join(":", 
+          $username,
+          $user->{uid} || "",
+          $user->{gid} || "",
+          "",
+          "",
+          "",
+          $user->{name} || "",
+          $user->{home} || "",
+          $user->{shell} || "",
+          ""). "\n";
+        close(FH);
+        if ($user->{password}) {
+          open(FH, "|pw user mod $username -H 0");
+          print FH "$user->{password}\n";
+          close(FH);
+        }
+      } elsif (i_os("solaris")) {
+        command("useradd",
+          ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
+          ($user->{gid} ? ("-g", $user->{gid}) : ()),
+          ($user->{groups} ? ("-G", join(",", @{$user->{groups}})) : ()),
+          ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
+          ($user->{name} ? ("-c", $user->{name}) : ()),
+          ($user->{shell} ? ("-s", $user->{shell}) : ()),
+          $username
+        );
+      } else {
+        throw ConfigException "Don't know how to create users on ". i_os();
+      }
     } else {
       # User exists
       delete $user->{force_password} unless i_should("force_password");
       my $modify = 0;
       $modify++ if $user->{uid} && $user->{uid} != $uid;
       $modify++ if $user->{home} && ($user->{home} ne $dir || !-d $dir);
-      $modify++ if $user->{password} && $user->{password} ne $passwd
+      $modify++ if i_os("linux") && $user->{password} && $user->{password} ne $passwd
                    && $user->{force_password};
       $modify++ if $user->{shell} && $user->{shell} ne $shell;
       $modify++ if $user->{name} && $user->{name} ne $gcos;
@@ -119,17 +169,38 @@ if (i_should("users") && %users) {
       }
       if ($modify) {
         l "Updating user $username";
-        command("usermod",
-          ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
-          ($user->{gid} ? ("-g", $user->{gid}) : ()),
-          ($user->{groups} ? ("-a", "-G", join(",", @{$user->{groups}})) : ()),
-          ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
-          ($user->{password} && $user->{force_password}
-            ? ("-p", $user->{password}) : ()),
-          ($user->{name} ? ("-c", $user->{name}) : ()),
-          ($user->{shell} ? ("-s", $user->{shell}) : ()),
-          $username
-        );
+        if (i_os("linux")) {
+          command("usermod",
+            ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
+            ($user->{gid} ? ("-g", $user->{gid}) : ()),
+            ($user->{groups} ? ("-a", "-G", join(",", @{$user->{groups}})) : ()),
+            ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
+            ($user->{password} && $user->{force_password}
+              ? ("-p", $user->{password}) : ()),
+            ($user->{name} ? ("-c", $user->{name}) : ()),
+            ($user->{shell} ? ("-s", $user->{shell}) : ()),
+            $username
+          );
+        } elsif (i_os("freebsd")) {
+        } elsif (i_os("solaris")) {
+          command("usermod",
+            ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
+            ($user->{gid} ? ("-g", $user->{gid}) : ()),
+            ($user->{groups} ? ("-G", join(",", @{$user->{groups}})) : ()),
+            ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
+            ($user->{name} ? ("-c", $user->{name}) : ()),
+            ($user->{shell} ? ("-s", $user->{shell}) : ()),
+            $username
+          );
+        } else {
+          throw ConfigException "Don't know how to modify users on ". i_os();
+        }
+      }
+      if (i_os("solaris") && $user->{password} && $user->{force_password}) {
+        if (!$safe_mode) {
+          file_modify("/etc/shadow", undef,
+                      [ "s/^$username:[^:]+:(.*)/$username:\Q$user->{password}\E:\$1/" ]);
+        }
       }
       $user->{uid} ||= $uid;
       $user->{gid} ||= $gid;
@@ -148,7 +219,15 @@ if (i_should("users")) {
     next if defined $user;
     next unless my $uid = getpwnam($username);
     l "Delete user $username";
-    command("userdel", $username);
+    if (i_os("linux")) {
+      command("userdel", $username);
+    } elsif (i_os("freebsd")) {
+      command("rmuser", "-y", $username);
+    } elsif (i_os("solaris")) {
+      command("userdel", $username);
+    } else {
+      throw ConfigException "Don't know how to delete users on ". i_os();
+    }
   }
 }
 
@@ -157,7 +236,15 @@ if (i_should("groups")) {
     next if defined $group;
     next unless my $gid = getgrnam($name);
     l "Delete group $name";
-    command("groupdel", $name);
+    if (i_os("linux")) {
+      command("groupdel", $name);
+    } elsif (i_os("freebsd")) {
+      command("pw", "groupdel", $name);
+    } elsif (i_os("solaris")) {
+      command("groupdel", $name);
+    } else {
+      throw ConfigException "Don't know how to delete groups on ". i_os();
+    }
   }
 }
 
