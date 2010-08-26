@@ -182,6 +182,14 @@ if (i_should("users") && %users) {
             $username
           );
         } elsif (i_os("freebsd")) {
+          command("pw", "usermod", $username, 
+            ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
+            ($user->{gid} ? ("-g", $user->{gid}) : ()),
+            ($user->{groups} ? ("-G", join(",", @{$user->{groups}})) : ()),
+            ($user->{home} ? ("-d", $user->{home}, "-m") : ()),
+            ($user->{name} ? ("-c", $user->{name}) : ()),
+            ($user->{shell} ? ("-s", $user->{shell}) : ())
+          );
         } elsif (i_os("solaris")) {
           command("usermod",
             ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
