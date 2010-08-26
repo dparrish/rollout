@@ -44,6 +44,17 @@ validate_config {
       },
     },
   },
+  cvsoptions => {
+    help => "Options for each cvs command",
+    type => "options",
+    options => {
+      cvs => { type => "string" },
+      update => { type => "string" },
+      checkout => { type => "string" },
+      diff => { type => "string" },
+    },
+    fail_on_unknown => 0,
+  },
 };
 
 return unless i_has('cvs');
@@ -54,10 +65,14 @@ while (my($user, $pass) = each %cvspass) {
               -uid => 0, -gid => 0, -mode => 0600, -create => 1);
 }
 
-file_append(-file => "/root/.cvsrc", -add => "cvs -z3 -q", -match => qr/^cvs/, -create => 1);
-file_append(-file => "/root/.cvsrc", -add => "update -d -P", -match => qr/^update/);
-file_append(-file => "/root/.cvsrc", -add => "checkout -P", -match => qr/^checkout/);
-file_append(-file => "/root/.cvsrc", -add => "diff -u -b -B", -match => qr/^diff/);
+my %o = flatten_hash(c("$hostname/cvsoptions"));
+$o{cvs} ||= "-z3 -q";
+$o{update} ||= "-d -P";
+$o{checkout} ||= "-P";
+$o{diff} ||= "-u -b -B";
+
+file_append(-file => "/root/.cvsrc", -add => "$_ $o{$_}", -match => qr/^$_/, -create => 1)
+  foreach keys %o;
 
 my %cvs = flatten_hash(c("$hostname/cvs"));
 package_check("cvs") if keys %cvs;
