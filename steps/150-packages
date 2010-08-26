@@ -38,25 +38,114 @@ validate_config {
     type => "list",
     items => { type => "string" },
   },
+  yum => {
+    help => "Configuration for the Yellowdog Updater Modified",
+    type => "options",
+    options => {
+      auto_upgrade => {
+        type => "boolean",
+        help => "Whether all installed packages will be upgraded when Rollout is run",
+      },
+    },
+  },
 };
 
-return unless -d "/etc/apt" && -f "/usr/bin/apt-get";
+# Get lists of packages to add and remove
+my @install = i_should("install")
+    ? grep { i_should("add-$_") } uniq(flatten_list(c("$hostname/packages")))
+    : ();
+my @remove = i_should("remove")
+    ? grep { i_should("remove-$_") } uniq(flatten_list(c("$hostname/packages_remove")))
+    : ();
 
-if (i_should("deb_options") && i_has("deb_options") && -f "/usr/bin/debconf-set-selections") {
-  my $text = join("\n", uniq(flatten_list(c("$hostname/deb_options")))). "\n";
-  if ($text && open(DEBCONF, "|debconf-set-selections")) {
-    print DEBCONF $text;
-    close(DEBCONF);
-  }
+return unless @install || @remove;
+
+# Check for packages that are to be installed and removed
+foreach my $package (@remove) {
+  throw ConfigException "Attempt to both remove and install package '$package'. Naughty."
+    if grep /^\Q$package\E$/, @install;
 }
 
-my @apt = uniq(flatten_list(c("$hostname/apt_base")));
-text_install(-file => "/etc/apt/sources.list.d/rollout.list",
-             -text => join("", map { "$_\n" } @apt), -mode => 0644, -uid => 0, -gid => 0)
-    if @apt && i_should("apt_sources");
+# {{{ Apt
+if (-x "/usr/bin/apt-get") {
+  # APT for package installation (Debian / Ubuntu)
+  my @apt = uniq(flatten_list(c("$hostname/apt_base")));
+  text_install(-file => "/etc/apt/sources.list.d/rollout.list",
+               -text => join("", map { "$_\n" } @apt),
+               -mode => 0644, -uid => 0, -gid => 0)
+      if @apt && i_should("apt_sources");
 
-package_check(map { s/\.32bit$//; $_ } grep { i_should("add-$_") }
-              uniq(flatten_list(c("$hostname/packages")))) if i_should("install");
+  if (i_should("deb_options") && i_has("deb_options") && -f "/usr/bin/debconf-set-selections") {
+    my $text = join("\n", uniq(flatten_list(c("$hostname/deb_options")))). "\n";
+    if ($text && open(DEBCONF, "|debconf-set-selections")) {
+      print DEBCONF $text;
+      close(DEBCONF);
+    }
+  }
+  package_check(map { s/\.(?:32|64)bit$//; $_ } @install) if @install;
+  package_uncheck(map { s/\.(?:32|64)bit$//; $_ } @remove) if @remove;
+}
+# }}}
+# {{{ Yum
+elsif (-x "/usr/bin/yum") {
+  my @do_install;
+  my @will_update;
+  if (@install || c("$hostname/yum/auto_upgrade")) {
+    l "Updating YUM metadata cache";
+    command("yum", "makecache");
+  }
+  if (@install) {
+    # Check that all required packages are either installed or up-to-date
+    v "Checking for packages that require updates";
+    if (open(FH, "/usr/bin/yum check-update|")) {
+      # Read the header
+      while (<FH>) { last if /^\s+$/ }
+      while (<FH>) {
+        chomp;
+        s/^(\s+|\s+$)//g;
+        my($package, $version, $extra) = split /\s+/, $_, 3;
+        $package =~ s/\.[a-z0-9+]+$//;
+        next unless $package;
+        push @do_install, grep { /^\Q$package\E(?:\.[a-z0-9]+)?$/ } @install;
+        push @will_update, $package unless grep /^\Q$package\E$/, @install;
+      }
+      close(FH);
+    }
+    v "Updating packages: ". join(" ", @do_install) if @do_install;
+  }
+  if ((@install && @do_install != @install) || @remove) {
+    my %installed_packages;
+    v "Building list of installed packages";
+    if (open(FH, "/bin/rpm -q -a --queryformat '%{NAME}\n'|")) {
+      while (<FH>) {
+        chomp;
+        $installed_packages{$_}++;
+      }
+      close(FH);
+    }
 
-package_check(map { s/\.32bit$//; $_ } grep { i_should("add-$_") }
-              uniq(flatten_list(c("$hostname/packages_remove")))) if i_should("remove");
+    push @do_install, grep { !$installed_packages{$_} } @install;
+    my @do_remove = grep { $installed_packages{$_} } @remove;
+
+    if (@do_install) {
+      l "Installing packages: ". join(" ", uniq(@do_install)). "\n";
+      command("yum", "install", "-y", uniq(@do_install));
+    }
+
+    if (@do_remove) {
+      l "Removing packages: ". join(" ", @do_remove);
+      command("yum", "remove", "-y", uniq(@do_remove));
+    }
+  }
+  if (c("$hostname/yum/auto_upgrade")) {
+    if ((@install && @will_update) || !@install) {
+      l "Upgrading all installed packages";
+      command("yum", "upgrade", "-y");
+    }
+  }
+}
+# }}}
+else {
+  w "Don't know how to manage packages on ". i_os();
+}
+
