@@ -212,6 +212,40 @@ elsif (i_os("solaris")) {
   w "Solaris package management is supported using pkgutil (http://pkgutil.wikidot.com/) only";
 }
 # }}}
+# {{{ FreeBSD Packages
+elsif (i_os("freebsd") && -f "/usr/sbin/pkg_add") {
+  my %installed_packages;
+  if (open(FH, "/usr/sbin/pkg_info|")) {
+    v "Building list of installed packages";
+    while (<FH>) {
+      chomp;
+      my($package, $extra) = split /\s+/, $_, 2;
+      $installed_packages{$package} = $package;
+    }
+  }
+  my @do_install;
+  foreach my $package (@install) {
+    push @do_install, $package unless grep /^\Q$package\E(?:-.*)?$/, keys %installed_packages;
+  }
+  if (@do_install) {
+    l "Installing packages: ". join(" ", @do_install);
+    command("/usr/sbin/pkg_add", "-r", @do_install);
+  }
+
+  my @do_remove;
+  foreach my $package (@remove) {
+    push @do_remove, grep { $_ } map { $_ if grep /^\Q$package\E(?:-.*)?$/, $_ }
+        keys %installed_packages;
+  }
+  if (@do_remove) {
+    l "Removing packages: ". join(" ", @do_remove);
+    command("/usr/sbin/pkg_delete", @do_remove);
+  }
+
+  # Automatic upgrades are not supported by these package tools
+  # TODO(dparrish): Add some kind of port management here
+}
+# }}}
 else {
   w "Don't know how to manage packages on ". i_os();
 }
