@@ -48,6 +48,16 @@ validate_config {
       },
     },
   },
+  pkgutil => {
+    help => "Configuration for the Solaris package manager",
+    type => "options",
+    options => {
+      auto_upgrade => {
+        type => "boolean",
+        help => "Whether all installed packages will be upgraded when Rollout is run",
+      },
+    },
+  },
 };
 
 # Get lists of packages to add and remove
@@ -143,6 +153,63 @@ elsif (-x "/usr/bin/yum") {
       command("yum", "upgrade", "-y");
     }
   }
+}
+# }}}
+# {{{ Pkgutil (Solaris)
+elsif (-f "/opt/csw/bin/pkgutil") {
+  my %available_packages;
+  my %can_upgrade;
+  my %installed_packages;
+
+  if (open(FH, "/opt/csw/bin/pkgutil -a|")) {
+    v "Building list of available packages";
+    while (<FH>) {
+      chomp;
+      my($package, $shortname, $version, $extra) = split /\s+/, $_, 4;
+      $available_packages{$package} = $shortname;
+    }
+  }
+
+  if (open(FH, "/opt/csw/bin/pkgutil -c|")) {
+    v "Building list of installed packages";
+    <FH>;
+    while (<FH>) {
+      s/\s+$//;
+      my($package, $installed, $catalog) = split /\s+/, $_, 3;
+      $installed_packages{$package} = $package;
+      $can_upgrade{$package}++ unless $catalog eq 'SAME';
+    }
+  }
+
+  if (@install) {
+    my @do_install = uniq(grep {
+      (!$installed_packages{$_} && !$installed_packages{$available_packages{$_}}) ||
+      ($can_upgrade{$_} || $can_upgrade{$available_packages{$_}})
+    } @install);
+    if (@do_install) {
+      l "Installing packages: ". join(" ", @do_install);
+      command("/opt/csw/bin/pkgutil", "-y", "-i", @do_install);
+      delete $can_upgrade{@do_install};
+    }
+  }
+
+  if (@remove) {
+    my @do_remove = uniq(grep { defined } map {
+      $installed_packages{$_} || $installed_packages{$available_packages{$_}}
+    } @remove);
+    if (@do_remove) {
+      l "Removing packages: ". join(" ", @do_remove);
+      command("/opt/csw/bin/pkgutil", "-y", "-r", @do_remove);
+    }
+  }
+
+  if (c("$hostname/pkgutil/auto_upgrade") && %can_upgrade) {
+    l "Upgrading all installed packages";
+    command("/opt/csw/bin/pkgutil", "-y", "-u");
+  }
+}
+elsif (i_os("solaris")) {
+  w "Solaris package management is supported using pkgutil (http://pkgutil.wikidot.com/) only";
 }
 # }}}
 else {
