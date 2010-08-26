@@ -75,7 +75,8 @@ file_append(-file => "/root/.cvsrc", -add => "$_ $o{$_}", -match => qr/^$_/, -cr
   foreach keys %o;
 
 my %cvs = flatten_hash(c("$hostname/cvs"));
-package_check("cvs") if keys %cvs;
+return unless %cvs;
+
 while (my($dir, $x) = each(%cvs)) {
   w "No module specified for $dir" or next unless $x->{module};
 
