@@ -20,9 +20,17 @@ validate_config {
 my $changed = 0;
 my %sysctl = flatten_hash(c("$hostname/sysctl"));
 while (my($item, $value) = each(%sysctl)) {
-  file_append(-file => "/etc/sysctl.conf", -add => "$item = $value", -match => qr/$item/,
+  my $text = i_os("freebsd") ? "$item=$value" : "$item = $value";
+  file_append(-file => "/etc/sysctl.conf", -add => $text, -match => qr/^#?\s*$item/,
               -uid => 0, -gid => 0) and $changed++;
 }
 
-command("sysctl", "-p", "/etc/sysctl.conf") if $changed;
-
+if ($changed) {
+  if (i_os("linux")) {
+    command("sysctl", "-p", "/etc/sysctl.conf");
+  } elsif (i_os("freebsd")) {
+    command("/etc/rc.d/sysctl", "restart");
+  } else {
+    throw ConfigException "Don't know how to reload sysctl entries on ". i_os();
+  }
+}
