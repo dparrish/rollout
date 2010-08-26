@@ -11,7 +11,6 @@ return unless i_has("timezone") && i_should("timezone");
 my $zone = (flatten_list(c("$hostname/timezone")))[0];
 print "No timezone\n" and return unless $zone;
 
-print "Here\n";
 if (i_os("solaris")) {
   validate("Unknown timezone $zone", -f "/usr/share/lib/zoneinfo/$zone");
   file_append("/etc/TIMEZONE", "TZ=\"$zone\"", qr/^TZ=/);
