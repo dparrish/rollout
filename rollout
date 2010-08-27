@@ -170,9 +170,7 @@ sub v(@) { l(@_) if $verbosity >= 2; return 1 }
 
 package RolloutHTTP;
 
-use Net::HTTP;
-
-use vars qw( $ua %per_host_certs $done_setup $use_lwp );
+use vars qw( $ua %per_host_certs $done_setup $use_lwp $use_sock );
 
 sub _setup {
   return if $done_setup;
@@ -197,7 +195,15 @@ sub _setup {
     }
     $use_lwp = 1;
   };
-  ::w "Error loading the LWP modules. SSL is disabled. Consider installing LWP.\n" if $@;
+  if ($@) {
+    ::w "Error loading the SSL modules. SSL is disabled. Consider installing libwww." if $@;
+    eval { require Net::HTTP; };
+    if ($@) {
+      $use_sock = 1;
+      ::w("Couldn't load any HTTP modules, falling back to direct socket IO. Install libwww!");
+    } else {
+    }
+  }
 }
 
 sub add_client_cert {
@@ -234,23 +240,50 @@ sub get {
     } else {
       $self->{message} = "OK";
     }
+  } elsif ($use_sock) {
+    require IO::Socket::INET;
+    my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
+    ::fatal("HTTPS is not supported without the Net::SSLeay module") if $protocol eq 'https';
+    my $sock = IO::Socket::INET->new(PeerAddr => $host, PeerPort => $port)
+      or ::fatal("Couldn't create socket to $host:$port");
+    print $sock "GET $path HTTP/1.0\r\n";
+    print $sock "Host: $host\r\n";
+    print $sock "\r\n";
+    chomp(my $header = <$sock>);
+    ::fatal("Error retrieving http://$host:$port/$path: $header")
+      unless $header =~ /^HTTP\/\d+\.\d+ (2\d\d) (.*)[\r\n]+$/;
+    $self->{code} = $1;
+    $self->{message} = $2;
+    while (<$sock>) {
+      # Ignore headers
+      s/[\r\n]+$//;
+      last if /^$/;
+    }
+    my $buf;
+    while (<$sock>) {
+      $data_cb->($_);
+      $len += length $_;
+    }
+    $sock->close;
   } else {
     my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
-    ::fatal("HTTPS is not supported without the LWP module") if $protocol eq 'https';
-    my $req = new Net::HTTP Host => $host, PeerPort => $port || 80, Protocol => $protocol;
-    if (!$req) {
-      $self->{message} = $@;
-      throw HttpException($@);
-    }
+    ::fatal("HTTPS is not supported without the Net::SSLeay module") if $protocol eq 'https';
+    if (!$@) {
+      my $req = new Net::HTTP Host => $host, PeerPort => $port || 80, Protocol => $protocol;
+      if (!$req) {
+        $self->{message} = $@;
+        throw HttpException($@);
+      }
 
-    $req->write_request(GET => $path, 'User-Agent' => "Rollout/$::VERSION");
-    ($self->{code}, $self->{message}) = $req->read_response_headers;
-    my $buf;
-    while (1) {
-      my $n = $req->read_entity_body($buf, 4096);
-      last unless $n;
-      $data_cb->($buf);
-      $len += $n;
+      $req->write_request(GET => $path, 'User-Agent' => "Rollout/$::VERSION");
+      ($self->{code}, $self->{message}) = $req->read_response_headers;
+      my $buf;
+      while (1) {
+        my $n = $req->read_entity_body($buf, 4096);
+        last unless $n;
+        $data_cb->($buf);
+        $len += $n;
+      }
     }
   }
   return $len;
