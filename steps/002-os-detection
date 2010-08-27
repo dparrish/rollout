@@ -23,6 +23,11 @@ if ($^O eq 'linux') {
     ($o->{distro}, $o->{version}) = (lc(slurp_file('/etc/redhat-release')) =~ /^(\w+).*?([\d.]+)/);
   }
 
+  if (-f '/etc/gentoo-release') {
+    $o->{distro} = 'gentoo';
+    ($o->{version}) = (lc(slurp_file('/etc/gentoo-release')) =~ /^.*?([\d.]+)/);
+  }
+
   if (!$o->{distro} || $o->{distro} eq 'unknown') {
     chomp($o->{distro} = lc `lsb_release -sd` || 'unknown');
     chomp($o->{version} = lc `lsb_release -sr` || 'unknown');

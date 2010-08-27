@@ -58,6 +58,16 @@ validate_config {
       },
     },
   },
+  emerge => {
+    help => "Configuration for the Gentoo portage manager",
+    type => "options",
+    options => {
+      auto_upgrade => {
+        type => "boolean",
+        help => "Whether all installed packages will be upgraded when Rollout is run",
+      },
+    },
+  },
 };
 
 # Get lists of packages to add and remove
@@ -244,6 +254,68 @@ elsif (i_os("freebsd") && -f "/usr/sbin/pkg_add") {
 
   # Automatic upgrades are not supported by these package tools
   # TODO(dparrish): Add some kind of port management here
+}
+# }}}
+# {{{ Gentoo Portage
+elsif (-f "/usr/bin/emerge") {
+  my @do_install;
+  my @do_upgrade;
+  my $basedir = "/usr/portage";
+  foreach my $package (@install) {
+    if (!-d "$basedir/$package") {
+      my @matches = glob("$basedir/*/$package");
+      w "Couldn't find package $package" and next unless @matches;
+      throw ConfigException "Multiple packages found installing '$package', specify category too"
+        if @matches > 1;
+      next unless -d $matches[0];
+      $matches[0] =~ s/^$basedir\/*//;
+      $package = $matches[0];
+    }
+    my($category, $shortpackage) = split /\//, $package;
+    open(FH, "<$basedir/$package/Manifest")
+      or throw LocalFileException "Couldn't read $basedir/$package/Manifest: $!";
+    my $latest_version = "";
+    while (<FH>) {
+      next unless /^EBUILD $shortpackage-(.*?)\.ebuild/;
+      $latest_version = $1;
+    }
+    # Skip installing if the installed version is the latest
+    next if $latest_version && -d "/var/db/pkg/$package-$latest_version";
+
+    if (uniq(glob("/var/db/pkg/$package-*"), glob("/var/db/pkg/*/$package-*"), glob("/var/db/pkg/*/$package")) || -d "/var/db/pkg/$package") {
+      push @do_upgrade, $package;
+    } else {
+      push @do_install, $package;
+    }
+  }
+
+  if (@do_install) {
+    l "Installing packages: ". join(" ", uniq(@do_install));
+    command("emerge", uniq(@do_install));
+  }
+  if (@do_upgrade) {
+    l "Upgrading packages: ". join(" ", uniq(@do_upgrade));
+    command("emerge", "-uD", uniq(@do_upgrade));
+  }
+
+  my @do_remove;
+  foreach my $package (@remove) {
+    my $found;
+    push @do_remove, $found = $package if -d "/var/db/pkg/$package";
+    push @do_remove, map { s!^/var/db/pkg/!!; $_ } grep { /^\/var\/db\/pkg/ }
+                         uniq(glob("/var/db/pkg/$package-*"), glob("/var/db/pkg/*/$package-*"),
+                              glob("/var/db/pkg/*/$package")) unless $found;;
+  }
+
+  if (@do_remove) {
+    l "Removing packages: ". join(" ", uniq(@do_remove));
+    command("emerge", "--unmerge", uniq(@do_remove));
+  }
+
+  if (c("$hostname/emerge/auto_upgrade")) {
+    l "Upgrading all installed packages";
+    command("emerge", "-uD", "world");
+  }
 }
 # }}}
 else {
