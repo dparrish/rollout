@@ -247,6 +247,6 @@ elsif (i_os("freebsd") && -f "/usr/sbin/pkg_add") {
 }
 # }}}
 else {
-  w "Don't know how to manage packages on ". i_os();
+  w "Don't know how to manage packages on ". i_os(). " ". i_distro();
 }
 
