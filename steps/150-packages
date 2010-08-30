@@ -46,6 +46,24 @@ validate_config {
         type => "boolean",
         help => "Whether all installed packages will be upgraded when Rollout is run",
       },
+      repos => {
+        type => "hash",
+        key => {
+          type => "string",
+        },
+        value => {
+          type => "options",
+          options => {
+            name => { type => "string" },
+            baseurl => { type => "string" },
+            mirrorlist => { type => "string" },
+            failovermethod => { type => "string" },
+            enabled => { type => "boolean" },
+            gpgcheck => { type => "boolean" },
+            gpgkey => { type => "string" },
+          },
+        },
+      },
     },
   },
   pkgutil => {
@@ -123,6 +141,17 @@ if (-x "/usr/bin/apt-get") {
 elsif (-x "/usr/bin/yum") {
   my @do_install;
   my @will_update;
+  if (c("$hostname/yum/repos")) {
+    my %config;
+    my %c = flatten_hash(c("$hostname/yum/repos"));
+    while (my($item, $value) = each(%c)) {
+      $config{$item} = [];
+      foreach (keys %$value) {
+        push @{$config{$item}}, $_, $value->{$_};
+      }
+    }
+    config_file(-file => "/etc/yum.repos.d/rollout.repo", -sections => \%config, -type => "ini");
+  }
   if (@install || c("$hostname/yum/auto_upgrade")) {
     l "Updating YUM metadata cache";
     command("yum", "makecache");
