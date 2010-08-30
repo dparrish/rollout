@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# chkconfig: - 91 35
+# description: Starts and stops the Rollout server
+#              #
+# pidfile: /var/run/rolloutd.pid
+
 
 RUN_ON_STARTUP=0
 BASEDIR="/usr/local/rollout"
