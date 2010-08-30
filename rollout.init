@@ -11,6 +11,7 @@ BASEDIR="/usr/local/rollout"
 ALLOW="127.0.0.0/24"
 LISTEN_ADDRESS="127.0.0.1"
 LISTEN_PORT=80
+LOGFILE="/var/log/rolloutd.log"
 ROLLOUTD="/usr/local/sbin/rolloutd"
 PIDFILE="/var/run/rolloutd.pid"
 LISTEN_SSL=""
@@ -42,6 +43,7 @@ case "$1" in
       ${LISTEN_SSL} \
       --user "${USER}" \
       --group "${GROUP}" \
+      --logfile "${LOGFILE}" \
       >> /var/log/rolloutd.log 2>&1
     ;;
   stop)

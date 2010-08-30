@@ -24,3 +24,5 @@ GROUP=daemon
 
 # This is the Rollout binary server that is run.
 ROLLOUTD="/usr/local/sbin/rolloutd"
+
+LOGFILE="/var/log/rolloutd.log"
