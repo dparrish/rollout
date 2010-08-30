@@ -163,10 +163,12 @@ sub handle_client {
     return $self->error_response(400, undef, "Unsupported method") unless $self->{method} eq 'GET';
     ($self->{file}, $self->{query_string}) = ($self->{uri} =~ /([^?]*)(?:\?(.*))?/s);   # split at ?
 
-    return $self->error_response(403, undef, "Invalid SSL issuer. Please use a valid client ".
-                                 "certificate for authentication") unless $self->{ssl_issuer};
-    return $self->error_response(403, undef, "Invalid client cert. Please use a valid client ".
-                                 "certificate for authentication") unless $self->{client_name};
+    if ($self->{ssl}) {
+      return $self->error_response(403, undef, "Invalid SSL issuer. Please use a valid client ".
+                                   "certificate for authentication") unless $self->{ssl_issuer};
+      return $self->error_response(403, undef, "Invalid client cert. Please use a valid client ".
+                                   "certificate for authentication") unless $self->{client_name};
+    }
 
     my $last_header;
     while (<$sock>) {
