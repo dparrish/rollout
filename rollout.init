@@ -40,7 +40,7 @@ case "$1" in
     ;;
   stop)
     check_status && exit 0
-    PID=$?
+    PID=`cat ${PIDFILE}`
     echo "Stopping Rollout (process $PID)"
     kill $PID
     rm -f /var/run/rolloutd.pid
@@ -52,7 +52,8 @@ case "$1" in
     ;;
   status)
     check_status && echo "Rollout is not running" && exit 1
-    echo "Rollout is running as PID $?"
+    PID=`cat ${PIDFILE}`
+    echo "Rollout is running as PID $PID"
     exit 0
     ;;
   *)
