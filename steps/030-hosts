@@ -48,10 +48,10 @@ if (i_should("localhost")) {
   $hosts .= " ". join(" ", @extra) if @extra;
   file_append(-file => $filename,
               -add => "127.0.0.1\t$hosts",
-              -match => qr/(?:^127\.0\.0\.1\s.*|.+\s$hostname.*)/);
+              -match => qr/^127\.0\.0\.1\s.*/);
   file_append(-file => $filename,
               -add => "::1\t$hosts",
-              -match => qr/(?:^::1\s.*|.+\s$hostname.*)/);
+              -match => qr/^::1\s.*/);
   if (i_os("solaris") && -f "/etc/inet/ipnodes") {
     file_append(-file => "/etc/inet/ipnodes",
                 -add => "127.0.0.1\t$hosts",
