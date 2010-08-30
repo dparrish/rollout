@@ -70,7 +70,7 @@ sub run {
         SSL_server => 1,
         SSL_error_trap => sub {
           my($sock, $error) = @_;
-          print "SSL error on $sock: $error\n";
+          print STDERR "SSL error on $sock: $error\n";
         },
         SSL_use_cert => 1,
         SSL_ca_file => 'rolloutd.ca/cacert.crt',
@@ -82,13 +82,14 @@ sub run {
       $self->{client_name} = $peer_cert->subject_name || "";
       $self->{ssl_issuer} = $peer_cert->issuer_name || "";
       if ($self->{client_name}) {
-        print "SSL connection from $self->{client_name}, issued by $self->{ssl_issuer}.\n";
+        print STDERR "SSL connection from $self->{client_name}, issued by $self->{ssl_issuer}.\n";
       } else {
-        print "SSL connection with no client certificate, rejecting requests.\n";
+        print STDERR "SSL connection with no client certificate, rejecting requests.\n";
       }
     }
 
-    binmode $sock, ':raw';
+    eval { binmode $sock, ':raw' };
+    print STDERR "Error setting binmode on socket: $@\n" if $@;
     $self->{peer} = [$ipaddr, $port];
     close($self->{sock});
     $self->{sock} = $sock;
@@ -135,7 +136,7 @@ sub send_headers {
 
   my($code) = ($self->{response_code} =~ /^(\d\d\d).*/);
 
-  printf STDERR "%s %s %s [%s] \"%s %s %s\" %s %s\n",
+  printf "%s %s %s [%s] \"%s %s %s\" %s %s\n",
     $self->{peer}->[0], "-", "-", scalar(localtime()), $self->{method},
     $self->{uri}, $self->{protocol}, $code, $self->{response_headers}{'Content-Length'} || 0;
 }
@@ -178,7 +179,7 @@ sub handle_client {
         $self->{request_headers}{$1} = $2;
       } else {
         if (!$last_header) {
-          print "Invalid header line \"$_\"\n";
+          print STDERR "Invalid header line \"$_\"\n";
           return $self->error_response(400);
         }
         my $value = $2;
