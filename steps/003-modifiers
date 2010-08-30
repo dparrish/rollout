@@ -1,0 +1,24 @@
+#!/usr/bin/perl -w
+# vim:tw=100 sw=2 expandtab ft=perl
+
+sub config_file {
+  my $p = named_params @_, [ -file => undef, -sections => undef, -cmd => undef, -type => "ini",
+                             -uid => undef, -owner => undef, -gid => undef, -group => undef,
+                             -mode => undef, -separator => "="];
+  throw ConfigException "No file specified" unless $p->{-file};
+  throw ConfigException "No sections specified" unless $p->{-sections};
+
+  my @config;
+  while (my($name, $config) = each %{$p->{-sections}}) {
+    push @config, "[$name]" if $name;
+    for (my $i = 0; $i < @$config; $i += 2) {
+      push @config, "$config->[$i]$p->{-separator}$config->[$i + 1]";
+    }
+    push @config, "";
+  }
+
+  delete $p->{-sections};
+  delete $p->{-separator};
+  $p->{-text} = join("", map { "$_\n" } @config);
+  text_install(%$p);
+}

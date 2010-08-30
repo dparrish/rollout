@@ -1787,7 +1787,7 @@ try {
   fatal("Can't find any steps to execute: ". shift());
   exit(1);
 };
-unshift @only_steps, "setup", "os-detection" if @only_steps;
+unshift @only_steps, "setup", "os-detection", "modifiers" if @only_steps;
 push @only_steps, "complete" if @only_steps;
 v "Only running steps: " . join(", ", @only_steps) if @only_steps;
 
