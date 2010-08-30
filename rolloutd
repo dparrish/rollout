@@ -76,10 +76,16 @@ sub run {
         SSL_ca_file => 'rolloutd.ca/cacert.crt',
         SSL_cert_file => 'rolloutd.ca/certs/rolloutd.pem',
         SSL_key_file  => 'rolloutd.ca/certs/rolloutd.key',
-        SSL_verify_mode => 0x01 | 0x02) or exit;
+        SSL_verify_mode => 0x01) or exit;
 
       my $peer_cert = $sock->get_peer_certificate;
-      print "SSL connection from ". ($peer_cert->subject_name || ""). ", issued by ". ($peer_cert->issuer_name || ""). "\n";
+      $self->{client_name} = $peer_cert->subject_name || "";
+      $self->{ssl_issuer} = $peer_cert->issuer_name || "";
+      if ($self->{client_name}) {
+        print "SSL connection from $self->{client_name}, issued by $self->{ssl_issuer}.\n";
+      } else {
+        print "SSL connection with no client certificate, rejecting requests.\n";
+      }
     }
 
     binmode $sock, ':raw';
@@ -156,6 +162,11 @@ sub handle_client {
         $self->{protocol} =~ /^HTTP\/\d+\.\d+$/;
     return $self->error_response(400, undef, "Unsupported method") unless $self->{method} eq 'GET';
     ($self->{file}, $self->{query_string}) = ($self->{uri} =~ /([^?]*)(?:\?(.*))?/s);   # split at ?
+
+    return $self->error_response(403, undef, "Invalid SSL issuer. Please use a valid client ".
+                                 "certificate for authentication") unless $self->{ssl_issuer};
+    return $self->error_response(403, undef, "Invalid client cert. Please use a valid client ".
+                                 "certificate for authentication") unless $self->{client_name};
 
     my $last_header;
     while (<$sock>) {
@@ -419,7 +430,6 @@ if ($daemon) {
   defined(my $pid = fork()) or die "Couldn't fork: $!";
   exit if $pid;
   $SIG{HUP} = 'IGNORE';
-  $SIG{CHLD} = 'IGNORE';
   setsid or die "Couldn't start a new session: $!";
   open STDIN, "/dev/null";
   open STDOUT, ">>$logfile";
@@ -432,6 +442,7 @@ if ($daemon) {
 chroot($server_base) if $chroot;
 $UID = $EUID = $uid if $user;
 $GID = $EGID = $gid if $group;
+$SIG{CHLD} = 'IGNORE';
 
 # Write out process ID
 if ($pidfile) {
