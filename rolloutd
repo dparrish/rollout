@@ -269,9 +269,12 @@ sub handle_request {
     foreach (@{$self->{allow}}) {
       $found++ if $_->match($self->{peer}->[0]);
     }
-    return $self->error_response(403, undef, "Not allowed to access $path\r\n")
-      if !$found || $path eq '/';
+    return $self->error_response(403, undef, "Not allowed to access rollout from your IP.\r\n")
+      unless $found;
   }
+
+  return $self->error_response(403, undef, "Not allowed to access $path\r\n")
+    if $path eq '/';
 
   my $localpath = canonpath(uri_unescape($path));
   return $self->error_response(403, undef, "Not allowed to access $localpath\r\n")
