@@ -68,6 +68,19 @@ validate_config {
       },
     },
   },
+  up2date => {
+    help => "Configuration for the RedHat Enterprise Linux package manager",
+    type => "options",
+    options => {
+      command => {
+        type => "string",
+      },
+      auto_upgrade => {
+        type => "boolean",
+        help => "Whether all installed packages will be upgraded when Rollout is run",
+      },
+    },
+  },
 };
 
 # Get lists of packages to add and remove
@@ -117,32 +130,31 @@ elsif (-x "/usr/bin/yum") {
   if (@install) {
     # Check that all required packages are either installed or up-to-date
     v "Checking for packages that require updates";
-    if (open(FH, "/usr/bin/yum check-update|")) {
-      # Read the header
-      while (<FH>) { last if /^\s+$/ }
-      while (<FH>) {
-        chomp;
-        s/^(\s+|\s+$)//g;
-        my($package, $version, $extra) = split /\s+/, $_, 3;
-        $package =~ s/\.[a-z0-9+]+$//;
-        next unless $package;
-        push @do_install, grep { /^\Q$package\E(?:\.[a-z0-9]+)?$/ } @install;
-        push @will_update, $package unless grep /^\Q$package\E$/, @install;
-      }
-      close(FH);
+    open(FH, "/usr/bin/yum check-update|") or throw LocalFileException "Could not run yum: $!";
+    # Read the header
+    while (<FH>) { last if /^\s+$/ }
+    while (<FH>) {
+      chomp;
+      s/^(\s+|\s+$)//g;
+      my($package, $version, $extra) = split /\s+/, $_, 3;
+      $package =~ s/\.[a-z0-9+]+$//;
+      next unless $package;
+      push @do_install, grep { /^\Q$package\E(?:\.[a-z0-9]+)?$/ } @install;
+      push @will_update, $package unless grep /^\Q$package\E$/, @install;
     }
+    close(FH);
     v "Updating packages: ". join(" ", @do_install) if @do_install;
   }
   if ((@install && @do_install != @install) || @remove) {
     my %installed_packages;
     v "Building list of installed packages";
-    if (open(FH, "/bin/rpm -q -a --queryformat '%{NAME}\n'|")) {
-      while (<FH>) {
-        chomp;
-        $installed_packages{$_}++;
-      }
-      close(FH);
+    open(FH, "/bin/rpm -q -a --queryformat '%{NAME}\n'|")
+        or throw LocalFileException "Could not run rpm: $!";
+    while (<FH>) {
+      chomp;
+      $installed_packages{$_}++;
     }
+    close(FH);
 
     push @do_install, grep { !$installed_packages{$_} } @install;
     my @do_remove = grep { $installed_packages{$_} } @remove;
@@ -171,24 +183,22 @@ elsif (-f "/opt/csw/bin/pkgutil") {
   my %can_upgrade;
   my %installed_packages;
 
-  if (open(FH, "/opt/csw/bin/pkgutil -a|")) {
-    v "Building list of available packages";
-    while (<FH>) {
-      chomp;
-      my($package, $shortname, $version, $extra) = split /\s+/, $_, 4;
-      $available_packages{$package} = $shortname;
-    }
+  v "Building list of available packages";
+  open(FH, "/opt/csw/bin/pkgutil -a|") or throw LocalFileException "Could not run pkgutil: $!";
+  while (<FH>) {
+    chomp;
+    my($package, $shortname, $version, $extra) = split /\s+/, $_, 4;
+    $available_packages{$package} = $shortname;
   }
 
-  if (open(FH, "/opt/csw/bin/pkgutil -c|")) {
-    v "Building list of installed packages";
-    <FH>;
-    while (<FH>) {
-      s/\s+$//;
-      my($package, $installed, $catalog) = split /\s+/, $_, 3;
-      $installed_packages{$package} = $package;
-      $can_upgrade{$package}++ unless $catalog eq 'SAME';
-    }
+  v "Building list of installed packages";
+  open(FH, "/opt/csw/bin/pkgutil -c|") or throw LocalFileException "Could not run pkgutil: $!";
+  <FH>;
+  while (<FH>) {
+    s/\s+$//;
+    my($package, $installed, $catalog) = split /\s+/, $_, 3;
+    $installed_packages{$package} = $package;
+    $can_upgrade{$package}++ unless $catalog eq 'SAME';
   }
 
   if (@install) {
@@ -315,6 +325,37 @@ elsif (-f "/usr/bin/emerge") {
   if (c("$hostname/emerge/auto_upgrade")) {
     l "Upgrading all installed packages";
     command("emerge", "-uD", "world");
+  }
+}
+# }}}
+# {{{ RedHat Enterprise
+elsif (i_os("linux") && i_distro("redhat") && -x "/usr/bin/up2date-nox") {
+  my $cmd = c("$hostname/up2date/command") || "/usr/bin/up2date-nox";
+  my %installed_packages;
+  v "Building list of installed packages";
+  open(FH, "/bin/rpm -q -a --queryformat '%{NAME}\n'|")
+      or throw LocalFileException "Could not run rpm: $!";
+  while (<FH>) {
+    chomp;
+    $installed_packages{$_}++;
+  }
+  close(FH);
+
+  my @do_install = grep { !$installed_packages{$_} } @install;;
+  if (@do_install) {
+    l "Installing packages: ". join(" ", uniq(@do_install));
+    command($cmd, "-i", uniq(@do_install));
+  }
+
+  my @do_remove = grep { $installed_packages{$_} } @remove;;
+  if (@do_remove) {
+    l "Removing packages: ". join(" ", uniq(@do_remove));
+    command("rpm", "-e", uniq(@do_remove));
+  }
+
+  if (c("$hostname/up2date/auto_upgrade")) {
+    l "Upgrading all installed packages";
+    command($cmd, "-u");
   }
 }
 # }}}

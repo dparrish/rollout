@@ -21,6 +21,7 @@ if ($^O eq 'linux') {
 
   if (-f '/etc/redhat-release') {
     ($o->{distro}, $o->{version}) = (lc(slurp_file('/etc/redhat-release')) =~ /^(\w+).*?([\d.]+)/);
+    $o->{distro} = 'redhat' if $o->{distro} eq 'red';
   }
 
   if (-f '/etc/gentoo-release') {
