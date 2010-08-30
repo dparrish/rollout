@@ -86,9 +86,10 @@ sub run {
       } else {
         print STDERR "SSL connection with no client certificate, rejecting requests.\n";
       }
+    } else {
+      eval { binmode $sock, ':raw' };
     }
 
-    eval { binmode $sock, ':raw' };
     print STDERR "Error setting binmode on socket: $@\n" if $@;
     $self->{peer} = [$ipaddr, $port];
     close($self->{sock});
