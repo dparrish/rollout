@@ -3,6 +3,7 @@
 # chkconfig: - 91 35
 # description: Starts and stops the Rollout server
 #              #
+# processname: rolloutd
 # pidfile: /var/run/rolloutd.pid
 
 
