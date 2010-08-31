@@ -365,7 +365,15 @@ if (i_should("hostname")) {
     file_modify(-file => $_, -modify => [ "s/$oldhostname/$hostname/g" ])
       for glob("/etc/net/*/hosts");
     dir_check("/var/crash/$hostname", 0700) && command("dumpadm", "-s", "/var/crash/$hostname");
-  } else {
+  } elsif (i_os("freebsd")) {
+    if ($oldhostname ne $hostname) {
+      l "Changing hostname from $oldhostname to $hostname";
+      command("hostname", $hostname);
+      $changes++;
+    }
+    file_append(-file => "/etc/rc.conf.local", -add => "hostname=\"$hostname\"",
+                -match => qr/^#?\s*hostname=/, -create => 1);
+  } elsif (i_os("linux")) {
     if ($oldhostname ne $hostname) {
       l "Changing hostname from $oldhostname to $hostname";
       command("hostname", $hostname);
@@ -378,6 +386,10 @@ if (i_should("hostname")) {
     } elsif (-f "/etc/sysconfig/network") {
       file_modify(-file => "/etc/sysconfig/network",
                   -modify => [ "s/^HOSTNAME=.*/HOSTNAME=$hostname/" ]);
+    }
+  } else {
+    if ($oldhostname ne $hostname) {
+      w "Don't know how to set the hostname on ". i_os(). " ". i_distro();
     }
   }
 }
