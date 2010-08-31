@@ -151,23 +151,29 @@ $m{$hostname}{_packages} ||= {
   done_remove => {},
   installed_packages => {},
   file => sub {
-    foreach my $filename (grep /\.(rpm|deb)$/, @_) {
+    foreach my $filename (@_) {
+      next unless $filename =~ /\.(rpm|deb)$/;
+      my $original_filename = $filename;
       package_check("rpm") if $1 eq 'rpm';
 
       if ($filename =~ /^(https?:\/\/|rollout:)/) {
         eval { require File::Temp };
         return w "No File::Temp module, cannot create temporary files: $@" if $@;
-        my($fh, $localfilename) = tempfile();
+        my($fh, $localfilename) = File::Temp::tempfile();
         $fh->close;
         http_file($filename, $localfilename);
         $filename = $localfilename;
       }
 
-      if (/\.rpm$/) {
-        command("rpm", "-Uvh", $filename);
-      } else {
-        command("dpkg", "-i", $filename);
-      }
+      try {
+        if ($original_filename =~ /\.rpm$/) {
+          command("rpm", "-Uvh", $filename);
+        } else {
+          command("dpkg", "-i", $filename);
+        }
+      } finally {
+        unlink $filename if $original_filename ne $filename;
+      };
     }
   },
 };
