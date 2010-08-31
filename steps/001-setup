@@ -67,7 +67,7 @@ sub get_fragments {
   my @fragments = http_index $location;
   foreach (sort { $a->{filename} cmp $b->{filename} } @fragments) {
     my $fragment = $_->{filename};
-    if ($fragment =~ /\/$/) {
+    if ($_->{type} eq 'directory') {
       # making the output look pretty in verbose
       $fragment =~ s/\/$//;
       get_fragments("$location/$fragment");
