@@ -390,8 +390,11 @@ if (i_should("resolvconf")) {
     file_append(-file => "/etc/resolv.conf", -add => "options ". join(" ", @options),
                 -match => qr/^options/) && $changes++;
   }
-  file_append(-file => "/etc/resolv.conf", -add => "nameserver $_", -match => qr/^nameserver $_/)
-    && $changes++ foreach uniq(flatten_list(c("$hostname/nameservers")));
+  if (c("$hostname/nameservers")) {
+    file_append(-file => "/etc/resolv.conf",
+                -add => join("", map { "nameserver $_\n" } uniq(flatten_list(c("$hostname/nameservers")))),
+                -match => qr/^nameserver\b/) && $changes++;
+  }
 }
 
 if (i_should("domain_name")) {
