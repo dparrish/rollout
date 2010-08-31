@@ -75,22 +75,46 @@ validate_config {
       help => "Interface configuration",
       type => "options",
       options => {
+        arp => { type => "string" },
         bond => { type => "list" },
+        bootfile => { type => "string" },
+        bootproto => { type => "string" },
+        bridge => { type => "string" },
+        broadcast => { type => "ip" },
+        client => { type => "string" },
         dhcp => { type => "boolean" },
         disabled => { type => "boolean" },
+        endpoint => { type => "string" },
         family => { type => "string" },
+        frame => { type => "string" },
         gateway => { type => "ip" },
         hostname => { type => "string" },
+        hwaddress => { type => "string", regex => qr/^([0-9a-f][0-9a-f]:){5}[0-9a-f][0-9a-f]$/i },
+        inactive => { type => "boolean" },
         ip => { type => "ip" },
         ipv6 => { type => "int" },
+        leasehours => { type => "int" },
+        leasetime => { type => "string" },
+        local => { type => "string" },
         mac => { type => "string", regex => qr/^([0-9a-f][0-9a-f]:){5}[0-9a-f][0-9a-f]$/i },
+        media => { type => "string" },
         method => { type => "string" },
+        metric => { type => "int" },
+        mtu => { type => "int" },
         multicast => { type => "string" },
         netmask => { type => "ip" },
+        netnum => { type => "int" },
+        network => { type => "ip" },
+        pointopoint => { type => "string" },
         primary => { type => "boolean" },
         provider => { type => "string" },
         routes => { type => "hash_list" },
+        server => { type => "string" },
         stp => { type => "string" },
+        ttl => { type => "int" },
+        type => { type => "string" },
+        userctl => { type => "string" },
+        vendor => { type => "string" },
       },
       fail_on_unknown => 1,
     },
@@ -244,7 +268,7 @@ elsif (i_should("interface") && -f "/etc/network/interfaces") {
     $x{$_} = $d->{$_}
       foreach qw( bootfile broadcast client gateway hostname hwaddress leasehours leasetime media
                   metric mtu network pointopoint provider server vendor frame netnum endpoint local
-                  gateway ttl );
+                  ttl );
     push @{$x{$_}}, ref $d->{$_} ? @{$d->{$_}} : $d->{$_}
       foreach qw( pre-up up post-up pre-down down post-down );
 
