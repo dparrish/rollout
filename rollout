@@ -196,7 +196,7 @@ sub _setup {
     $use_lwp = 1;
   };
   if ($@) {
-    ::w "Error loading the SSL modules. SSL is disabled. Consider installing libwww." if $@;
+    ::w "Error loading the SSL modules. SSL is disabled. Installing libwww and Net::SSLeay." if $@;
     eval { require Net::HTTP; };
     if ($@) {
       $use_sock = 1;
@@ -359,6 +359,9 @@ sub http_file(@) {
   my $req = new RolloutHTTP;
   my($protocol, $host, $port, $path) = $url =~ /^(?:(https?):\/\/)?([^\/:]+)(?::(\d+))?(\/?.*)/;
   if ($protocol eq 'https') {
+    $ENV{HTTPS_CERT_FILE} = "$::configdir/$::config->{client_certificate}";
+    $ENV{HTTPS_KEY_FILE} = "$::configdir/$::config->{client_certificate_key}";
+    $ENV{HTTPS_CA_FILE} = "$::configdir/$::config->{ca_certificate}";
     $req->add_client_cert($host, $port, "$::configdir/$::config->{client_certificate}",
                           "$::configdir/$::config->{client_certificate_key}");
   }
@@ -888,7 +891,7 @@ sub file_append {
 
   validate("Incorrect parameters to file_append", $p->{-file} && $p->{-add});
   validate("Skipping append of $p->{-file}: $p->{-match} does NOT match '$p->{-add}'",
-           defined $p->{-match} and $p->{-add} !~ /$p->{-match}/);
+           defined $p->{-match} && $p->{-add} =~ /$p->{-match}/);
 
   # Only compare first line for multiline $p->{-add}
   my($firstline) = $p->{-add};
@@ -1612,7 +1615,14 @@ sub remote_require($;$) {
 sub validate($@) {
   my($message, @checks) = @_;
   foreach (@checks) {
-    throw ConfigException $message unless $_;
+    next if $_;
+    if ($verbosity > 1) {
+      eval {
+        require Carp;
+        $message .= Carp::longmess;
+      };
+    }
+    throw ConfigException $message;
   }
 }
 
