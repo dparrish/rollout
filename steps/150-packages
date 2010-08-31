@@ -31,12 +31,32 @@ validate_config {
   apt_base => {
     help => "List of apt sources to add to /etc/apt/sources.list.d/rollout.list",
     type => "list",
+    deprecated => "apt/repos",
     items => { type => "string" },
   },
   deb_options => {
     help => "List of options to run through debconf-set-selections",
     type => "list",
     items => { type => "string" },
+    deprecated => "apt/deb_options",
+  },
+  apt => {
+    type => "options",
+    options => {
+      repos => {
+        type => "list",
+        items => { type => "string" },
+      },
+      deb_options => {
+        help => "List of options to run through debconf-set-selections",
+        type => "list",
+        items => { type => "string" },
+      },
+      always_check => {
+        type => "boolean",
+        help => "Always update the local cache before attemping any other ops (slower)",
+      },
+    }
   },
   yum => {
     help => "Configuration for the Yellowdog Updater Modified",
@@ -45,6 +65,10 @@ validate_config {
       auto_upgrade => {
         type => "boolean",
         help => "Whether all installed packages will be upgraded when Rollout is run",
+      },
+      always_check => {
+        type => "boolean",
+        help => "Always update the local cache before attemping any other ops (slower)",
       },
       repos => {
         type => "hash",
@@ -117,30 +141,140 @@ foreach my $package (@remove) {
     if grep /^\Q$package\E$/, @install;
 }
 
+
+# {{{ Local package installation wrappers
+$m{$hostname}{_packages} ||= {
+  install => undef,
+  remove => undef,
+  update => undef,
+  done_install => {},
+  done_remove => {},
+  installed_packages => {},
+  file => sub {
+    foreach my $filename (grep /\.(rpm|deb)$/, @_) {
+      package_check("rpm") if $1 eq 'rpm';
+
+      if ($filename =~ /^(https?:\/\/|rollout:)/) {
+        eval { require File::Temp };
+        return w "No File::Temp module, cannot create temporary files: $@" if $@;
+        my($fh, $localfilename) = tempfile();
+        $fh->close;
+        http_file($filename, $localfilename);
+        $filename = $localfilename;
+      }
+
+      if (/\.rpm$/) {
+        command("rpm", "-Uvh", $filename);
+      } else {
+        command("dpkg", "-i", $filename);
+      }
+    }
+  },
+};
+my $p = $m{$hostname}{_packages};
+
+sub package_check(@) {
+  my $p = $m{$hostname}{_packages};
+  if (!$p->{install}) {
+    w "Don't know how to manage packages on ". i_os(). " ". i_distro();
+    return 0;
+  }
+
+  if ($p->{file}) {
+    my @p = grep /\.(rpm|deb)$/, @_;
+    $p->{file}->(@p);
+  }
+
+  $p->{update}->() if $p->{update};
+  my @p = grep { !/\.(rpm|deb)$/ && !$p->{done_install}{$_} } @_;
+  $p->{done_install} = {%{$p->{done_install}}, map { $_ => 1 } @_};
+  return 0 unless @p;
+  return $p->{install}->(@p);
+}
+
+sub package_uncheck(@) {
+  my $p = $m{$hostname}{_packages};
+  if (!$p->{remove}) {
+    w "Don't know how to manage packages on ". i_os(). " ". i_distro();
+    return 0;
+  }
+
+  $p->{update}->() if $p->{update};
+  my @p = grep { !$p->{done_remove}{$_} } @_;
+  $p->{done_remove} = {%{$p->{done_remove}}, map { $_ => 1 } @_};
+  return 0 unless @p;
+  return $p->{remove}->(@p);
+}
+# }}}
 # {{{ Apt
-if (-x "/usr/bin/apt-get") {
+if (-x "/usr/bin/apt-get" && -x "/usr/bin/dpkg") {
   # APT for package installation (Debian / Ubuntu)
-  my @apt = uniq(flatten_list(c("$hostname/apt_base")));
+  my @apt = uniq(flatten_list(c("$hostname/apt/repos")));
   text_install(-file => "/etc/apt/sources.list.d/rollout.list",
                -text => join("", map { "$_\n" } @apt),
                -mode => 0644, -uid => 0, -gid => 0)
       if @apt && i_should("apt_sources");
 
-  if (i_should("deb_options") && i_has("deb_options") && -f "/usr/bin/debconf-set-selections") {
-    my $text = join("\n", uniq(flatten_list(c("$hostname/deb_options")))). "\n";
+  if (i_should("deb_options") && -f "/usr/bin/debconf-set-selections") {
+    my $text = join("", map { "$_\n" } uniq(flatten_list(c("$hostname/apt/deb_options"))));
     if ($text && open(DEBCONF, "|debconf-set-selections")) {
       print DEBCONF $text;
       close(DEBCONF);
     }
   }
-  package_check(map { s/\.(?:32|64)bit$//; $_ } @install) if @install;
-  package_uncheck(map { s/\.(?:32|64)bit$//; $_ } @remove) if @remove;
+
+  $ENV{DEBIAN_FRONTEND} = 'noninteractive';
+
+  $p->{update} = sub {
+    my $p = $m{$hostname}{_packages};
+    if (!%{$p->{installed_packages}}) {
+      $p->{installed_packages} = {};
+      v "Updating installed packages list";
+      open(FH, "dpkg -l|") or throw LocalFileException "Can't run dpkg: $!";
+      while (<FH>) {
+        my($status, $package, $version, $description) = split /\s+/;
+        next unless $package;
+        next unless $status =~ /^.i/i;
+        $p->{installed_packages}{$package} = $version;
+      }
+      close(FH);
+
+      if (c("$hostname/apt/always_check")) {
+        v "Updating packages list";
+        command("apt", "-q", "update");
+      }
+    }
+  };
+
+  $p->{install} = sub {
+    my @do_install = grep { !$p->{installed_packages}{$_} } map { s/\.(?:32|64)bit$//; $_ }
+                     grep { !$p->{installed_packages}{$_} } @_;
+    if (@do_install) {
+      l "Installing packages: ". join(" ", uniq(@do_install));
+      command("apt-get", "-qy", "-oStopOnError=false", "-oDPkg::Options={\"--force-confold\"}",
+              "--force-yes", "--allow-unauthenticated","install", uniq(@do_install));
+    }
+  };
+
+  $p->{remove} = sub {
+    my @do_remove = grep { $p->{installed_packages}{$_} } map { s/\.(?:32|64)bit$//; $_ } @_;
+    if (@do_remove) {
+      l "Removing packages: ". join(" ", @do_remove);
+      command("apt-get", "-qq", "-y", "remove", uniq(@do_remove));
+    }
+  };
+
+  package_check(@install);
+  package_uncheck(@remove);
+
+  if (c("$hostname/apt/auto_upgrade")) {
+    l "Upgrading all installed packages";
+    command("apt-get", "upgrade", "-q", "-y");
+  }
 }
 # }}}
 # {{{ Yum
 elsif (-x "/usr/bin/yum") {
-  my @do_install;
-  my @will_update;
   if (c("$hostname/yum/repos")) {
     my %config;
     my %c = flatten_hash(c("$hostname/yum/repos"));
@@ -152,109 +286,120 @@ elsif (-x "/usr/bin/yum") {
     }
     config_file(-file => "/etc/yum.repos.d/rollout.repo", -sections => \%config, -type => "ini");
   }
-  if (@install || c("$hostname/yum/auto_upgrade")) {
-    l "Updating YUM metadata cache";
-    command("yum", "makecache");
-  }
-  if (@install) {
-    # Check that all required packages are either installed or up-to-date
-    v "Checking for packages that require updates";
-    open(FH, "/usr/bin/yum check-update|") or throw LocalFileException "Could not run yum: $!";
-    # Read the header
-    while (<FH>) { last if /^\s+$/ }
-    while (<FH>) {
-      chomp;
-      s/^(\s+|\s+$)//g;
-      my($package, $version, $extra) = split /\s+/, $_, 3;
-      $package =~ s/\.[a-z0-9+]+$//;
-      next unless $package;
-      push @do_install, grep { /^\Q$package\E(?:\.[a-z0-9]+)?$/ } @install;
-      push @will_update, $package unless grep /^\Q$package\E$/, @install;
-    }
-    close(FH);
-    v "Updating packages: ". join(" ", @do_install) if @do_install;
-  }
-  if ((@install && @do_install != @install) || @remove) {
-    my %installed_packages;
-    v "Building list of installed packages";
-    open(FH, "/bin/rpm -q -a --queryformat '%{NAME}\n'|")
-        or throw LocalFileException "Could not run rpm: $!";
-    while (<FH>) {
-      chomp;
-      $installed_packages{$_}++;
-    }
-    close(FH);
 
-    push @do_install, grep { !$installed_packages{$_} } @install;
-    my @do_remove = grep { $installed_packages{$_} } @remove;
+  $p->{update} = sub {
+    my $p = $m{$hostname}{_packages};
+    if (!%{$p->{installed_packages}}) {
+      if (c("$hostname/yum/always_check")) {
+        l "Updating YUM metadata cache";
+        command("yum", "makecache");
+      }
 
-    if (@do_install) {
-      l "Installing packages: ". join(" ", uniq(@do_install)). "\n";
-      command("yum", "install", "-y", uniq(@do_install));
-    }
+      v "Building list of installed packages";
+      open(FH, "/bin/rpm -q -a --queryformat '%{NAME}\n'|")
+          or throw LocalFileException "Could not run rpm: $!";
+      while (<FH>) {
+        chomp;
+        $p->{installed_packages}{$_}++;
+      }
+      close(FH);
 
-    if (@do_remove) {
-      l "Removing packages: ". join(" ", @do_remove);
-      command("yum", "remove", "-y", uniq(@do_remove));
+      # Check that all required packages are either installed or up-to-date
+      v "Checking for packages that require updates";
+      $p->{can_update} ||= [];
+      open(FH, "/usr/bin/yum check-update|") or throw LocalFileException "Could not run yum: $!";
+      while (<FH>) { last if /^\s+$/ }   # Read the header
+      while (<FH>) {
+        chomp;
+        s/^(\s+|\s+$)//g;
+        my($package, $version, $extra) = split /\s+/, $_, 3;
+        $package =~ s/\.[a-z0-9+]+$//;
+        next unless $package;
+        push @{$p->{can_update}}, grep { /^\Q$package\E(?:\.[a-z0-9]+)?$/ } @_;
+      }
+      close(FH);
     }
-  }
+  };
+
+  $p->{install} = sub {
+    my @do_install = grep { !$p->{installed_packages}{$_} } map { s/\.(?:32|64)bit$//; $_ }
+                     grep { !$p->{installed_packages}{$_} } @_;
+    return unless @do_install;
+    l "Installing packages: ". join(" ", uniq(@do_install));
+    command("yum", "install", "-y", uniq(@do_install));
+  };
+
+  $p->{remove} = sub {
+    my @do_remove = grep { $p->{installed_packages}{$_} } map { s/\.(?:32|64)bit$//; $_ } @_;
+    return unless @do_remove;
+    l "Removing packages: ". join(" ", @do_remove);
+    command("yum", "remove", "-y", uniq(@do_remove));
+  };
+
+  package_check(@install);
+  package_uncheck(@remove);
+
   if (c("$hostname/yum/auto_upgrade")) {
-    if ((@install && @will_update) || !@install) {
-      l "Upgrading all installed packages";
-      command("yum", "upgrade", "-y");
-    }
+    l "Upgrading all installed packages";
+    command("yum", "upgrade", "-y");
   }
 }
 # }}}
 # {{{ Pkgutil (Solaris)
 elsif (-f "/opt/csw/bin/pkgutil") {
-  my %available_packages;
-  my %can_upgrade;
-  my %installed_packages;
+  $p->{update} = sub {
+    my $p = $m{$hostname}{_packages};
+    if (!%{$p->{installed_packages}}) {
+      $p->{available} = {};
+      $p->{can_upgrade} = {};
+      v "Building list of available packages";
+      open(FH, "/opt/csw/bin/pkgutil -a|") or throw LocalFileException "Could not run pkgutil: $!";
+      while (<FH>) {
+        chomp;
+        my($package, $shortname, $version, $extra) = split /\s+/, $_, 4;
+        $p->{available}{$package} = $shortname;
+      }
 
-  v "Building list of available packages";
-  open(FH, "/opt/csw/bin/pkgutil -a|") or throw LocalFileException "Could not run pkgutil: $!";
-  while (<FH>) {
-    chomp;
-    my($package, $shortname, $version, $extra) = split /\s+/, $_, 4;
-    $available_packages{$package} = $shortname;
-  }
+      v "Building list of installed packages";
+      open(FH, "/opt/csw/bin/pkgutil -c|") or throw LocalFileException "Could not run pkgutil: $!";
+      <FH>;
+      while (<FH>) {
+        s/\s+$//;
+        my($package, $installed, $catalog) = split /\s+/, $_, 3;
+        $p->{installed_packages}{$package} = $package;
+        $p->{can_upgrade}{$package}++ unless $catalog eq 'SAME';
+      }
+    }
+  };
 
-  v "Building list of installed packages";
-  open(FH, "/opt/csw/bin/pkgutil -c|") or throw LocalFileException "Could not run pkgutil: $!";
-  <FH>;
-  while (<FH>) {
-    s/\s+$//;
-    my($package, $installed, $catalog) = split /\s+/, $_, 3;
-    $installed_packages{$package} = $package;
-    $can_upgrade{$package}++ unless $catalog eq 'SAME';
-  }
-
-  if (@install) {
+  $p->{install} = sub {
     my @do_install = uniq(grep {
-      (!$installed_packages{$_} && !$installed_packages{$available_packages{$_}}) ||
-      ($can_upgrade{$_} || $can_upgrade{$available_packages{$_}})
-    } @install);
-    if (@do_install) {
-      l "Installing packages: ". join(" ", @do_install);
-      command("/opt/csw/bin/pkgutil", "-y", "-i", @do_install);
-      delete $can_upgrade{@do_install};
-    }
-  }
+      (!$p->{installed_packages}{$_} && !$p->{installed_packages}{$p->{available}{$_}}) ||
+      ($p->{can_upgrade}{$_} || $p->{can_upgrade}{$p->{available}{$_}})
+    } @_);
+    return unless @do_install;
+    l "Installing packages: ". join(" ", @do_install);
+    command("/opt/csw/bin/pkgutil", "-y", "-i", @do_install);
+    delete $p->{can_upgrade}{@do_install};
+  };
 
-  if (@remove) {
+  $p->{remove} = sub {
     my @do_remove = uniq(grep { defined } map {
-      $installed_packages{$_} || $installed_packages{$available_packages{$_}}
-    } @remove);
-    if (@do_remove) {
-      l "Removing packages: ". join(" ", @do_remove);
-      command("/opt/csw/bin/pkgutil", "-y", "-r", @do_remove);
-    }
-  }
+      $p->{installed_packages}{$_} || $p->{installed_packages}{$p->{available}{$_}}
+    } @_);
+    return unless @do_remove;
+    l "Removing packages: ". join(" ", @do_remove);
+    command("/opt/csw/bin/pkgutil", "-y", "-r", @do_remove);
+  };
 
-  if (c("$hostname/pkgutil/auto_upgrade") && %can_upgrade) {
+
+  package_check(@install);
+  package_uncheck(@remove);
+
+  if (c("$hostname/pkgutil/auto_upgrade") && %{$p->{can_upgrade}}) {
     l "Upgrading all installed packages";
     command("/opt/csw/bin/pkgutil", "-y", "-u");
+    $p->{can_upgrade} = {};
   }
 }
 elsif (i_os("solaris")) {
@@ -263,33 +408,44 @@ elsif (i_os("solaris")) {
 # }}}
 # {{{ FreeBSD Packages
 elsif (i_os("freebsd") && -f "/usr/sbin/pkg_add") {
-  my %installed_packages;
-  if (open(FH, "/usr/sbin/pkg_info|")) {
-    v "Building list of installed packages";
-    while (<FH>) {
-      chomp;
-      my($package, $extra) = split /\s+/, $_, 2;
-      $installed_packages{$package} = $package;
+  $p->{update} = sub {
+    my $p = $m{$hostname}{_packages};
+    if (!%{$p->{installed_packages}}) {
+      open(FH, "/usr/sbin/pkg_info|") or throw LocalFileException "Can't run pkg_info: $!";
+      v "Building list of installed packages";
+      while (<FH>) {
+        chomp;
+        my($package, $extra) = split /\s+/, $_, 2;
+        $p->{installed_packages}{$package} = $package;
+      }
+      close(FH);
     }
-  }
-  my @do_install;
-  foreach my $package (@install) {
-    push @do_install, $package unless grep /^\Q$package\E(?:-.*)?$/, keys %installed_packages;
-  }
-  if (@do_install) {
-    l "Installing packages: ". join(" ", @do_install);
-    command("/usr/sbin/pkg_add", "-r", @do_install);
-  }
+  };
 
-  my @do_remove;
-  foreach my $package (@remove) {
-    push @do_remove, grep { $_ } map { $_ if grep /^\Q$package\E(?:-.*)?$/, $_ }
-        keys %installed_packages;
-  }
-  if (@do_remove) {
+  $p->{install} = sub {
+    my @do_install;
+    foreach my $package (@_) {
+      push @do_install, $package unless grep /^\Q$package\E(?:-.*)?$/, keys
+                        %{$p->{installed_packages}};
+    }
+    return unless @do_install;
+    l "Installing packages: ". join(" ", uniq(@do_install));
+    command("/usr/sbin/pkg_add", "-r", @do_install);
+  };
+
+  $p->{remove} = sub {
+    my @do_remove;
+    foreach my $package (@_) {
+      push @do_remove, grep { $_ } map { $_ if grep /^\Q$package\E(?:-.*)?$/, $_ }
+          keys %{$p->{installed_packages}};
+    }
+    return unless @do_remove;
     l "Removing packages: ". join(" ", @do_remove);
     command("/usr/sbin/pkg_delete", @do_remove);
-  }
+  };
+
+  package_check(@install);
+  package_uncheck(@remove);
 
   # Automatic upgrades are not supported by these package tools
   # TODO(dparrish): Add some kind of port management here
@@ -297,59 +453,70 @@ elsif (i_os("freebsd") && -f "/usr/sbin/pkg_add") {
 # }}}
 # {{{ Gentoo Portage
 elsif (-f "/usr/bin/emerge") {
-  my @do_install;
-  my @do_upgrade;
-  my $basedir = "/usr/portage";
-  foreach my $package (@install) {
-    if (!-d "$basedir/$package") {
-      my @matches = glob("$basedir/*/$package");
-      w "Couldn't find package $package" and next unless @matches;
-      throw ConfigException "Multiple packages found installing '$package', specify category too"
-        if @matches > 1;
-      next unless -d $matches[0];
-      $matches[0] =~ s/^$basedir\/*//;
-      $package = $matches[0];
+  $p->{update} = sub {
+    my $p = $m{$hostname}{_packages};
+    if (!%{$p->{installed_packages}}) {
     }
-    my($category, $shortpackage) = split /\//, $package;
-    open(FH, "<$basedir/$package/Manifest")
-      or throw LocalFileException "Couldn't read $basedir/$package/Manifest: $!";
-    my $latest_version = "";
-    while (<FH>) {
-      next unless /^EBUILD $shortpackage-(.*?)\.ebuild/;
-      $latest_version = $1;
+  };
+
+  $p->{install} = sub {
+    my @do_install;
+    my @do_upgrade;
+    my $basedir = "/usr/portage";
+    foreach my $package (@_) {
+      if (!-d "$basedir/$package") {
+        my @matches = glob("$basedir/*/$package");
+        w "Couldn't find package $package" and next unless @matches;
+        throw ConfigException "Multiple packages found installing '$package', specify category too"
+          if @matches > 1;
+        next unless -d $matches[0];
+        $matches[0] =~ s/^$basedir\/*//;
+        $package = $matches[0];
+      }
+      my($category, $shortpackage) = split /\//, $package;
+      open(FH, "<$basedir/$package/Manifest")
+        or throw LocalFileException "Couldn't read $basedir/$package/Manifest: $!";
+      my $latest_version = "";
+      while (<FH>) {
+        next unless /^EBUILD $shortpackage-(.*?)\.ebuild/;
+        $latest_version = $1;
+      }
+      # Skip installing if the installed version is the latest
+      next if $latest_version && -d "/var/db/pkg/$package-$latest_version";
+
+      if (uniq(glob("/var/db/pkg/$package-*"), glob("/var/db/pkg/*/$package-*"),
+               glob("/var/db/pkg/*/$package")) || -d "/var/db/pkg/$package") {
+        push @do_upgrade, $package;
+      } else {
+        push @do_install, $package;
+      }
     }
-    # Skip installing if the installed version is the latest
-    next if $latest_version && -d "/var/db/pkg/$package-$latest_version";
-
-    if (uniq(glob("/var/db/pkg/$package-*"), glob("/var/db/pkg/*/$package-*"), glob("/var/db/pkg/*/$package")) || -d "/var/db/pkg/$package") {
-      push @do_upgrade, $package;
-    } else {
-      push @do_install, $package;
+    if (@do_install) {
+      l "Installing packages: ". join(" ", uniq(@do_install));
+      command("emerge", uniq(@do_install));
     }
-  }
+    if (@do_upgrade) {
+      l "Upgrading packages: ". join(" ", uniq(@do_upgrade));
+      command("emerge", "-uD", uniq(@do_upgrade));
+    }
+  };
 
-  if (@do_install) {
-    l "Installing packages: ". join(" ", uniq(@do_install));
-    command("emerge", uniq(@do_install));
-  }
-  if (@do_upgrade) {
-    l "Upgrading packages: ". join(" ", uniq(@do_upgrade));
-    command("emerge", "-uD", uniq(@do_upgrade));
-  }
-
-  my @do_remove;
-  foreach my $package (@remove) {
-    my $found;
-    push @do_remove, $found = $package if -d "/var/db/pkg/$package";
-    push @do_remove, map { s!^/var/db/pkg/!!; $_ } grep { /^\/var\/db\/pkg/ }
-                         uniq(glob("/var/db/pkg/$package-*"), glob("/var/db/pkg/*/$package-*"),
-                              glob("/var/db/pkg/*/$package")) unless $found;;
-  }
-
-  if (@do_remove) {
-    l "Removing packages: ". join(" ", uniq(@do_remove));
+  $p->{remove} = sub {
+    my @do_remove;
+    foreach my $package (@_) {
+      my $found;
+      push @do_remove, $found = $package if -d "/var/db/pkg/$package";
+      push @do_remove, map { s!^/var/db/pkg/!!; $_ } grep { /^\/var\/db\/pkg/ }
+                           uniq(glob("/var/db/pkg/$package-*"), glob("/var/db/pkg/*/$package-*"),
+                                glob("/var/db/pkg/*/$package")) unless $found;;
+    }
+    return unless @do_remove;
+    l "Removing packages: ". join(" ", @do_remove);
     command("emerge", "--unmerge", uniq(@do_remove));
-  }
+  };
+
+  package_check(@install);
+  package_uncheck(@remove);
 
   if (c("$hostname/emerge/auto_upgrade")) {
     l "Upgrading all installed packages";
@@ -359,31 +526,43 @@ elsif (-f "/usr/bin/emerge") {
 # }}}
 # {{{ RedHat Enterprise
 elsif (i_os("linux") && i_distro("redhat") && -x "/usr/bin/up2date-nox") {
-  my $cmd = c("$hostname/up2date/command") || "/usr/bin/up2date-nox";
-  my %installed_packages;
-  v "Building list of installed packages";
-  open(FH, "/bin/rpm -q -a --queryformat '%{NAME}\n'|")
-      or throw LocalFileException "Could not run rpm: $!";
-  while (<FH>) {
-    chomp;
-    $installed_packages{$_}++;
-  }
-  close(FH);
+  $p->{update} = sub {
+    my $p = $m{$hostname}{_packages};
+    if (!%{$p->{installed_packages}}) {
+      my %installed_packages;
+      v "Building list of installed packages";
+      open(FH, "/bin/rpm -q -a --queryformat '%{NAME}\n'|")
+          or throw LocalFileException "Could not run rpm: $!";
+      while (<FH>) {
+        chomp;
+        $p->{installed_packages}{$_}++;
+      }
+      close(FH);
+    }
+  };
 
-  my @do_install = grep { !$installed_packages{$_} } @install;;
-  if (@do_install) {
+  $p->{install} = sub {
+    my $cmd = c("$hostname/up2date/command") || "/usr/bin/up2date-nox";
+    my @do_install = grep { !$p->{installed_packages}{$_} } @_;
+    return unless @do_install;
     l "Installing packages: ". join(" ", uniq(@do_install));
-    command($cmd, "-i", uniq(@do_install));
-  }
+    command($cmd, "-i", @do_install);
+  };
 
-  my @do_remove = grep { $installed_packages{$_} } @remove;;
-  if (@do_remove) {
-    l "Removing packages: ". join(" ", uniq(@do_remove));
-    command("rpm", "-e", uniq(@do_remove));
-  }
+  $p->{remove} = sub {
+    my $cmd = c("$hostname/up2date/command") || "/usr/bin/up2date-nox";
+    my @do_remove = grep { $p->{installed_packages}{$_} } @_;
+    return unless @do_remove;
+    l "Removing packages: ". join(" ", @do_remove);
+    command("rpm", "-e", @do_remove);
+  };
+
+  package_check(@install);
+  package_uncheck(@remove);
 
   if (c("$hostname/up2date/auto_upgrade")) {
     l "Upgrading all installed packages";
+    my $cmd = c("$hostname/up2date/command") || "/usr/bin/up2date-nox";
     command($cmd, "-u");
   }
 }

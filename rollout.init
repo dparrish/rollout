@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# chkconfig: - 91 35
+# chkconfig: - 91 35 91
 # description: Starts and stops the Rollout server
 #              #
 # processname: rolloutd
