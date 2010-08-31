@@ -886,10 +886,9 @@ sub file_append {
                              -create => 0 ];
   local $_;
 
-  if (defined $p->{-match} and $p->{-add} !~ /$p->{-match}/) {
-    w "Skipping append of $p->{-file}: '$p->{-match}' does NOT match '$p->{-add}'";
-    return 0;
-  }
+  validate("Incorrect parameters to file_append", $p->{-file} && $p->{-add});
+  validate("Skipping append of $p->{-file}: $p->{-match} does NOT match '$p->{-add}'",
+           defined $p->{-match} and $p->{-add} !~ /$p->{-match}/);
 
   # Only compare first line for multiline $p->{-add}
   my($firstline) = $p->{-add};
@@ -945,6 +944,8 @@ sub file_modify {
   my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
   local $_;
 
+  validate("Incorrect parameters to file_modify", $p->{-file} && @{$p->{-modify} || []});
+
   (-f $p->{-file}) or return l "$p->{-file} does not exist!";
 
   my $fh = new IO::File $p->{-file} or throw LocalFileException "Unable to read $p->{-file}: $!";
@@ -978,6 +979,8 @@ sub file_modify {
 
 sub safe_write {
   my $p = named_params @_, [ -file => undef, -text => undef, -mode => undef, -comment => undef ];
+
+  validate("Incorrect parameters to safe_write", $p->{-file} && $p->{-text});
 
   my($dir, $file) = $p->{-file} =~ /(?:(.*)\/)?(.*)/;
   $p->{-mode} ||= (stat($p->{-file}))[2];
@@ -1017,6 +1020,8 @@ sub safe_write {
 
 sub safe_write_file {
   my $p = named_params @_, [ -file => undef, -text => undef ];
+
+  validate("Incorrect parameters to safe_write_file", $p->{-file} && $p->{-text});
   my $file = $p->{-file};
 
   return 1 if $safe_mode;
@@ -1070,7 +1075,7 @@ sub set_attr {
                              -owner => undef, -group => undef, -flags => {}];
   $p->{-file} ||= $p->{-dir};
   $p->{$_} ||= $p->{-flags}{$_} foreach keys %{$p->{-flags}};
-  validate("set_attr called with no filename",  $p->{-file});
+  validate("set_attr called with no filename", $p->{-file});
   my($mode, $uid, $gid);
 
   for ($p->{-mode}) {
@@ -1190,6 +1195,7 @@ sub text_install {
 sub file_install {
   my $p = named_params @_, [ -file => undef, -src => undef, -cmd => undef, -flags => {},
                              -modify => [] ];
+  validate("Incorrect parameters to file_install", $p->{-file} && $p->{-src});
   my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
   my $srctext;
 
@@ -1230,6 +1236,7 @@ sub file_install {
 
 sub dir_check {
   my $p = named_params @_, [ -dir => undef, -mode => undef, -uid => undef, -gid => undef ];
+  validate("Incorrect parameters to dir_check", $p->{-dir});
   my $flags;
   throw LocalFileException "Existing $p->{-dir} is not a directory" if -e $p->{-dir} && ! -d _;
   return set_attr($p) if -d _;
@@ -1255,6 +1262,7 @@ sub dir_check {
 
 sub symlink_check {
   my $p = named_params @_, [ -src => undef, -dest => undef ];
+  validate("Incorrect parameters to symlink_check", $p->{-src} && $p->{-dest});
   if (-l $p->{-dest}) {
     return 0 if (readlink $p->{-dest}) eq $p->{-src};
     l "Changing target of symlink $p->{-dest} to $p->{-src}";
