@@ -37,7 +37,7 @@ eval {
 
 use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %networks @only_steps
              $rollout_comment $start_time $configfile $configdir $VERSION %m $no_step_labels
-             $validate_mode );
+             $validate_mode $current_step );
 $VERSION = "1.2.0";
 $verbosity = 1;
 $safe_mode = 0;
@@ -66,7 +66,7 @@ Getopt::Long::GetOptions(
 
 # Global variables
 $hostname =~ s/\..*//;
-my(@all_steps, $steps, %steps_code, $current_step);
+my(@all_steps, $steps, %steps_code);
 $configfile ||= "$configdir/rollout.cfg";
 $configfile = "$configdir/$configfile" unless $configfile =~ /^\//;
 my $log = "";

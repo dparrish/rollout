@@ -38,6 +38,9 @@ sub validate_config {
           $d->Indent(0);
           $d->Terse(1);
           $text .= "Config: $global_config_key => ". $d->Dump(). "\n";
+          if ($::current_step) {
+            $text .= "Help: http://sites.dparrish.com/rollout/manual/$::current_step\n";
+          }
         };
         if ($@) {
           $text .= "Unable to print config fragment, install Data::Dumper\n";
