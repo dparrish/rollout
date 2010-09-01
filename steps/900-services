@@ -1,6 +1,36 @@
 #!/usr/bin/perl -w
-# Start or stop services
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+900-services
+
+=head1 DESCRIPTION
+
+Start or stop services and configure them to start or stop on boot.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    service => {
+      # Run httpd
+      httpd => 1,
+      # Run rollout, with custom checks
+      rollout => {
+        status => 1,
+        proc => 'rolloutd',
+        check => "ps auxww | grep -q 'perl .*rolloutd'",
+      },
+      # Don't run postfix
+      postfix => 0,
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 use IO::Dir;
 
 validate_config {

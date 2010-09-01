@@ -1,6 +1,40 @@
 #!/usr/bin/perl -w
-# Build and activate firewall rules
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+950-iptables
+
+=head1 DESCRIPTION
+
+Build and activate firewall rules, using iptables.
+
+This generates a file suitable for loading with C<iptables-restore>. The file contains a set of
+basic default rules that allow acceptable limits of ICMP, allow whatever is specified in the
+C<firewall_accept> block, and reject anything else.
+
+B<WARNING:> If you have I<any> C<firewall_accept> blocks, this step will be enabled. If you don't
+have any blocks that allow your SSH access, your session will be disconnected as soon as you run
+rollout. B<Be careful.>
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    fireweall_accept => [
+      home => '22',
+      any => '80',
+      '192.168.1.0/24' => '53:udp',
+    ],
+    firewall_drop => [
+      '192.168.1.10' => '53:udp',
+    ],
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 
 validate_config {
   firewall_accept => {

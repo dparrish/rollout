@@ -1,5 +1,26 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+002-os-detection
+
+=head1 DESCRIPTION
+
+This step doesn't do any configuration, it's used purely to determine the type of system that
+Rollout is running on. The data from this step is used in other steps.
+
+B<This is a required step and will always be run, no matter what C<skip_steps> configurations or
+C<-o> command line options are specified.>
+
+=head1 EXAMPLE
+
+There is noconfiguration for this step.
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 use POSIX;
 

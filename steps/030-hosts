@@ -1,11 +1,74 @@
 #!/usr/bin/perl -w
-# Update the /etc/hosts file with all hosts in this machine's network
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
 
-# Available skip_steps items:
-#       localhost - Add a localhost entry including the full host name
-#       network - Add entries for every machine in the local network
-#       hosts_append - Add custom hosts_append entries
+030-hosts
+
+=head1 DESCRIPTION
+
+This step configures the /etc/hosts file (or equivalent).
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    domain_name => "sample.com",
+    network => [ "home", "monitoring" ],
+    hosts_append => {
+      '192.168.1.1' => 'gw1',
+      '192.168.1.2' => 'somehost',
+    },
+    extra_localhost => 'foohost',
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item domain_name
+
+This is the domain name for the machine. It will be appended to the hostname when
+it's added to /etc/hosts
+
+=item network
+
+The list of networks this machine belongs to. Every other machine with the same network tag
+will be added to to /etc/hosts, using the primary interface's IP address. This network can also be
+used for firewalling.
+
+=item hosts_append
+
+A list of IP to hostname mappings to add directly to /etc/hosts
+
+=item extra_localhost
+
+Extra hostnames that will be considered 127.0.0.1
+
+=back
+
+=head1 SKIPPABLE STEPS
+
+=over
+
+=item localhost
+
+Add a localhost entry including the full host name
+
+=item network
+
+Add entries for every machine in the local network
+
+=item hosts_append
+
+Add custom hosts_append entries
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 
 validate_config {
   domain_name => {

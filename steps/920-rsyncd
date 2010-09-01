@@ -1,6 +1,36 @@
 #!/usr/bin/perl -w
-# Set up /etc/rsyncd.conf
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+920-rsyncd
+
+=head1 DESCRIPTION
+
+Set up /etc/rsyncd.conf to allow rsync file transfers.
+
+B<NOTE:> This uses the rsync protocol, which is less secure than using rsync over SSH.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    module => {
+      comment => "Test module",
+      path => "/tmp",
+      user => "foouser",
+      password => "foopass",
+      allow => '10.0.0.0/24',
+      chroot => 1,
+      uid => 0,
+      gid => 0,
+      readonly => 1,
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   rsync => {

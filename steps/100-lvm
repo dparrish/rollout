@@ -1,5 +1,100 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+100-lvm
+
+=head1 DESCRIPTION
+
+=over
+
+=item * Build and resize LVM logical volumes
+
+=item * Create filesystems on the logical volumes
+
+=item * Mount logical volumes on startup
+
+=back
+
+B<NOTE:> This step currently doesn't create Volume Groups or Physical Volumes.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    lvm => {
+      vol01 => {
+        # Ext4 filesystem mounted at /mnt/vol01
+        size => '10G',
+        vg => 'vg01',
+        filesystem => 'ext4',
+        mountpoint => '/mnt/vol01',
+        mkfsoptions => '-j',
+        mount_options => 'noatime',
+        mount_order => 3,
+      },
+      vol02 => {
+        # Raw block device
+        size => '100G',
+      },
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+
+=item lvm/C<lv>
+
+Manage the given Logical Volume. If it doesn't exist, it will be created. If it does exist,
+it will be resized to match the options.
+
+=item lvm/C<lv>/size
+
+Set the size of the LV. This can be any size expression that lvcreate understands,
+such as 100M, 1G, 1T, 1P.
+
+=item lvm/C<lv>/vg
+
+Choose which Volume Group the LV will be created on. This is only used at creation
+time.
+
+=item lvm/C<lv>/filesystem
+
+Choose the filesystem which will be created on the LV. If this is not set,
+no filesystem will be created and it will be left as an empty block device. This is only used at
+creation time.
+
+=item lvm/C<lv>/mkfsoptions
+
+Add flags to mkfs when the filesystem is created. This is only used at
+creation time.
+
+Example: -j -L lv01 -O large_file
+
+=item lvm/C<lv>/mountpoint
+
+Choose the local path that the LV will be mounted on. If this is not set,
+the LV will not be mounted.
+
+=item lvm/C<lv>/mount_options
+
+The set of options to mount for the filsystem.
+
+Example: noatime,noexec
+
+=item lvm/C<lv>/mount_order
+
+The order field (the last field in /etc/fstab) which is used to set the
+order that filesystem are mounted and checked at boot time.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 use strict;
 

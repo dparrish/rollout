@@ -1,21 +1,80 @@
 #!/usr/bin/perl -w
-# CVS checkout
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
 
-# Example:
-# cvspass => {
-#   # This gets installed to /root/.cvspass
-#   ':pserver:rollout@cvs.domain:2401/home/cvs' => 'Ahohlasd=',
-# },
-#
-# cvs => {
-#   '/tmp/checkout_dir' => {
-#     module => 'cvs_module',
-#     rev => 'HEAD',
-#     repository => ':pserver:rollout@cvs.domain:2401/home/cvs',
-#     cmd => 'ls -l /tmp/checkout_dir',
-#   },
-# },
+210-cvs
+
+=head1 DESCRIPTION
+
+Check out CVS modules to the local filesystem.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    cvspass => {
+      # This gets installed to /root/.cvspass
+      ':pserver:rollout@cvs.domain:2401/home/cvs' => 'Ahohlasd=',
+    },
+    cvs => {
+      '/tmp/checkout_dir' => {
+        module => 'cvs_module',
+        rev => 'HEAD',
+        repository => ':pserver:rollout@cvs.domain:2401/home/cvs',
+        cmd => 'ls -l /tmp/checkout_dir',
+      },
+    },
+    cvsoptions => {
+      cvs => '-z3 -q',
+      update => '-d -P',
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+
+=item cvs/I<path>
+
+Check out the given module to path.
+
+=item cvs/I<path>/module
+
+The CVS module name that will be checked out.
+
+=item cvs/I<path>/rev
+
+The revision to check out. If this changes, the current checked out version will be updated to match
+the revision specified here..
+
+=item cvs/I<path>/repository
+
+The CVS repository string (CVSROOT environment variable)
+
+=item cvs/I<path>/cmd
+
+A shell command to be run after the checkout or any updates are applied. This
+
+=item command
+
+is run from inside the checked-out directory.
+
+=item cvspass
+
+A list of CVS repositories and the encoded passwords. You can find the passwords for any existing
+repositories in the file ~/.cvspass
+
+=item cvsoptions
+
+Default command line flags for each CVS command.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   cvapass => {

@@ -1,12 +1,27 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
 
-# Example:
-#
-# file_attr => {
-#   '/tmp/foobar' => 0644,
-#   '/tmp/foobar2' => { mode => 0644, uid => 0, gid => 0 },
-# },
+810-file_attr
+
+=head1 DESCRIPTION
+
+Set attributes (owner, group, mode) for files.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    file_attr => {
+      '/tmp/foobar' => 0644,
+      '/tmp/foobar2' => { mode => 0644, uid => 0, gid => 0 },
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   file_attr => {

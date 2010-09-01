@@ -1,15 +1,29 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
-#
-# Example:
-#
-# file_comment => {
-#   '/etc/sysctl.conf' => [ qr/net.ipv6/ ],
-# },
-# file_uncomment => {
-#   '/etc/sysctl.conf' => [ qr/net.ipv4/ ],
-# },
-#
+=head1 NAME
+
+801-file_comment
+
+=head1 DESCRIPTION
+
+Comment or uncomment lines in files. By default, lines will be commented out using C<#>.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    file_comment => {
+      '/etc/sysctl.conf' => [ qr/net.ipv6/ ],
+    },
+    file_uncomment => {
+      '/etc/sysctl.conf' => [ qr/net.ipv4/ ],
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   file_comment => {
@@ -20,7 +34,11 @@ validate_config {
   file_uncomment => {
     type => "hash",
     key => { type => "path", help => "File to uncomment lines in" },
-    value => { type => "string", help => "Regex for each line to uncomment" },
+    value => {
+      type => [ "string", "regex", "list" ],
+      help => "Regex for each line to uncomment",
+      items => { type => [ "string", "regex" ] },
+    },
   },
 };
 

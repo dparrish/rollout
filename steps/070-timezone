@@ -1,5 +1,35 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+070-timezone
+
+=head1 DESCRIPTION
+
+Set the timezone of the machine.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    timezone => "Australia/Sydney",
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item timezone
+
+This should be a file or a directory that exists in C</usr/share/zoneinfo> or
+C</usr/share/lib/zoneinfo>.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   timezone => {

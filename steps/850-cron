@@ -1,13 +1,29 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
-#
-# Example:
-#
-# crontab => {
-#   test_file => [
-#     '* * * * * root ps fax >/dev/null',
-#   ],
-# },
+=head1 NAME
+
+850-cron
+
+=head1 DESCRIPTION
+
+Create and maintain files of crontab entries.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    crontab => {
+      # Create /etc/cron.d/test_file, with the following contents
+      test_file => [
+        '* * * * * root ps fax >/dev/null',
+      ],
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   crontab => {

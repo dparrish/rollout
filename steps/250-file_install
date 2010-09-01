@@ -1,24 +1,75 @@
 #!/usr/bin/perl -w
-# Install files and symlink
 # vim:tw=100 sw=2 expandtab ft=perl
-#
-# Example:
-#
-# file_install => {
-#   '/tmp/dest_file' => {
-#     source => 'rollout:/conf/source_file',
-#     command => 'ls -l /tmp/dest_file',
-#     mode => 0640,
-#     uid => 1000,
-#     gid => 1000,
-#   },
-#   '/tmp/dest_file' => {
-#     text => 'This is some text\n',
-#   },
-# },
-# symlink => {
-#   '/tmp/dest' => '/tmp/source',
-# },
+=head1 NAME
+
+250-file_install
+
+=head1 DESCRIPTION
+
+=over
+
+=item * Downloads and installs files locally
+
+=item * Create and maintain symlinks
+
+=back
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    file_install => {
+      "/tmp/foobar.txt" => {
+        source => "rollout:/files/$hostname/foobar.txt",
+        owner => "root",
+        group => "root",
+        mode => 0600,
+      },
+      "/tmp/foobar3.txt" => {
+        text => "This is some long text\n",
+      },
+    },
+    symlink => {
+      "/tmp/foobar2.txt" => "/tmp/foobar.txt",
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item file_install/I<path>
+
+Download the given file and install it into path.
+
+=item file_install/I<path>/source
+
+The source of the file. This can be a local file, a HTTP url, or a path starting with rollout: which
+will be replaced with the Rollout server's base URL. Either this or text should be specified.
+
+=item file_install/I<path>/text
+
+Raw text to write to the file. Either this or source should be specified.
+
+=item file_install/I<path>/owner
+
+Set the owner. This can be a name or an ID.
+
+=item file_install/I<path>/group
+
+Set the group. This can be a name or an ID.
+
+=item file_install/I<path>/command
+
+Shell command to run after extraction. This command will be run from inside the destination
+directory of the extraction.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   file_install => {

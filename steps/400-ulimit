@@ -1,18 +1,34 @@
 #!/usr/bin/perl
-# Update user/group limits in /etc/security/limits.conf
 # vim:tw=100 sw=2 expandtab ft=perl
-#
-# ulimit => {
-#   user1 => {
-#    nofile => 2048,
-#    maxlogins => 3,
-#    -c => 5000,    # ulimit style parameters supported
-#    stack => { soft => 8192, hard => 16384 }, # different soft and hard limits
-#  },
-#   '@group1' => {
-#    maxlogins => 15,
-#  },
-# },
+=head1 NAME
+
+400-ulimit
+
+=head1 DESCRIPTION
+
+Update user/group limits in C</etc/security/limits.conf>.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    ulimit => {
+      user1 => {
+       nofile => 2048,
+       maxlogins => 3,
+       -c => 5000,    # ulimit style parameters supported
+       stack => { soft => 8192, hard => 16384 }, # different soft and hard limits
+     },
+      '@group1' => {
+       maxlogins => 15,
+     },
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 use strict;
 

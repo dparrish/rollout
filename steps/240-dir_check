@@ -1,10 +1,38 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
-# Example:
-# dir_check => [
-#  [ '/tmp/foobar', 0750 ],
-#  [ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],
-# ],
+=head1 NAME
+
+240-dir_check
+
+=head1 DESCRIPTION
+
+Creates directories with set permissions.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    dir_check => [
+      [ -dir => '/tmp/dir1', -mode => 0777, -uid => 'root', -gid => 'daemon' ],
+      [ '/tmp/dir2', 0777, 'root', 'daemon' ],
+    ],
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item dir_check/path
+
+Create the given directory. Options can be specified either as a set of -
+prefixed options, or a short ordered list.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   dir_check => {

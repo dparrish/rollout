@@ -1,10 +1,62 @@
 #!/usr/bin/perl -w
-# Install SSH keys into root and user's authorized_keys
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
 
-# Available skip_steps items:
-#  root_keys - Update root's ssh authorized_keys
-#  user_keys - Update individual users's ssh authorized_keys
+060-ssh_keys
+
+=head1 DESCRIPTION
+
+Manage SSH keys for users to login without passwords.
+
+See L<http://sites.dparrish.com/rollout/ssh-keys> for more information on using this.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    user => {
+      dparrish => {
+        ssh_keys => [ 'dparrish' ],  # This is implied when a dparrish user exists
+      },
+    },
+    ssh_keys_add => [ 'dparrish', 'testuser', 'adminuser' ],
+  };
+
+=head1 OPTIONS
+
+=over
+
+
+=item user/username/ssh_keys
+
+Add the SSH keys to the user's authorized_keys file. Rollout will automatically
+look for a key with the same name as he user, so that's not required. This is
+for adding other keys, for example to a role account.
+
+=item ssh_keys_add
+
+Add the SSH keys to root's authorized_keys file.
+
+=back
+
+=head1 SKIPPABLE STEPS
+
+=over
+
+=item user_keys
+
+Add keys to individual user's authorized_keys.
+
+=item root_keys
+
+Add keys to root's authorized_keys.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   user => {

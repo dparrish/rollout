@@ -1,7 +1,50 @@
 #!/usr/bin/perl -w
-# Last step to be called
-# Make a record of a Rollout run
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+999-complete
+
+=head1 DESCRIPTION
+
+Log the run in a log file, e.g. /var/log/rollout.log. The contents of the log file should be the
+same as the output given when rollout is run, with the addition of a header at the start of each
+run's output. The header looks like:
+
+ -------------------------------------------------
+ START: Tue Aug 31 17:23:49 2010
+ DURATION: 32
+ COMMENT: No comment specified
+ FROM: 172.16.140.1 42642
+ HOSTNAME: rhel6
+
+B<This is a required step and will always be run, no matter what C<skip_steps> configurations or
+C<-o> command line options are specified.>
+
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    rollout => {
+      logfile => "/var/log/rollout.log",
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item rollout/logfile
+
+Path to log every Rollout run to. If this is not specified, no logging will be done.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 
 if (!$safe_mode) {
   my $end_time = time;

@@ -1,10 +1,31 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
-# Example:
-# pre_pkg_dir_check => [
-#  [ '/tmp/foobar', 0750 ],
-#  [ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],
-# ],
+=head1 NAME
+
+140-pre_pkg_dir_check
+
+=head1 DESCRIPTION
+
+Ensures directories exist, before installing packages.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    pre_pkg_dir_check => [
+     [ '/tmp/foobar', 0750 ],
+     [ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],
+    ],
+  };
+
+=head1 SEE ALSO
+
+L<240-dir_check>
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   dir_check => {

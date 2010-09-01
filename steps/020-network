@@ -1,67 +1,199 @@
 #!/usr/bin/perl -w
-# Configure the network interfaces
 # vim:tw=100 sw=2 expandtab ft=perl
-#
-# This is considered a dangerous operation and will always be run in safe mode
-# unless "-f network" is specified
-#
-# Example:
-# interfaces => {
-#   eth0 => {
-#     primary => 1,
-#     ip => '192.168.1.5',
-#     netmask => '255.255.255.0',
-#     gateway => '192.168.1.1',
-#     mac => '00:50:8d:6d:c6:0c', # If not specified, the OS will choose which int is eth0
-#     routes => {
-#       '10.0.0.1/24' => '192.168.1.1', # Route via a gateway
-#       '10.0.0.0/24' => undef,         # Route directly out this interface
-#     },
-#   },
-#   'eth0:1' => {
-#     family => 'inet6',
-#     method => 'static',
-#     ip => '2002:389:d010:7d00:251:9dff:fe6d:c60c',
-#     netmask => 64,
-#     gateway => '2002:389:d010:7d00',
-#   },
-#   eth1 => {
-#     disabled => 1, # This interface will be added but not enabled
-#     mac => '00:50:8d:6d:c6:0d',
-#   },
-#   ppp0 => {
-#     method => 'ppp',
-#     provider => 'dsl-provider', # A filename in /etc/ppp/peers
-#   },
-#   eth2 =>{
-#     dhcp => 1,
-#     mac => '00:50:8d:6d:c6:0e',
-#     hostname => 'test-client',
-#   },
-#   # Bonding interface created from eth0 & eth1 which should not already be configured
-#   bond0 => {
-#     ip => '192.168.1.5',
-#     netmask => '255.255.255.0',
-#     gateway => '192.168.1.1',
-#     bond => [ 'eth0', 'eth1' ],
-#     multicast => 'no',
-#     stp => 'off',
-#   },
-# },
-# resolver => {   # Optional
-#   timeout => 5,
-#   attempts => 2,
-# },
-#
-# Available skip_steps items:
-#  interface - Configure any interfaces
-#  bond - Configure bonding interfaces
-#  bridge - Configure bridging interfaces
-#  routes - Add static routes
-#  resolvconf - Add name servers and resolv options
-#  hostname - Set local hostname
-#  domain_name - Set local domain name
-#  iftab - Add mac address <-> interface name mapping
+=head1 NAME
+
+020-network
+
+=head1 DESCRIPTION
+
+This step configures networking:
+
+=over 4
+
+=item * Configure all interfaces, statically or with DHCP
+
+=item * Add static routes
+
+=item * Modify C</etc/resolv.conf> with nameservers and resolver options
+
+=item * Set the local hostname and domain name
+
+=back
+
+This is a I<dangerous step>. It will no make any changes to your system unless forced, using the
+C<-f network> command line parameter. This is to ensure that running rollout with the default
+options won't make your system inaccessable.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    interfaces => {
+      eth0 => {
+        primary => 1,
+        ip => '192.168.1.5',
+        netmask => '255.255.255.0',
+        gateway => '192.168.1.1',
+        mac => '00:50:8d:6d:c6:0c', # If not specified, the OS will choose which int is eth0
+        routes => {
+          '10.0.0.1/24' => '192.168.1.1', # Route via a gateway
+          '10.0.0.0/24' => undef,         # Route directly out this interface
+        },
+      },
+      'eth0:1' => {
+        family => 'inet6',
+        method => 'static',
+        ip => '2002:389:d010:7d00:251:9dff:fe6d:c60c',
+        netmask => 64,
+        gateway => '2002:389:d010:7d00',
+      },
+      eth1 => {
+        disabled => 1, # This interface will be added but not enabled
+        mac => '00:50:8d:6d:c6:0d',
+      },
+      ppp0 => {
+        method => 'ppp',
+        provider => 'dsl-provider', # A filename in /etc/ppp/peers
+      },
+      eth2 =>{
+        dhcp => 1,
+        mac => '00:50:8d:6d:c6:0e',
+        hostname => 'test-client',
+      },
+      # Bonding interface created from eth0 & eth1 which should not already be configured
+      bond0 => {
+        ip => '192.168.1.5',
+        netmask => '255.255.255.0',
+        gateway => '192.168.1.1',
+        bond => [ 'eth0', 'eth1' ],
+        multicast => 'no',
+        stp => 'off',
+      },
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item interfaces/I<int>/primary
+
+This is the primary interface for the client. This address will be used for all operations on other
+clients when talking to this system.
+
+=item interfaces/I<int>/ip
+
+The IP address for this interface. Either this or dhcp is normally required for every interface.
+This can be an IPv4 or IPv6 address.
+
+=item interfaces/I<int>/netmask
+
+The network netmask for this interface. This should be specified if C<ip> is.
+
+=item interfaces/I<int>/gateway
+
+Set the default route out this interface via this given router IP.
+
+=item interfaces/I<int>/disabled
+
+If set, the interface will be configured, but set to not start on startup. This is useful for
+dynamically enabled interfaces such as dialup.
+
+=item interfaces/I<int>/mac
+
+Force this interface to be the one with the given MAC address. Many systems will dynamically assign
+interface numbers based on the order they are initialized. Using this option, interfaces will always
+have the correct name when hardware is changed.
+
+=item interfaces/I<int>/routes
+
+Add specific host or network routes via this interface.
+
+=item interfaces/I<int>/mac
+
+Force this interface to be the one with the given MAC address. Many systems will dynamically assign
+interface numbers based on the order they are initialized. Using this option, interfaces will always
+have the correct name when hardware is changed.
+
+=item interfaces/I<int>/method
+
+Which method to use for configuring the interface. Only C<ppp> is useful here.
+
+=item interfaces/I<int>/provider
+
+The ppp provider to connect to this interface.
+
+=item interfaces/I<int>/dhcp
+
+Configure this interface using DHCP.
+
+=item interfaces/I<int>/hostname
+
+The hostname that will be sent with the DHCP request.
+
+=item interfaces/I<int>/bond
+
+Sets the list of physical devices that will be bonded to create this virtual interface. Only useful
+for bonding interfaces.
+
+=item resolver/timeout
+
+The number of seconds before a DNS request times out.
+
+=item resolver/attempts
+
+The number of times each DNS server will be tried before moving to the next.
+
+=item nameservers
+
+A list of IP address of preferred DNS name servers.
+
+=item domain_name   The local domain name
+
+=back
+
+=head1 SKIPPABLE STEPS
+
+=over
+
+=item interface
+
+Configure network interfaces
+
+=item iftab
+
+Configure logical to physical interface mapping (by MAC address)
+
+=item bond
+
+Configure bonded interfaces
+
+=item bridge
+
+Configure bridging interfaces
+
+=item routes
+
+Add static routes
+
+=item hostname
+
+Set the local hostname
+
+=item domain_name
+
+Set the local domain name
+
+=item resolvconf
+
+Modify /etc/resolv.conf, including name servers and resolver options.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   interfaces => {

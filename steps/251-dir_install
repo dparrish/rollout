@@ -1,17 +1,67 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
-# Example:
-#
-# dir_install => {
-#   '/tmp/test' => {
-#     source => 'rollout:/files/test',
-#     dir_mode => 0755,
-#     mode => 0644,
-#     owner => 'root',
-#     group => 'daemon',
-#     command => "find /tmp/test -ls",
-#   },
-# },
+=head1 NAME
+
+251-dir_install
+
+=head1 DESCRIPTION
+
+Downloads and installs a directory of files locally
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    dir_install => {
+      '/tmp/test' => {
+        source => 'rollout:/files/test',
+        dir_mode => 0755,
+        mode => 0644,
+        owner => 'root',
+        group => 'daemon',
+        command => "find /tmp/test -ls",
+      },
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item dir_install/I<path>
+
+Download the given directory of files and install them into I<path>.
+
+=item dir_install/I<path>/source
+
+The source of the directory. This can be a local file, a HTTP url, or a path starting with C<rollout:> which will be replaced with the Rollout server's base URL.
+
+=item dir_install/I<path>/mode
+
+Set the mode of files.
+
+=item dir_install/I<path>/dir_mode
+
+Set the mode of directories.
+
+=item dir_install/I<path>/owner
+
+Set the owner of files and directories. This can be a name or an ID.
+
+=item dir_install/I<path>/group
+
+Set the group of files and directories. This can be a name or an ID.
+
+=item dir_install/I<path>/command
+
+Shell command to run after extraction. This command will be run from inside the destination directory of the extraction.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   dir_install => {

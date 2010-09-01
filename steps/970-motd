@@ -1,6 +1,39 @@
 #!/usr/bin/perl -w
-# Update /etc/motd
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+970-motd
+
+=head1 DESCRIPTION
+
+Update the Message Of The Day. You can specify a message in each config fragment, and they will be
+appended together.
+
+The first part of the motd is always:
+
+ Updated by rollout at Tue Aug 31 12:08:01 2010 from 172.16.140.1
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    motd => "Have a nice day.",
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item motd
+
+Append this string to the message of the day.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   motd => {

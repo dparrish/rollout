@@ -1,6 +1,29 @@
 #!/usr/bin/perl -w
-# Configure snmpd by building a snmpd.conf file
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+830-snmp
+
+=head1 DESCRIPTION
+
+# Configure snmpd by building a snmpd.conf file
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    snmp => [
+      community => 'foocommunity',
+      community => 'barcommunity',
+      trap => '192.168.1.1 foocommunity',
+      disk => '/dev/hda 90',
+    ],
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   snmp => {

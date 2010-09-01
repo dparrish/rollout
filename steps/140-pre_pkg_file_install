@@ -1,19 +1,37 @@
 #!/usr/bin/perl -w
-# Install files before packages
 # vim:tw=100 sw=2 expandtab ft=perl
-#
-# Example:
-#
-# pre_pkg_file_install => {
-#   '/tmp/dest_file' => {
-#     source => 'rollout:/conf/source_file',
-#     command => 'ls -l /tmp/dest_file',
-#     mode => 0640,
-#     uid => 1000,
-#     gid => 1000,
-#   },
-#   '/tmp/dest_file' => { text => 'This is some text\n' },
-# },
+=head1 NAME
+
+140-pre_pkg_file_install
+
+=head1 DESCRIPTION
+
+Install files before packages
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    pre_pkg_file_install => {
+      '/tmp/dest_file' => {
+        source => 'rollout:/conf/source_file',
+        command => 'ls -l /tmp/dest_file',
+        mode => 0640,
+        uid => 1000,
+        gid => 1000,
+      },
+      '/tmp/dest_file' => { text => 'This is some text\n' },
+    },
+  };
+
+=head1 SEE ALSO
+
+L<250-file_install>
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   pre_pkg_file_install => {

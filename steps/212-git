@@ -1,6 +1,64 @@
 #!/usr/bin/perl -w
-# GIT checkout
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+212-git
+
+=head1 DESCRIPTION
+
+Check out git modules to the local filesystem.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    git => {
+      '/tmp/checkout_path' => {
+        source => 'http://git.domain/module/trunk.git',
+        branch => 'master',
+        clone_options => '',
+        pull_options => '',
+        cmd => 'ls -l',
+      },
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item git/I<path>
+
+Check out the given module to path.
+
+=item git/I<path>/source
+
+The git URL that will be cloned
+
+=item git/I<path>/branch
+
+The branch to check out. If this changes, the current checked out version will be updated to match
+the revision specified here.
+
+=item git/I<path>/cmd
+
+A shell command to be run after the checkout or any updates are applied. This command is run from
+inside the checked-out directory.
+
+=item git/I<path>/clone_options
+
+Any options to add to the git clone command line
+
+=item git/I<path>/pull_options
+
+Any options to add to the git pull command line
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   git => {

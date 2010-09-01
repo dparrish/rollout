@@ -1,5 +1,24 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+450-python
+
+=head1 DESCRIPTION
+
+Install Python eggs using C<easy_install>.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    python => [ "python-setuptools" ],
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   python => {

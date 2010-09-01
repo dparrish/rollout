@@ -1,14 +1,29 @@
 #!/usr/bin/perl -w
-# Modify files according to the file_modify section
 # vim:tw=100 sw=2 expandtab ft=perl
-#
-# Example:
-#
-# file_modify => [
-#   '/etc/updatedb.conf' => [
-#     's/^DAILY_UPDATE=no/DAILY_UPDATE=yes/',  # Run this regex across every line in the file
-#   ],
-# ],
+=head1 NAME
+
+802-file_modify
+
+=head1 DESCRIPTION
+
+Modify files according to the file_modify section
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    file_modify => [
+      '/etc/updatedb.conf' => [
+        # Run this regex replacement across every line in the file
+        's/^DAILY_UPDATE=no/DAILY_UPDATE=yes/',
+      ],
+    ],
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   file_modify => {

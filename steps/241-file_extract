@@ -1,6 +1,54 @@
 #!/usr/bin/perl -w
-# Extract tarballs
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+241-file_extract
+
+=head1 DESCRIPTION
+
+Downloads a tarball and extracts it locally.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    file_extract => {
+      "rollout:/files/bigtarball.tar.gz" => {
+        dest => "/tmp/bigtarball",
+        check => "/tmp/bigtarball/inner_file",
+        cmd => "ls -l",
+      },
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item file_extract/I<tarball>
+
+Download and extract the given tarball locally.
+
+=item file_extract/I<tarball>/dest
+
+Desination directory to extract the tarball to.
+
+=item file_extract/I<tarball>/check
+
+Check the existence of this file before downloading. If this file exists, this
+tarball will be skipped.
+
+=item file_extract/I<tarball>/cmd
+
+Shell command to run after extraction. This command will be run from inside the
+destination directory of the extraction.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   file_extract => {

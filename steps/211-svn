@@ -1,6 +1,76 @@
 #!/usr/bin/perl -w
-# svn checkout
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+211-svn
+
+=head1 DESCRIPTION
+
+Check out Subversion modules to the local filesystem.
+
+You will need to set up subversion authorzation first. Something like this:
+
+  text_install("/root/.subversion/auth/svn.simple/9d08aae7faefae89dbd1349e9496af13", <<EOF);
+  K 8
+  passtype
+  V 6
+  simple
+  K 8
+  password
+  V 8
+  principe
+  K 15
+  svn:realmstring
+  V 53
+  <http://svn.domain:80> My Subversion Repository
+  K 8
+  username
+  V 7
+  rollout
+  END
+  EOF
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    svn => {
+      '/tmp/checkout_path' => {
+        url => 'http://svn.domain/module/path/trunk',
+        rev => 'HEAD',
+        post_cmd => 'ls -l',
+      },
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item svn/I<path>
+
+Check out the given module to path.
+
+=item svn/I<path>/url
+
+The subversion URL that will be checked out.
+
+=item svn/I<path>/rev
+
+The revision to check out. If this changes, the current checked out version will be updated to match
+the revision specified here..
+
+=item svn/I<path>/post_cmd
+
+A shell command to be run after the checkout or any updates are applied.  This command is run from
+inside the checked-out directory.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   svn => {
@@ -33,26 +103,6 @@ store-auth-creds = yes
 global-ignores = *.o *.lo *.la #*# .*.rej *.rej .*~ *~ .#* .DS_Store
 EOF
 
-# You will need to set up subversion authorzation first. Something like this:
-#text_install("/root/.subversion/auth/svn.simple/9d08aae7faefae89dbd1349e9496af13", <<EOF);
-#K 8
-#passtype
-#V 6
-#simple
-#K 8
-#password
-#V 8
-#principe
-#K 15
-#svn:realmstring
-#V 53
-#<http://svn.domain:80> My Subversion Repository
-#K 8
-#username
-#V 7
-#rollout
-#END
-#EOF
 
 while (my($dir, $x) = each(%svn)) {
   w "No module specified for $dir" or next unless $x->{url};

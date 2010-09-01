@@ -1,6 +1,38 @@
 #!/usr/bin/perl -w
-# Add entries to /etc/sysctl.conf
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+200-sysctl
+
+=head1 DESCRIPTION
+
+Add entries to /etc/sysctl.conf
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    sysctl => {
+      'net.ipv4.tcp_syncookies' => 1,
+      'net.ipv4.conf.all.accept_source_route' => 0,
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item sysctl
+
+Add or replace the given entries in /etc/sysctl.conf. After adding, they will be run.
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 
 validate_config {
   sysctl => {

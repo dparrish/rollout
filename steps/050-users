@@ -1,6 +1,105 @@
 #!/usr/bin/perl -w
-# This step creates system users and groups
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+050-users
+
+=head1 DESCRIPTION
+
+Add, remove and modify users and groups.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    user => {
+      testuser => {
+        name => "Full User Name",
+        uid => 1000,
+        gid => 1000,
+        groups => ["testgroup", "wheel"],
+        password => '12345',       # Preferably specify a MD5 encoded password instead of plaintext
+        force_password => 1,       # Reset the password if it's changed on the system
+        home => "/home/testuser",  # Create home directory here
+        shell => "/bin/bash",
+        ssh_keys => ["testuser"],
+        homedir_mode => 0750,
+      },
+      baduser => undef,  # Remove this user
+    },
+    group => {
+      testgroup => {
+        gid => 998,
+      },
+      badgroup => undef,  # Remove this group
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+
+=item user/C<username>
+
+Configure a user with this username. If the value is undef, the user will be deleted.
+
+=item user/C<username>/name
+
+The full name (GECOS field) for the user
+
+=item user/C<username>/uid
+
+Force the user ID, otherwise it will be assigned by the system when the user is created.
+
+=item user/C<username>/gid
+
+Force the group ID, otherwise it will be assigned by the system when the user is created.
+
+=item user/C<username>/groups
+
+A list of extra groups that the user should be a member of
+
+=item user/C<username>/home
+
+Create a home directory at this location for the user. The permissions will be set according to the
+homedir_mode option, but the owner will always be this user.
+
+=item user/C<username>/ssh_keys
+
+A list of SSH key names that will be allowed to connect as this user without using a password. See
+http://sites.dparrish.com/rollout/ssh-keys for details on this option.
+
+=item group/C<groupname>/gid
+
+Force the group ID, otherwise it will be assigned by the system when the group is created.
+
+=back
+
+=head1 SKIPPABLE STEPS
+
+=over
+
+
+=item groups
+
+Configure groups
+
+=item users
+
+Configure users
+
+=item force_password
+
+Reset passwords if they have been changed
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 
 # Available skip_steps items:
 #  users - Create and update user entries
@@ -116,7 +215,7 @@ if (i_should("users") && %users) {
       } elsif (i_os("freebsd")) {
         next if $safe_mode;
         open(FH, "|adduser -q -f");
-        print FH join(":", 
+        print FH join(":",
           $username,
           $user->{uid} || "",
           $user->{gid} || "",
@@ -182,7 +281,7 @@ if (i_should("users") && %users) {
             $username
           );
         } elsif (i_os("freebsd")) {
-          command("pw", "usermod", $username, 
+          command("pw", "usermod", $username,
             ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
             ($user->{gid} ? ("-g", $user->{gid}) : ()),
             ($user->{groups} ? ("-G", join(",", @{$user->{groups}})) : ()),

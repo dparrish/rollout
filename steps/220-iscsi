@@ -1,5 +1,48 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+220-iscsi
+
+=head1 DESCRIPTION
+
+Configure iSCSI targets.
+
+Currently works only on Debian / Ubuntu.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    iscsi => {
+      startup => 1,
+      initiator => "initiatorname",
+      targets => {
+        footarget => '192.168.1.5',
+        bartarget => '192.168.1.6:3260',
+      },
+    }
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
+validate_config {
+  iscsi => {
+    type => "options",
+    options => {
+      startup => { type => "boolean" },
+      initiator => { type => "string" },
+      targets => {
+        type => "hash",
+        key => { type => "string" },
+        value => { type => "string" },
+      },
+    },
+  },
+};
 
 return unless i_has("iscsi");
 validate("Only works on Debian / Ubuntu currently", i_os("debian", "ubuntu"));

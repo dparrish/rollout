@@ -1,6 +1,37 @@
 #!/usr/bin/perl -w
-# Configure S.M.A.R.T.
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+820-smart
+
+=head1 DESCRIPTION
+
+Configure S.M.A.R.T. monitoring of the local disks
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    smart_disks => [
+      hda1 => "ide",
+      hda2 => "ide",
+    ],
+  };
+
+=head1 SKIPPABLE STEPS
+
+=over
+
+=item smart
+
+Enable S.M.A.R.T monitoring
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   smart_disks => {
@@ -16,8 +47,7 @@ validate_config {
   },
 };
 
-return if i_has('no_smart');
-return unless i_has("smart_disks");
+return unless i_should('smart') && i_has("smart_disks");
 
 my $text;
 foreach (i_isa_fetchall("smart_disks")) {

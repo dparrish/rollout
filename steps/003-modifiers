@@ -1,5 +1,26 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+003-modifiers
+
+=head1 DESCRIPTION
+
+This step doesn't do any configuration, it's used to download the modification code that will be
+used by later steps..
+
+B<This is a required step and will always be run, no matter what C<skip_steps> configurations or
+C<-o> command line options are specified.>
+
+=head1 EXAMPLE
+
+There is no configuration for this step.
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 sub config_file {
   my $p = named_params @_, [ -file => undef, -sections => undef, -cmd => undef, -type => "ini",

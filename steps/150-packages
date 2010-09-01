@@ -1,15 +1,160 @@
 #!/usr/bin/perl -w
-# Install all required packages
 # vim:tw=100 sw=2 expandtab ft=perl
-#
-# Available skip_steps items:
-#  apt_sources - Configure apt repositories
-#  deb_options - Preconfigure .deb options before installation
-#  install - Install packages
-#  remove - Remove packages
-#
-# Example:
-# packages => [ 'package1', 'package2' ],
+=head1 NAME
+
+150-packages
+
+=head1 DESCRIPTION
+
+=over
+
+=item * Install new packages
+
+=item * Remove packages that are not required
+
+=item * Updgrade specific packages
+
+=item * Upgrade all installed packages
+
+=back
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    packages => [ "zsh", "cvs", "rcs" ],
+    packages_remove => [ "svn", "git" ],
+
+    apt => {
+      repos => [
+        'deb http://archive.debian.org/debian/ etch main',
+        'deb-src http://archive.debian.org/debian/ etch main',
+      ],
+      always_check => 1,
+      auto_upgrade => 1,
+    },
+
+    yum => {
+      repos => {
+        epel => {
+          name => 'Extra Packages for Enterprise Linux 5 - $basearch',
+          mirrorlist => 'http://mirrors.fedoraproject.org/mirrorlist?repo=epel-5&arch=$basearch',
+          failovermethod => 'priority',
+          enabled => 1,
+          gpgcheck => 0,
+        },
+      },
+      always_check => 1,
+      auto_upgrade => 1,
+    },
+
+    pkgutil => {
+      auto_upgrade => 1,
+    },
+
+    emerge => {
+      auto_upgrade => 1,
+    },
+
+    up2date => {
+      auto_upgrade => 1,
+      command => "/usr/bin/up2date-nox",
+    },
+  };
+
+  $m{machine1} => {
+    ISA => { Sample => 1 },
+    # This specific machine uses csh instead of zsh
+    packages => [ "csh" ],
+    skip_steps => [ "install-zsh" ],
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item packages
+
+Install the given list of packages. If the packages are already installed, they will be upgraded.
+
+=item packages_remove
+
+Uninstall the given list of packages
+
+=item apt/repos
+
+Add the set of apt repositories to C</etc/apt/sources.list.d/rollout.list>.
+
+=item apt/auto_upgrade
+
+Automatically upgrade all installed packages using apt
+
+=item apt/always_check
+
+Always download the latest lists of available packages using C<apt-get update>. This is normally
+done daily by a cron job, but you can set this to C<1> if you want to make sure you always have the
+latest package lists when Rollout is run.
+
+=item yum/repos
+
+Add the set of YUM repositories to C</etc/yum.repos.d/rollout.repo>.
+
+=item yum/auto_upgrade
+
+Automatically upgrade all installed packages using YUM
+
+=item yum/always_check
+
+Always download the latest lists of available packages using C<yum makecache>.  This is normally
+done daily by a cron job, but you can set this to C<1> if you want to make sure you always have the
+latest package lists when Rollout is run.
+
+=item pkgutil/auto_upgrade
+
+Automatically upgrade all installed packages using pkgutil
+
+=item emerge/auto_upgrade
+
+Automatically upgrade all installed packages using emerge
+
+=item up2date/auto_upgrade
+
+Automatically upgrade all installed packages using up2date
+
+=item up2date/command
+
+Set the command that is used for up2date operations. By default this is C</usr/bin/up2date-nox>.
+
+=back
+
+=head1 SKIPPABLE STEPS
+
+=over
+
+
+=item install
+
+Install any packages
+
+=item install-I<package>
+
+Install a specific package. This can be used to prevent a specific package being installed on a
+limited set of machines.
+
+=item remove
+
+Remove any packages
+
+=item remove-I<package>
+
+Remove a specific package
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   packages => {

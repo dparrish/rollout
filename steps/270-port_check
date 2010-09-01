@@ -1,6 +1,32 @@
 #!/usr/bin/perl -w
-# Add ports to /etc/services
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+270-port_check
+
+=head1 DESCRIPTION
+
+Add a list of port <-> service name mappings to /etc/services.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    port_check => [
+      svc1 => 1000,
+      svc2 => '1000:tcp',  # TCP is default if not specified
+      svc3 => {
+        comment => 'Generic UDP Service',
+        port => '1001:udp',
+      },
+    ],
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 
 validate_config {
   port_check => {

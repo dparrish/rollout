@@ -1,17 +1,35 @@
 #!/usr/bin/perl -w
-# Set up both NFS shares and NFS mounts
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
 
-# Example:
-# nfs_share => {
-#   '/home' => { hostname => 'rw,root_squash,no_subtree_check,async,fsid=0,crossmnt' },
-#   '/r1' => { Class_Name => 'ro,root_squash,no_subtree_check,async,fsid=1,crossmnt' },
-#   '/r2' => { network => 'ro,root_squash,no_subtree_check,async,fsid=2,crossmnt' },
-# },
-# nfs_mount => {
-#   '/r1' => 'fileserver:/r1',
-#   '/r2' => { path => 'fileserver:/r2', options => [ 'sync' ] },
-# },
+700-nfs
+
+=head1 DESCRIPTION
+
+Set up both NFS shares and NFS mounts.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    nfs_share => {
+      # Share /home to a single host
+      '/home' => { hostname => 'rw,root_squash,no_subtree_check,async,fsid=0,crossmnt' },
+      # Share /home to a class of machines
+      '/r1' => { Class_Name => 'ro,root_squash,no_subtree_check,async,fsid=1,crossmnt' },
+      # Share /home to all machines in a given network
+      '/r2' => { network => 'ro,root_squash,no_subtree_check,async,fsid=2,crossmnt' },
+    },
+    nfs_mount => {
+      '/r1' => 'fileserver:/r1',
+      '/r2' => { path => 'fileserver:/r2', options => [ 'sync' ] },
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
 
 validate_config {
   nfs_share => {
@@ -42,7 +60,11 @@ validate_config {
     },
     value => {
       help => "NFS share to mount (<hostname>:<path>)",
-      type => "string",
+      type => [ "string", "options" ],
+      options => {
+        path => { type => "string" },
+        options => { type => "list", items => { type => "string" } },
+      },
     },
   },
 };

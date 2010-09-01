@@ -1,5 +1,43 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+600-sudo
+
+=head1 DESCRIPTION
+
+Add user and command entries to /etc/sudoers.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    sudo => {
+      username => [ "/bin/ls", "/usr/local/bin/rollout" ],
+      '%admin' => [ "/usr/local/bin/rollout" ],
+      '%wheel' => [ "ALL" ],
+    },
+  };
+
+=head1 OPTIONS
+
+=over
+
+=item wheel_all
+
+Automatically allow the C<%wheel> group to run all commands
+
+=item I<username>
+
+Add this user to sudoers
+
+=back
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 
 validate_config {
   sudo => {

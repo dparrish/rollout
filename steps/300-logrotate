@@ -1,5 +1,33 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+300-logrotate
+
+=head1 DESCRIPTION
+
+Configure log rotation, using C<logadm> or C<logrotate>.
+
+=head1 EXAMPLE
+
+  $m{Sample} = {
+    logrotate => {
+      "/var/log/foo.log" => {
+        daily => 1,  # Could be daily, monthly, weekly, yearly
+        compress => 1,
+        missingok => 1,
+        notifempty => 1,
+        postrotate => "ls -l /var/log/foo.* > /tmp/foologfiles",
+      },
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2010 David Parrish
+
+=cut
+
 
 validate_config {
   logrotate => {
