@@ -52,6 +52,10 @@ validate_config {
         type => "list",
         items => { type => "string" },
       },
+      auto_upgrade => {
+        type => "boolean",
+        help => "Whether all installed packages will be upgraded when Rollout is run",
+      },
       always_check => {
         type => "boolean",
         help => "Always update the local cache before attemping any other ops (slower)",
