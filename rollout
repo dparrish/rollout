@@ -848,13 +848,27 @@ sub step_help {
   };
   eval {
     require Pod::Text;
+    require File::Temp;
   };
   fatal "Could not load Pod::Text module, step help is unavailable: $@" if $@;
-  my $parser = new Pod::Text;
-  my $output;
-  $parser->output_string(\$output);
-  $parser->parse_string_document($steps_code{$filename});
-  l $output, $indent;
+  my($outputfh, $outputfilename) = File::Temp::tempfile();
+  close $outputfh;
+  my($inputfh, $inputfilename) = File::Temp::tempfile();
+  print $inputfh $steps_code{$filename};
+  close $inputfh;
+  try {
+    my $parser = new Pod::Text;
+    $parser->parse_from_file($inputfilename, $outputfilename);
+    open(FH, "<$outputfilename") or fatal "Could not read the expected Pod::Text output file: $!";
+    my $output = join("", <FH>);
+    close(FH);
+    l $output, $indent;
+  } catch Error with {
+    fatal "The Pod::Text module installed does not support parsing from a string. Upgrade Pod::Text, or run perldoc on the Rollout server."
+  } finally {
+    unlink $inputfilename;
+    unlink $outputfilename;
+  };
 }
 
 # Adds a command to be run just before completion
