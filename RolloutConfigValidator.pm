@@ -39,7 +39,7 @@ sub validate_config {
           $d->Terse(1);
           $text .= "Config: $global_config_key => ". $d->Dump(). "\n";
           if ($::current_step) {
-            $text .= "Help: http://sites.dparrish.com/rollout/manual/$::current_step\n";
+            $text .= "Help: Run \"rollout -H $::current_step\"\n";
           }
         };
         if ($@) {
