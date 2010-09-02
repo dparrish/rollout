@@ -196,7 +196,7 @@ sub _setup {
     $use_lwp = 1;
   };
   if ($@) {
-    ::w "Error loading the SSL modules. SSL is disabled. Installing libwww and Net::SSLeay." if $@;
+    ::w "Error loading the SSL modules. SSL is disabled. Install libwww and Net::SSLeay." if $@;
     eval { require Net::HTTP; };
     if ($@) {
       $use_sock = 1;
