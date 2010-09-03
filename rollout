@@ -522,33 +522,6 @@ sub i_isa {
 }
 eval { memoize('i_isa') };
 
-sub i_isa_fetchall {
-  my($class, $m) = @_;
-  my @list;
-  i_iterate($class, sub { push @list, $_[1] }, $m);
-  return @list;
-}
-eval { memoize('i_isa_fetchall') };
-
-sub i_isa_classes {
-  my($class) = @_;
-
-  $class ||= $hostname;
-
-  my %list;
-  return () unless $m{$class};
-
-  foreach (keys %{$m{$class}->{ISA} || {}}) {
-    if ($m{$class}) {
-      $list{$_} = 1 foreach i_isa_classes($_);
-    }
-    $list{$_} = 1;
-  }
-
-  return keys %list;
-}
-eval { memoize('i_isa_classes') };
-
 sub i_ip {
   my($host) = @_;
   foreach (i_isa_fetchall("interfaces", $host)) {

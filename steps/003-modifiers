@@ -250,10 +250,10 @@ sub file_append {
 
 sub file_modify {
   my $p = named_params @_, [ -file => undef, -cmd => undef, -modify => [] ];
-  my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
+  my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : $p->{-modify};
   local $_;
 
-  validate("Incorrect parameters to file_modify", $p->{-file} && @{$p->{-modify} || []});
+  validate("Incorrect parameters to file_modify", $p->{-file} && @expr);
 
   (-f $p->{-file}) or return l "$p->{-file} does not exist!";
 
@@ -265,7 +265,7 @@ sub file_modify {
 
     foreach my $e (@expr) {
       eval $e;
-      throw RolloutException "Regex error in file_modify: $@" if $@;
+      throw RolloutException "Regex error in file_modify '$e': $@" if $@;
     }
 
     $changes++ unless $original eq $_;
@@ -505,7 +505,7 @@ sub file_install {
   my $p = named_params @_, [ -file => undef, -src => undef, -cmd => undef, -flags => {},
                              -modify => [] ];
   validate("Incorrect parameters to file_install", $p->{-file} && $p->{-src});
-  my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : [ $p->{-modify} ];
+  my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : $p->{-modify};
   my $srctext;
 
   $p->{-src} =~ s/^rollout:/$config->{base_url}/;
@@ -515,6 +515,7 @@ sub file_install {
       $_ = http_file -url => $p->{-src};
       foreach my $e (@expr) {
         eval $e;
+        throw RolloutException "Regex error in file_install '$e': $@" if $@;
       }
       $srctext = $_;
     } catch HttpException with {

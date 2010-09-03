@@ -54,7 +54,15 @@ validate_config {
   },
 };
 
-return unless i_isa_fetchall("sudo");
+
+my %sudo;
+my %input = flatten_hash(c("$hostname/sudo"));
+while(my($username, $commands) = each(%input)) {
+  next unless i_should($username);
+  map { $sudo{$username}->{$_}++ } @$commands;
+}
+
+return unless %sudo;
 
 my $text = <<EOF;
 # sudoers file.
@@ -76,14 +84,6 @@ if (i_should("wheel_all")) {
 
 EOF
 }
-
-my %sudo;
-my %input = flatten_hash(c("$hostname/sudo"));
-while(my($username, $commands) = each(%input)) {
-  next unless i_should($username);
-  map { $sudo{$username}->{$_}++ } @$commands;
-}
-
 $text .= "$_ ALL=(ALL) ". join(", ", keys %{$sudo{$_}}). "\n"
   foreach keys %sudo;
 

@@ -80,7 +80,6 @@ validate_config {
 };
 
 return unless -f "/etc/security/limits.conf";
-return unless i_isa_fetchall("ulimit");
 
 my %all_limits = (
   "-c" => "core",

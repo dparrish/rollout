@@ -29,6 +29,20 @@ rollout. B<Be careful.>
     ],
   };
 
+=head1 SKIPPABLE STEPS
+
+=over
+
+=item firewall
+
+Configure the local host-based firewall
+
+=item iptables
+
+Configure the local host-based firewall using iptables
+
+=back
+
 =head1 COPYRIGHT
 
 Copyright 2010 David Parrish
@@ -60,18 +74,26 @@ validate_config {
   },
 };
 
-return if i_has("skip_firewall");
-return unless i_has("firewall_accept") || i_has("firewall_drop") || i_has("firewall_append");
+return unless i_should("firewall") && i_should('iptables');
+my @accept = flatten_list(c("$hostname/firewall_accept"), c("$hostname/firewall_allow"));
+my @drop = flatten_list(c("$hostname/firewall_drop"), c("$hostname/firewall_deny"));
+my @append = flatten_list(c("$hostname/firewall_append"));
+return unless (@accept || @drop || @append);
 
 # Make sure iptables is installed
 if (i_distro("debian", "ubuntu")) {
+  package_check("iptables");
   dir_check("/var/lib/iptables");
   file_modify("/etc/default/iptables", undef,
-              's/enable_autosave=true/enable_autosave=false/',
-              's/enable_save_counters=true/enable_save_counters=false/')
+              [ 's/enable_autosave=true/enable_autosave=false/',
+                's/enable_save_counters=true/enable_save_counters=false/' ])
     if -f "/etc/default/iptables";
-} elsif (i_distro("redhat")) {
+}
+elsif (i_distro("redhat")) {
   package_check("iptables");
+}
+else {
+  w "Don't know how to manage iptables on ". i_os(). " ". i_distro();
 }
 
 my @rules;
@@ -97,39 +119,34 @@ push @rules, (
 push @rules, "-A INPUT -p udp --sport bootps -j DROP" unless i_isa("Dhcp_Server");
 
 sub add_rules {
-  my($action, @r) = @_;
-  foreach (@r) {
-    for (my $i = 0; $i < @$_; $i += 2) {
-      my($source, $port) = ($_->[$i], $_->[$i + 1]);
-      if ($source =~ /^#/) {
-        push @rules, $source;
-        $i--;
-        next;
-      }
-      my $proto = "tcp";
-      $proto = $1 if ($port =~ s/:(udp|tcp)$//);
-
-      my @hosts = $source eq 'any' ? () : expand_network($source);
-      if ($source ne 'any' && $source =~ /[a-zA-Z]/ && !@hosts) {
-        # Class name, skip it
-        w "Can't expand network $source" and next if $source =~ /^[A-Z]/;
-        # All lower case, assume it's a host name
-        @hosts = ($source);
-      }
-      @hosts = (undef) unless @hosts;
-      push @rules, "# $action $port from $source";
-      push @rules, "-A INPUT". ($_ ? " -s $_" : ""). " -p $proto --dport $port -j $action"
-        foreach @hosts;
+  my $action = shift;
+  for (my $i = 0; $i < @_; $i += 2) {
+    my($source, $port) = ($_[$i], $_[$i + 1]);
+    if ($source =~ /^#/) {
+      push @rules, $source;
+      $i--;
+      next;
     }
+    my $proto = "tcp";
+    $proto = $1 if ($port =~ s/:(udp|tcp)$//);
+
+    my @hosts = $source eq 'any' ? () : expand_network($source);
+    if ($source ne 'any' && $source =~ /[a-zA-Z]/ && !@hosts) {
+      # Class name, skip it
+      w "Can't expand network $source" and next if $source =~ /^[A-Z]/;
+      # All lower case, assume it's a host name
+      @hosts = ($source);
+    }
+    @hosts = (undef) unless @hosts;
+    push @rules, "# $action $port from $source";
+    push @rules, "-A INPUT". ($_ ? " -s $_" : ""). " -p $proto --dport $port -j $action"
+      foreach @hosts;
   }
 }
 
-add_rules('DROP', i_isa_fetchall("firewall_drop"));
-add_rules('ACCEPT', i_isa_fetchall("firewall_accept"));
-
-foreach (i_isa_fetchall("firewall_append")) {
-  push @rules, @$_;
-}
+add_rules('DROP', @drop);
+add_rules('ACCEPT', @accept);
+push @rules, @append;
 
 push @rules, (
   "# Log & Reject everything else",
@@ -137,34 +154,33 @@ push @rules, (
   "-A INPUT -p tcp -j REJECT --reject-with tcp-reset",
   "-A INPUT -p udp -j REJECT --reject-with icmp-port-unreachable",
   "-A INPUT -j REJECT",
-#  "-A INPUT -j DROP",
   "# Don't forward anything",
   "-A FORWARD -j DROP",
   "COMMIT",
 );
 
-if (i_has("firewall_nat_append")) {
-  push @rules, (
+my @nat_append = flatten_list(c("$hostname/firewall_nat_append"));
+if (@nat_append && i_should("firewall_nat_append")) {
+  push @rules,
     "*nat",
     ":PREROUTING ACCEPT [0:0]",
     ":POSTROUTING ACCEPT [0:0]",
     ":OUTPUT ACCEPT [0:0]",
-  );
-  push @rules, @$_ foreach (i_isa_fetchall("firewall_nat_append"));
-  push @rules, "COMMIT";
+    @nat_append,
+    "COMMIT";
 }
 
-if (i_has("firewall_mangle_append")) {
-  push @rules, (
+my @mangle_append = flatten_list(c("$hostname/firewall_mangle_append"));
+if (@mangle_append && i_should("firewall_mangle_append")) {
+  push @rules,
     "*mangle",
     ":PREROUTING ACCEPT [0:0]",
     ":INPUT ACCEPT [0:0]",
     ":FORWARD ACCEPT [0:0]",
     ":OUTPUT ACCEPT [0:0]",
     ":POSTROUTING ACCEPT [0:0]",
-  );
-  push @rules, @$_ foreach (i_isa_fetchall("firewall_mangle_append"));
-  push @rules, "COMMIT";
+    @mangle_append,
+    "COMMIT";
 }
 
 if (i_distro("redhat")) {
