@@ -277,7 +277,7 @@ validate_config {
   },
 };
 
-local $safe_mode = grep(/^network$/, @force_dangerous) ? 0 : 1;
+dangerous_step;
 
 my $changes = 0;
 
@@ -573,7 +573,7 @@ if (i_should("domain_name")) {
 }
 
 if ($safe_mode && $changes) {
-  return l "Network config is considered dangerous, changes won't be applied \nunless you specify ".
-           "the \"-f network\" argument.";
+  w "Network config is considered dangerous, changes won't be applied unless you specify the ".
+    "\"-f network\" argument.";
 }
 

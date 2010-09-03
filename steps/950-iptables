@@ -16,6 +16,10 @@ B<WARNING:> If you have I<any> C<firewall_accept> blocks, this step will be enab
 have any blocks that allow your SSH access, your session will be disconnected as soon as you run
 rollout. B<Be careful.>
 
+This is a I<dangerous step>. It will no make any changes to your system unless forced, using the
+C<-f iptables> command line parameter. This is to ensure that running rollout with the default
+options won't make your system inaccessable.
+
 =head1 EXAMPLE
 
   $m{Sample} = {
@@ -49,7 +53,6 @@ Copyright 2010 David Parrish
 
 =cut
 
-
 validate_config {
   firewall_accept => {
     help => "List of source addresses and destination ports to accept",
@@ -73,6 +76,8 @@ validate_config {
     },
   },
 };
+
+dangerous_step;
 
 return unless i_should("firewall") && i_should('iptables');
 my @accept = flatten_list(c("$hostname/firewall_accept"), c("$hostname/firewall_allow"));
@@ -183,12 +188,17 @@ if (@mangle_append && i_should("firewall_mangle_append")) {
     "COMMIT";
 }
 
+my $changes = 0;
 if (i_distro("redhat")) {
   text_install("/etc/sysconfig/iptables", join("", map { "$_\n" } @rules),
-               "iptables-restore /etc/sysconfig/iptables");
+               "iptables-restore /etc/sysconfig/iptables") and $changes++;
 } elsif (i_distro("debian", "ubuntu")) {
   dir_check("/var/lib/iptables");
   text_install("/var/lib/iptables/active", join("", map { "$_\n" } @rules),
-               "iptables-restore /var/lib/iptables/active");
+               "iptables-restore /var/lib/iptables/active") and $changes++;
 }
 
+if ($safe_mode && $changes) {
+  w "Firewall config is considered dangerous, changes won't be applied unless you specify the ".
+    "\"-f iptables\" argument.";
+}

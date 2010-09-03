@@ -41,6 +41,7 @@ use vars qw( $config $verbosity $safe_mode @skip_steps @force_dangerous %network
 $VERSION = "1.2.0";
 $verbosity = 1;
 $safe_mode = 0;
+my $restore_safe_mode;
 $configdir = "/etc/rollout";
 $no_step_labels = 0;
 $config = {
@@ -706,6 +707,7 @@ my $errors = 0;
 sub run_step {
   my($filename) = @_;
   validate("Attempt to run a step with no filename", $filename);
+  $safe_mode = $restore_safe_mode;
   $current_step = $filename;
   l $filename, 0 unless $no_step_labels;
   try {
@@ -790,6 +792,14 @@ sub queue_code {
 }
 
 # }}}
+
+sub dangerous_step() {
+  $safe_mode = 1;
+  return unless $current_step;
+  $safe_mode = 0 if grep /^\Q$current_step\E$/, @force_dangerous;
+  my(undef, $step_name) = split /-/, $current_step, 2;
+  $safe_mode = 0 if grep /^\Q$step_name\E$/, @force_dangerous;
+}
 
 sub slurp_file($) {
   my $file = shift;
@@ -967,8 +977,10 @@ sub read_config {
 }
 
 sub write_config {
-  text_install(-file => $configfile,
-               -text => join("", map { "$_ = $config->{$_}\n" } keys %$config));
+  eval {
+    text_install(-file => $configfile,
+                 -text => join("", map { "$_ = $config->{$_}\n" } keys %$config));
+  };
 }
 
 # Load some optional modules
@@ -1011,6 +1023,7 @@ Getopt::Long::GetOptions(
   "validate"        => sub { $safe_mode = 1; $validate_mode = 1; $no_step_labels = 1 },
 ) or usage();
 @ARGV = @oldargv;
+$restore_safe_mode = $safe_mode;
 
 try {
   @all_steps = http_index "steps";
