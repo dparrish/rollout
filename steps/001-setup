@@ -229,6 +229,24 @@ foreach my $n (map { $_->{network} } grep { $_->{network} } values %m) {
   }
 }
 
+sub i_isa_classes {
+  my($class) = @_;
+
+  $class ||= $hostname;
+
+  my %list;
+  return () unless $m{$class};
+
+  foreach (keys %{$m{$class}->{ISA} || {}}) {
+    if ($m{$class}) {
+      $list{$_} = 1 foreach i_isa_classes($_);
+    }
+    $list{$_} = 1;
+  }
+
+  return keys %list;
+}
+
 foreach my $d (grep { $m{$_}->{ISA} } keys %m) {
   next unless $m{$d}->{interfaces};
   foreach (i_isa_classes($d)) {
