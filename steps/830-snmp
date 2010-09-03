@@ -39,6 +39,27 @@ validate_config {
 
 return unless i_has("snmp");
 
+my $restart = 0;
+if (i_distro("fedora", "redhat", "centos")) {
+  package_check("net-snmp", "net-snmp-utils") and $restart++;
+}
+elsif (i_distro("debian", "ubuntu")) {
+  package_check("snmp", "snmpd") and $restart++;
+}
+elsif (i_os("freebsd")) {
+  package_check("net-snmp") and $restart++;
+  file_append("/etc/rc.conf.local", 'snmpd_enable="YES"', qr/^snmpd_enable/) and $restart++;
+  file_append("/etc/rc.conf.local", 'snmpd_flags="-a"', qr/^snmpd_flags/) and $restart++;
+  file_append("/etc/rc.conf.local", 'snmpd_conffile="/usr/local/share/snmpd.conf"',
+              qr/^snmpd_conffile/) and $restart++;
+}
+elsif (i_distro("solaris")) {
+  package_check("netsnmp") and $restart++;
+}
+else {
+  w "Don't know how to install snmpd on ". i_os(). " ". i_distro();
+}
+
 my @options = (
   '# SNMPD Configuration file',
   '',
@@ -50,42 +71,102 @@ my @options = (
 );
 
 my $community_counter = 0;
+my $has_trapsink = 0;
 
-foreach (i_isa_fetchall("snmp")) {
-  for (my $i = 0; $i < @$_; $i += 2) {
-    my($key, $value) = ($_->[$i], $_->[$i + 1]);
-    next unless $key && defined $value;
+my @opts = flatten_list(c("$hostname/snmp"));
+for (my $i = 0; $i < @opts; $i += 2) {
+  my($key, $value) = ($opts[$i], $opts[$i + 1]);
+  next unless $key && defined $value;
 
-    if ($key eq 'community') {
-      push @options,
-        "com2sec readonly default $value",
-        "group com_$community_counter v1 readonly",
-        "group com_$community_counter v2c readonly",
-        "group com_$community_counter usm readonly",
-        "access com_$community_counter \"\" any noauth exact all none none";
-      push @options, "trapcommunity $value";
-    } elsif ($key eq 'trap') {
-      # host community [port]
-      push @options, "trapsink $value";
-      push @options, "trap2sink $value";
-      push @options, "informsink $value";
-    } elsif ($key eq 'disk') {
-      next unless $value =~ /^\/\S*\s+([0-9]+)$/;
-      next unless $1 <= 100;
-      push @options, "disk $value";
-    } else {
-      push @options, "$key $value";
-    }
+  if ($key eq 'community') {
+    push @options,
+      "com2sec readonly default $value",
+      "group com_$community_counter v1 readonly",
+      "group com_$community_counter v2c readonly",
+      "group com_$community_counter usm readonly",
+      "access com_$community_counter \"\" any noauth exact all none none";
+    push @options, "trapcommunity $value";
+  } elsif ($key eq 'trap') {
+    # host community [port]
+    push @options, "trapsink $value";
+    push @options, "trap2sink $value";
+    push @options, "informsink $value";
+    $has_trapsink++;
+  } elsif ($key eq 'disk') {
+    next unless $value =~ /^\/\S*\s+([0-9]+)$/;
+    next unless $1 <= 100;
+    push @options, "disk $value";
+  } else {
+    push @options, "$key $value";
   }
 }
 
 if (-f "/etc/default/snmpd") {
   file_modify(-file => "/etc/default/snmpd",
-              -modify => [ 's/^SNMPDOPTS=\'(.*) 127.0.0.1\'/SNMPDOPTS=\'$1\'/' ]);
+              -modify => [ 's/^SNMPDOPTS=\'(.*) 127.0.0.1\'/SNMPDOPTS=\'$1\'/' ]) and $restart++;
 }
 
-if (-f "/etc/init.d/snmpd" && -d "/etc/snmp") {
-  text_install(-file => "/etc/snmp/snmpd.conf", -text => join("\n", @options). "\n",
-               -cmd => "/etc/init.d/snmpd restart", -uid => 'root', -mode => 0600);
+if (i_os("freebsd")) {
+  text_install(-file => "/usr/local/share/snmpd.conf", -text => join("\n", @options),
+               -uid => 'root', -mode => 0600) and $restart++;
+  command("/usr/local/etc/rc.d/snmpd", "restart") if $restart;
+}
+elsif (i_os("solaris")) {
+  text_install(-file => "/opt/csw/share/snmp/snmpd.conf", -text => join("\n", @options),
+               -uid => 'root', -mode => 0600) and $restart++;
+
+  if (-x "/usr/sbin/svcadm") {
+    text_install(-file => "/var/svc/manifest/network/snmpd.xml", -text => <<EOF, -mode => 0444, -group => 'sys', -cmd => "svccfg -v delete snmpd; svccfg -v import /var/svc/manifest/network/snmpd.xml; svcadm enable snmpd");
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<service_bundle type='manifest' name='snmpd'>
+  <service name='network/snmpd' type='service' version='1'>
+    <create_default_instance enabled='false' />
+    <single_instance />
+    <exec_method type='method' name='start' exec='/lib/svc/method/snmpd start' timeout_seconds='60' />
+    <exec_method type='method' name='stop' exec='/lib/svc/method/snmpd stop' timeout_seconds='60' />
+    <stability value='Unstable' />
+    <template>
+      <common_name><loctext xml:lang='C'>SNMP 5.0.9</loctext></common_name>
+      <documentation>
+        <manpage title='snmpd' section='8' manpath='/opt/csw/share/man' />
+      </documentation>
+    </template>
+  </service>
+</service_bundle>
+EOF
+    text_install(-file => "/lib/svc/method/snmpd", -text => <<EOF, -mode => 0744, -group => "bin");
+#!/sbin/sh
+case "\$1" in
+  'start')
+    /opt/csw/sbin/snmpd -c /opt/csw/share/snmp/snmpd.conf
+    ;;
+
+  'stop')
+    pkill -f /opt/csw/sbin/snmpd
+    ;;
+
+  'restart')
+    \$0 stop
+    \$0 start
+    ;;
+
+  *)
+    echo "Usage: \$0 { start | stop | restart }"
+    exit 1
+    ;;
+esac
+EOF
+    symlink_check("/lib/svc/method/snmpd", "/etc/init.d/snmpd");
+    command("svcadm", "restart", "svc:/network/snmpd:default") if $restart++;
+  }
+}
+elsif (-f "/etc/init.d/snmpd" && -d "/etc/snmp") {
+  text_install(-file => "/etc/snmp/snmpd.conf", -text => join("\n", @options),
+               -uid => 'root', -mode => 0600) and $restart++;
+  command("/etc/init.d/snmpd", "restart") if $restart;
+}
+else {
+  w "Don't know how to configure snmpd on ". i_os(). " ". i_distro();
 }
 
