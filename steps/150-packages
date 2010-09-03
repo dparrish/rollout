@@ -283,6 +283,8 @@ my @remove = i_should("remove")
     : ();
 
 return unless @install || @remove;
+my $p = $m{$hostname}{_packages};
+$p->{_done_packages} = 1;
 
 # Check for packages that are to be installed and removed
 foreach my $package (@remove) {
@@ -290,77 +292,6 @@ foreach my $package (@remove) {
     if grep /^\Q$package\E$/, @install;
 }
 
-
-# {{{ Local package installation wrappers
-$m{$hostname}{_packages} ||= {
-  install => undef,
-  remove => undef,
-  update => undef,
-  done_install => {},
-  done_remove => {},
-  installed_packages => {},
-  file => sub {
-    foreach my $filename (@_) {
-      next unless $filename =~ /\.(rpm|deb)$/;
-      my $original_filename = $filename;
-      package_check("rpm") if $1 eq 'rpm';
-
-      if ($filename =~ /^(https?:\/\/|rollout:)/) {
-        eval { require File::Temp };
-        return w "No File::Temp module, cannot create temporary files: $@" if $@;
-        my($fh, $localfilename) = File::Temp::tempfile();
-        $fh->close;
-        http_file($filename, $localfilename);
-        $filename = $localfilename;
-      }
-
-      try {
-        if ($original_filename =~ /\.rpm$/) {
-          command("rpm", "-Uvh", $filename);
-        } else {
-          command("dpkg", "-i", $filename);
-        }
-      } finally {
-        unlink $filename if $original_filename ne $filename;
-      };
-    }
-  },
-};
-my $p = $m{$hostname}{_packages};
-
-sub package_check(@) {
-  my $p = $m{$hostname}{_packages};
-  if (!$p->{install}) {
-    w "Don't know how to manage packages on ". i_os(). " ". i_distro();
-    return 0;
-  }
-
-  if ($p->{file}) {
-    my @p = grep /\.(rpm|deb)$/, @_;
-    $p->{file}->(@p);
-  }
-
-  $p->{update}->() if $p->{update};
-  my @p = grep { !/\.(rpm|deb)$/ && !$p->{done_install}{$_} } @_;
-  $p->{done_install} = {%{$p->{done_install}}, map { $_ => 1 } @_};
-  return 0 unless @p;
-  return $p->{install}->(@p);
-}
-
-sub package_uncheck(@) {
-  my $p = $m{$hostname}{_packages};
-  if (!$p->{remove}) {
-    w "Don't know how to manage packages on ". i_os(). " ". i_distro();
-    return 0;
-  }
-
-  $p->{update}->() if $p->{update};
-  my @p = grep { !$p->{done_remove}{$_} } @_;
-  $p->{done_remove} = {%{$p->{done_remove}}, map { $_ => 1 } @_};
-  return 0 unless @p;
-  return $p->{remove}->(@p);
-}
-# }}}
 # {{{ Apt
 if (-x "/usr/bin/apt-get" && -x "/usr/bin/dpkg") {
   # APT for package installation (Debian / Ubuntu)
