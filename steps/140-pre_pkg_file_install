@@ -60,7 +60,6 @@ my %done_files;
 my %files = flatten_hash(c("$hostname/pre_pkg_file_install"));
 while (my($dest, $f) = each(%files)) {
   next if $done_files{$dest}++;
-  next if i_immutable_file($dest);
   next unless i_should($dest);
   if ($f->{source}) {
     file_install(-file => $dest, -src => $f->{source}, -cmd => $f->{command} || undef,

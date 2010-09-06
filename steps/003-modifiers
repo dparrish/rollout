@@ -198,6 +198,7 @@ sub file_append {
   validate("Incorrect parameters to file_append", $p->{-file} && $p->{-add});
   validate("Skipping append of $p->{-file}: $p->{-match} does NOT match '$p->{-add}'",
            defined $p->{-match} && $p->{-add} =~ /$p->{-match}/);
+  return 0 if i_immutable_file($p->{-file});
 
   # Only compare first line for multiline $p->{-add}
   my($firstline) = $p->{-add};
@@ -254,6 +255,7 @@ sub file_modify {
   local $_;
 
   validate("Incorrect parameters to file_modify", $p->{-file} && @expr);
+  return 0 if i_immutable_file($p->{-file});
 
   (-f $p->{-file}) or return l "$p->{-file} does not exist!";
 
@@ -290,6 +292,7 @@ sub safe_write {
   my $p = named_params @_, [ -file => undef, -text => undef, -mode => undef, -comment => undef ];
 
   validate("Incorrect parameters to safe_write", $p->{-file} && $p->{-text});
+  return 0 if i_immutable_file($p->{-file});
 
   my($dir, $file) = $p->{-file} =~ /(?:(.*)\/)?(.*)/;
   $p->{-mode} ||= (stat($p->{-file}))[2];
@@ -385,6 +388,7 @@ sub set_attr {
   $p->{-file} ||= $p->{-dir};
   $p->{$_} ||= $p->{-flags}{$_} foreach keys %{$p->{-flags}};
   validate("set_attr called with no filename", $p->{-file});
+  return 0 if i_immutable_file($p->{-file});
   my($mode, $uid, $gid);
 
   for ($p->{-mode}) {
@@ -458,6 +462,7 @@ sub text_install {
                              -skip_checksum => undef ];
   validate("text_install called with no filename" => $p->{-file});
   validate("text_install called without text for $p->{-file}", defined $p->{-text});
+  return 0 if i_immutable_file($p->{-file});
 
   my $changed = 1;
 
@@ -505,6 +510,7 @@ sub file_install {
   my $p = named_params @_, [ -file => undef, -src => undef, -cmd => undef, -flags => {},
                              -modify => [] ];
   validate("Incorrect parameters to file_install", $p->{-file} && $p->{-src});
+  return 0 if i_immutable_file($p->{-file});
   my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : $p->{-modify};
   my $srctext;
 
