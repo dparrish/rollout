@@ -71,8 +71,6 @@ my(@all_steps, $steps, %steps_code);
 $configfile ||= "$configdir/rollout.cfg";
 $configfile = "$configdir/$configfile" unless $configfile =~ /^\//;
 my $log = "";
-$rollout_comment = join(" ", @ARGV) || "No comment specified";
-$rollout_comment =~ s/(^['"]|['"]$)//g;
 my $pid = $$;
 
 # Exceptions {{{
@@ -1022,6 +1020,8 @@ Getopt::Long::GetOptions(
   "step_help|H=s"   => \@step_help,
   "validate"        => sub { $safe_mode = 1; $validate_mode = 1; $no_step_labels = 1 },
 ) or usage();
+$rollout_comment = join(" ", @ARGV) || "No comment specified";
+$rollout_comment =~ s/(^['"]|['"]$)//g;
 @ARGV = @oldargv;
 $restore_safe_mode = $safe_mode;
 
