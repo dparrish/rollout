@@ -10,7 +10,7 @@ Configure log rotation, using C<logadm> or C<logrotate>.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     logrotate => {
       "/var/log/foo.log" => {
         daily => 1,  # Could be daily, monthly, weekly, yearly

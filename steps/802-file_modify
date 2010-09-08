@@ -10,7 +10,7 @@ Modify files according to the file_modify section
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     file_modify => [
       '/etc/updatedb.conf' => [
         # Run this regex replacement across every line in the file

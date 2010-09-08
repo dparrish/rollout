@@ -10,7 +10,7 @@ Configure S.M.A.R.T. monitoring of the local disks
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     smart_disks => [
       hda1 => "ide",
       hda2 => "ide",

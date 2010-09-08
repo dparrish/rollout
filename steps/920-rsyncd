@@ -12,7 +12,7 @@ B<NOTE:> This uses the rsync protocol, which is less secure than using rsync ove
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     rsync => {
       testmodule => {
         comment => "Test module",

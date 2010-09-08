@@ -10,7 +10,7 @@ Add, remove and modify users and groups.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     user => {
       testuser => {
         name => "Full User Name",

@@ -22,7 +22,7 @@ options won't make your system inaccessable.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     fireweall_accept => [
       home => '22',
       any => '80',

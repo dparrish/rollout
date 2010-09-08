@@ -10,7 +10,7 @@
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     snmp => [
       community => 'foocommunity',
       community => 'barcommunity',

@@ -10,7 +10,7 @@ Check out CVS modules to the local filesystem.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     cvspass => {
       # This gets installed to /root/.cvspass
       ':pserver:rollout@cvs.domain:2401/home/cvs' => 'Ahohlasd=',

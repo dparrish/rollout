@@ -23,7 +23,7 @@ C<-o> command line options are specified.>
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     rollout => {
       logfile => "/var/log/rollout.log",
     },

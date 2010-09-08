@@ -10,7 +10,7 @@ Add user and command entries to /etc/sudoers.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     sudo => {
       username => [ "/bin/ls", "/usr/local/bin/rollout" ],
       '%admin' => [ "/usr/local/bin/rollout" ],

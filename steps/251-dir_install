@@ -10,7 +10,7 @@ Downloads and installs a directory of files locally
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     dir_install => {
       '/tmp/test' => {
         source => 'rollout:/files/test',

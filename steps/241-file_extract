@@ -10,7 +10,7 @@ Downloads a tarball and extracts it locally.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     file_extract => {
       "rollout:/files/bigtarball.tar.gz" => {
         dest => "/tmp/bigtarball",

@@ -10,7 +10,7 @@ Update user/group limits in C</etc/security/limits.conf>.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     ulimit => {
       user1 => {
        nofile => 2048,

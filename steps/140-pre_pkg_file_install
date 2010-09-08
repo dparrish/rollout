@@ -10,7 +10,7 @@ Install files before packages
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     pre_pkg_file_install => {
       '/tmp/dest_file' => {
         source => 'rollout:/conf/source_file',

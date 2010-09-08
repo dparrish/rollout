@@ -10,7 +10,7 @@ Modify files according to the file_append section
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     file_append => [
       [
         "/etc/aliases",                # The file to change

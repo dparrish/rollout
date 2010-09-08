@@ -20,7 +20,7 @@
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     packages => [ "zsh", "cvs", "rcs" ],
     packages_remove => [ "svn", "git" ],
 
@@ -61,7 +61,7 @@
     },
   };
 
-  $m{machine1} => {
+  device machine1 =>> {
     ISA => { Sample => 1 },
     # This specific machine uses csh instead of zsh
     packages => [ "csh" ],

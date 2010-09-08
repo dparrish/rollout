@@ -20,7 +20,7 @@ B<NOTE:> This step currently doesn't create Volume Groups or Physical Volumes.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     lvm => {
       vol01 => {
         # Ext4 filesystem mounted at /mnt/vol01

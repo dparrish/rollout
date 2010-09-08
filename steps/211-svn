@@ -32,7 +32,7 @@ You will need to set up subversion authorzation first. Something like this:
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     svn => {
       '/tmp/checkout_path' => {
         url => 'http://svn.domain/module/path/trunk',

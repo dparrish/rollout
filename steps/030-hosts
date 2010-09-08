@@ -10,7 +10,7 @@ This step configures the /etc/hosts file (or equivalent).
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     domain_name => "sample.com",
     network => [ "home", "monitoring" ],
     hosts_append => {

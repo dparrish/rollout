@@ -12,7 +12,7 @@ See L<http://sites.dparrish.com/rollout/ssh-keys> for more information on using 
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     user => {
       dparrish => {
         ssh_keys => [ 'dparrish' ],  # This is implied when a dparrish user exists

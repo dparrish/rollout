@@ -15,7 +15,7 @@ The first part of the motd is always:
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     motd => "Have a nice day.",
   };
 

@@ -10,7 +10,7 @@ Add a list of port <-> service name mappings to /etc/services.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     port_check => [
       svc1 => 1000,
       svc2 => '1000:tcp',  # TCP is default if not specified

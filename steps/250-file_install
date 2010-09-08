@@ -16,7 +16,7 @@
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     file_install => {
       "/tmp/foobar.txt" => {
         source => "rollout:/files/$hostname/foobar.txt",

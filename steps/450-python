@@ -10,7 +10,7 @@ Install Python eggs using C<easy_install>.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     python => [ "python-setuptools" ],
   };
 

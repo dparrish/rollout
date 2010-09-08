@@ -10,7 +10,7 @@ Ensures directories exist, before installing packages.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     pre_pkg_dir_check => [
      [ '/tmp/foobar', 0750 ],
      [ -dir => '/tmp/foobar2', -mode => 04755, -uid => 1000 ],

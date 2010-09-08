@@ -10,7 +10,7 @@ Check out git modules to the local filesystem.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     git => {
       '/tmp/checkout_path' => {
         source => 'http://git.domain/module/trunk.git',

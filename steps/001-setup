@@ -19,7 +19,7 @@ C<-o> command line options are specified.>
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     rollout => {
       # A reason for running rollout must be given on the command line
       require_reason => 1,

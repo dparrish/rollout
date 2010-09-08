@@ -10,7 +10,7 @@ Start or stop services and configure them to start or stop on boot.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     service => {
       # Run httpd
       httpd => 1,

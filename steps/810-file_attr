@@ -10,7 +10,7 @@ Set attributes (owner, group, mode) for files.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     file_attr => {
       '/tmp/foobar' => 0644,
       '/tmp/foobar2' => { mode => 0644, uid => 0, gid => 0 },

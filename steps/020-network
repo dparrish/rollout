@@ -26,7 +26,7 @@ options won't make your system inaccessable.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     interfaces => {
       eth0 => {
         primary => 1,

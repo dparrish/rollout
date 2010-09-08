@@ -10,7 +10,7 @@ Creates directories with set permissions.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     dir_check => [
       [ -dir => '/tmp/dir1', -mode => 0777, -uid => 'root', -gid => 'daemon' ],
       [ '/tmp/dir2', 0777, 'root', 'daemon' ],

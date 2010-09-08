@@ -10,7 +10,7 @@ Set the timezone of the machine.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     timezone => "Australia/Sydney",
   };
 

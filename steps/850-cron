@@ -10,7 +10,7 @@ Create and maintain files of crontab entries.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     crontab => {
       # Create /etc/cron.d/test_file, with the following contents
       test_file => [

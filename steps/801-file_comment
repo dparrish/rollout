@@ -10,7 +10,7 @@ Comment or uncomment lines in files. By default, lines will be commented out usi
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     file_comment => {
       '/etc/sysctl.conf' => [ qr/net.ipv6/ ],
     },

@@ -12,7 +12,7 @@ Currently works only on Debian / Ubuntu.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     iscsi => {
       startup => 1,
       initiator => "initiatorname",

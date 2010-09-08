@@ -10,7 +10,7 @@ Set up both NFS shares and NFS mounts.
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     nfs_share => {
       # Share /home to a single host
       '/home' => { hostname => 'rw,root_squash,no_subtree_check,async,fsid=0,crossmnt' },

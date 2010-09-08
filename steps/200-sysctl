@@ -10,7 +10,7 @@ Add entries to /etc/sysctl.conf
 
 =head1 EXAMPLE
 
-  $m{Sample} = {
+  class Sample => {
     sysctl => {
       'net.ipv4.tcp_syncookies' => 1,
       'net.ipv4.conf.all.accept_source_route' => 0,
