@@ -13,15 +13,15 @@
 # fragments/dir1/dir2/file1
 
 # Define the first machine 'demo_testserver'
-$m{demo_testserver} = {
-  ISA => {
-    Demo_RHEL4_i386 => 1,       # It's RHEL4, on i386
-    Demo_Production => 1,       # It's a production machine
-    Demo_Netbackup_Client => 1, # It's a netbackup client. This isn't required because
-                                # 'Production' also inherits this class, but it makes it
-                                # more obvious
-    Demo_Web_Server => 1,       # It's also a web server, although not configured by rollout
-  },
+device demo_testserver => {
+  inherits(
+    Demo_RHEL4_i386,        # It's RHEL4, on i386
+    Demo_Production,        # It's a production machine
+    Demo_Netbackup_Client,  # It's a netbackup client. This isn't required because
+                            # 'Production' also inherits this class, but it makes it
+                            # more obvious
+    Demo_Web_Server,        # It's also a web server, although not configured by rollout
+  ),
   # Define the network interfaces. These aren't applied unless '-f network'
   # is specified on the command line
   interfaces => {
@@ -50,8 +50,8 @@ $m{demo_testserver} = {
 };
 
 # Define the backup server.
-$m{demo_backupserver} = {
-  ISA => { Demo_Debian => 1, Demo_Production => 1 },
+device demo_backupserver => {
+  inherits(Demo_Debian, Demo_Production),
   interfaces => {
     # Create 2 interfaces, one in the admin lan and one in the backup lan
     eth0 => {

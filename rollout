@@ -447,6 +447,36 @@ sub http_index(@) {
 }
 
 #}}}
+# Configuration Definition {{{
+
+sub device(*$) {
+  my($name, $block) = @_;
+  throw ConfigException "Attempt to define device \"$name\" with invalid name. ".
+        "Device names must match /^[a-z][\\w-]+$/" unless $name =~ /^[a-z][\w-]+$/;
+  $m{$name} = $block;
+  $m{$name}{ISA} ||= {};
+}
+
+sub class(*$) {
+  my($name, $block) = @_;
+  throw ConfigException "Attempt to define class \"$name\" with invalid name. ".
+        "Class names must match /^[A-Z][\\w-]+$/" unless $name =~ /^[A-Z][\w-]+$/;
+  $m{$name} = $block;
+  $m{$name}{ISA} ||= {};
+}
+
+sub network(*@) {
+  my($name, @list) = @_;
+  $networks{$name} ||= [];
+  $networks{$name} = [uniq(@{$networks{$name}}, @list)];
+}
+
+sub inherits(*;**********************************************************************************) {
+  my %h = map { $_ => 1 } @_;
+  return (ISA => \%h);
+}
+
+# }}}
 # i_* functions {{{
 
 sub i_iterate {
