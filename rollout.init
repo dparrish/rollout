@@ -6,6 +6,15 @@
 # processname: rolloutd
 # pidfile: /var/run/rolloutd.pid
 
+### BEGIN INIT INFO
+# Provides:          rolloutd
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Run Rollout Server
+# Description:       Enable Rollout Server
+### END INIT INFO
 
 RUN_ON_STARTUP=0
 BASEDIR="/usr/local/rollout"
