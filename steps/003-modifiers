@@ -660,7 +660,7 @@ sub dir_install {
         try {
           my $file = http_file -url => "$p->{-src}/$filename";
           text_install(-file => "$p->{-dest}/$filename", -text => $file, -flags => $p->{-flags},
-                       -skip_checksum => 1, -flags => $p->{-flags})
+                       -skip_checksum => $_->{checksum}, -flags => $p->{-flags})
             && $changed++;
         } catch HttpException with {
           w "Error retrieving $p->{-src}/$filename: ". shift();
