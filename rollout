@@ -553,13 +553,12 @@ eval { memoize('i_isa') };
 
 sub i_ip {
   my($host) = @_;
-  foreach (i_isa_fetchall("interfaces", $host)) {
-    while (my($name, $int) = each(%$_)) {
-      next unless $int->{primary};
-      next unless $int->{gateway};
-      next unless $int->{ip};
-      return $int->{ip};
-    }
+  my %interfaces = flatten_hash(c("$host/interfaces"));
+  while (my($name, $int) = each %interfaces) {
+    next unless $int->{primary};
+    next unless $int->{gateway};
+    next unless $int->{ip};
+    return $int->{ip};
   }
   return undef;
 }
