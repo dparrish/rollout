@@ -645,14 +645,15 @@ sub dir_install {
         if (@stat && $_->{mtime} <= $stat[9] && $_->{size} == $stat[7]) {
           # Same file size and newer locally, check the checksum to see if it should be skipped
           if (@stat && $_->{checksum}) {
+            my $md5;
             eval {
-              my $md5 = Digest::MD5->new->add(slurp_file("$p->{-dest}/$filename"))->hexdigest;
-              if ($md5 && $_->{checksum} && $_->{checksum} eq $md5) {
-                v "Skipping $p->{-src}/$filename -> $p->{-dest}/$filename, it's the same";
-                $changed += set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}});
-                next;
-              }
+              $md5 = Digest::MD5->new->add(slurp_file("$p->{-dest}/$filename"))->hexdigest;
             };
+            if ($md5 && $_->{checksum} && $_->{checksum} eq $md5) {
+              v "Skipping $p->{-src}/$filename -> $p->{-dest}/$filename, it's the same";
+              $changed += set_attr(-file => "$p->{-dest}/$filename", %{$p->{-flags}});
+              next;
+            }
           }
         }
         v "Installing file $p->{-src}/$filename to $p->{-dest}/$filename";
