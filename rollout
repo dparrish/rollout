@@ -120,10 +120,19 @@ package main;
 
 # }}}
 # Logging wrappers {{{
+my $_current_step_for_printing = "";
+sub _print_step_name {
+  return unless $current_step;
+  return if $_current_step_for_printing eq $current_step;
+  $_current_step_for_printing = $current_step;
+  print "$current_step\n";
+}
+
 sub l(@) {
   my($text, $indent) = @_;
   return unless $verbosity && defined $text;
   $indent = 2 unless defined $indent;
+  _print_step_name();
   $indent = " " x $indent;
   my $newtext = $text;
   $newtext =~ s/^/$indent/mg;
@@ -135,6 +144,7 @@ sub l(@) {
 sub w(@) {
   my($text, $indent) = @_;
   return 1 unless $text;
+  _print_step_name();
   $indent = 2 unless defined $indent;
   $indent = " " x $indent;
   my $newtext = $text;
@@ -144,18 +154,19 @@ sub w(@) {
 }
 
 sub fatal(@) {
+  _print_step_name();
   print "------ FATAL ERROR ------\n";
   if ($verbosity >= 3) {
     carp "$_\n" foreach (grep { defined $_ } @_);
   } else {
     print "$_\n" foreach (grep { defined $_ } @_);
   }
-  print "Current Step: $current_step\n" if $current_step;
   exit 1 if $current_step;
   return 1;
 }
 
 sub d($) {
+  _print_step_name() if $verbosity >= 3;
   eval {
     require Data::Dumper;
     return v(Data::Dumper::Dumper(@_)) if $verbosity >= 3;
@@ -736,7 +747,7 @@ sub run_step {
   validate("Attempt to run a step with no filename", $filename);
   $safe_mode = $restore_safe_mode;
   $current_step = $filename;
-  l $filename, 0 unless $no_step_labels;
+  _print_step_name() unless $no_step_labels || $verbosity < 1;
   try {
     $steps_code{$filename} ||= http_file -url => "steps/$filename";
   } catch HttpException with {

@@ -91,7 +91,7 @@ while (my($dir, $x) = each(%git)) {
     dir_check($basedir);
     chdir $basedir or throw LocalFileException "Could not cd to new dir $basedir: $!";
     v "Checking out $x->{source} to $dir";
-    my @cmd = ("git", "clone", );
+    my @cmd = ("git", "clone");
     push @cmd, "--branch", $x->{branch} if $x->{branch};
     push @cmd, @{$x->{clone_options} || []};
     push @cmd, $x->{source}, $dir;
