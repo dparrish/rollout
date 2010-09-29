@@ -756,7 +756,10 @@ sub run_step {
   };
   try {
     eval $steps_code{$filename};
-    $@->throw if $@;
+    if ($@) {
+      $@->throw if ref $@;
+      throw RolloutException "$@";
+    }
   } catch ConfigException with {
     $errors++;
     w "Configuration error in step $filename:\n". shift();
