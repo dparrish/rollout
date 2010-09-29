@@ -564,6 +564,7 @@ eval { memoize('i_isa') };
 
 sub i_ip {
   my($host) = @_;
+  $host ||= $hostname;
   my %interfaces = flatten_hash(c("$host/interfaces"));
   while (my($name, $int) = each %interfaces) {
     next unless $int->{primary};

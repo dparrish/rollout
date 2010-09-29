@@ -12,13 +12,13 @@ Modify files according to the file_append section
 
   class Sample => {
     file_append => [
-      [
-        "/etc/aliases",                # The file to change
-        "root: root\@yourdomain.com",  # The line to add
-        qr/^root/,                     # Replace any lines matching this regex
-        "newaliases",                  # Run this if the file is changed
-        1,                             # Create the file if it doesn't already exist
-      ],
+      {
+        file => "/etc/aliases",               # The file to change
+        add => "root: root\@yourdomain.com",  # The line to add
+        match => qr/^root/,                   # Replace any lines matching this regex
+        cmd => "newaliases",                  # Run this if the file is changed
+        create => 1,                          # Create the file if it doesn't already exist
+      },
     ],
   };
 
@@ -33,10 +33,37 @@ validate_config {
     type => "list",
     items => {
       type => [ "list", "options" ],
-      # TODO(dparrish): Do some proper validation of each entry here
       items => { type => [ "string", "regex" ] },
+      options => {
+        file => { type => "path" },
+        add => { type => "string" },
+        match => { type => "regex" },
+        cmd => { type => "string" },
+        create => { type => "boolean" },
+        pre_hook => { type => "code" },
+        post_hook => { type => "code" },
+      },
     },
   },
 };
 
-file_append(@$_) foreach flatten_list(c("$hostname/file_append"));
+foreach my $entry (flatten_list(c("$hostname/file_append"))) {
+  if (ref $entry eq 'ARRAY') {
+    w "Deprecated use of file_append, should be HASH";
+    file_append(@$entry);
+  } elsif (ref $entry eq 'HASH') {
+    if ($entry->{'pre_hook'}) {
+      local $_ = $entry;
+      if ($entry->{pre_hook}()) {
+        $entry = $_;
+      }
+    }
+    file_append(map { '-'. $_ => $entry->{$_} } keys %$entry);
+    if ($entry->{'post_hook'}) {
+      local $_ = $entry;
+      $entry->{'post_hook'}();
+    }
+  } else {
+    throw ConfigException "Invalid entry type for file_append";
+  }
+}

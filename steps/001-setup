@@ -64,6 +64,53 @@ my $global_safe_mode = $safe_mode;
 # This first step has to be done without safe mode
 local $safe_mode = 0;
 
+# Basic pre_hook closures {{{
+
+sub HookChain {
+  my(@hooks) = @_;
+  return sub {
+    foreach my $hook (@hooks) {
+      $hook->(@_);
+    }
+  }
+}
+
+package HookFactory;
+
+sub template_replace($%) {
+  my($key, %replacements) = @_;
+  return sub {
+    foreach my $x (keys %replacements) {
+      $_->{$key} =~ s/\%$x\%/$replacements{$x}/g;
+    }
+  }
+}
+
+sub expand_network($) {
+  my($key) = @_;
+  return HookChain(expand_ip($key), expand_hostname($key), expand_domain($key));
+}
+
+sub expand_ip($) {
+  my($key) = @_;
+  my $ip = ::i_ip() || "127.0.0.1";
+  return template_replace($key, PRIMARY_IP => $ip);
+}
+
+sub expand_hostname($) {
+  my($key) = @_;
+  return template_replace($key, HOSTNAME => $hostname);
+}
+
+sub expand_domain($) {
+  my($key) = @_;
+  my $domain = ::c($hostname. "/domain_name") || "localdomain";
+  return template_replace($key, DOMAIN => $domain);
+}
+
+package main;
+
+# }}}
 # Retreive and parse configuration {{{
 try {
   my $machines_data = http_file "rollout.cfg";

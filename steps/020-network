@@ -560,7 +560,8 @@ if (i_should("resolvconf")) {
   }
   if (c("$hostname/nameservers")) {
     file_append(-file => "/etc/resolv.conf",
-                -add => join("", map { "nameserver $_\n" } uniq(flatten_list(c("$hostname/nameservers")))),
+                -add => join("", map { "nameserver $_\n" }
+                             uniq(flatten_list(c("$hostname/nameservers")))),
                 -match => qr/^nameserver\b/) && $changes++;
   }
 }
