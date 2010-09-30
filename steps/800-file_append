@@ -22,6 +22,70 @@ Modify files according to the file_append section
     ],
   };
 
+=head1 HOOKS
+
+file_append supports adding custom hooks - blocks of Perl code that are run just before the
+file_append modification is done, and just after a modification is done. You can add a pre_hook and
+a post_hook to each file_append block.
+
+The value must be a CODE ref that takes a single argument - the key of the file_append value to
+modify. The item itself will be localized in $_ inside the closure. You can use this code to modify
+the item before it is run.
+
+Consider the following example:
+
+  file_append => [
+    {
+      file => "/tmp/rollout_time.txt",
+      add => "Current time: ",
+      match => qr/^Current time:/,
+      pre_hook => sub {
+        my($key) = $_;
+        l "The value of \$key before modification is $_->{$key}";
+        $_->{$key} .= asctime(localtime);
+        l "The value of \$key after modification is $_->{$key}";
+      },
+    }
+  ],
+
+When this file_append entry runs, it will append a line to B</tmp/rollout_tmp.txt> that contains the
+current time when the step is run.
+
+There are a set of standard hooks in the HookFactory package that you can use:
+
+=over 4
+
+=item expand_hostname
+
+Replace the token %HOSTNAME% in the string with the current hostname.
+
+=item expand_domain
+
+Replace the token %DOMAIN% in the string with the current domain name (Configured by the
+C<domain_name config key).
+
+=item expand_ip
+
+Replace the token %PRIMARY_IP% in the string with the current primary IP address (Configured by
+the C<networks> config key).
+
+=item template_replace
+
+Replace multiple template values. This function takes a second parameter, a hash of keys to replace
+and their values.
+
+  pre_hook => HookFactory::template_replace("Add", FOOBAR => "foo", BARBAZ => "bar"),
+
+On an input string of C<This %FOOBAR% is really %BARBAZ%> this will output C<This foo is really
+bar>.
+
+=back
+
+You can chain multiple hooks together ysing the HookChain() function. Each argument to this function
+is a closure that will be called in order.
+
+  pre_hook => HookChain(HookFactory::expand_hostname("add"), HookFactory::expand_domain("add")),
+
 =head1 COPYRIGHT
 
 Copyright 2010 David Parrish
