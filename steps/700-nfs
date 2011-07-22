@@ -136,7 +136,7 @@ EOF
 
 my %mounts = flatten_hash(c("$hostname/nfs_mount"));
 if (%mounts) {
-  package_check("nfs-common") if i_os("debian", "ubuntu");
+  package_check("nfs-common") if i_distro("debian", "ubuntu");
 
   while (my($dir, $x) = each(%mounts)) {
     dir_check($dir);
