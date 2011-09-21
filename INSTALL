@@ -2,20 +2,33 @@ Rollout Server installation instructions
 
 
 Server Installation:
+   Required Information:
+      BASEDIR=</base/directoy/for/rolloutd/>
+      USER=<username_rolloutd_will_run_as>
+      GROUP=<groupname_rolloutd_will_run_as>
+      ROLLOUT_SERVER=<resolvable hostname | ip address>
+      ROLLOUTD_PORT=<some port number>
 
 1. You'll need the following perl modules:
    Net::Netmask
    IO::Socket::SSL
 
 2. After extraction, run the following as root:
+   BASEDIR=/usr/local/rollout
+   USER=nobody
+   GROUP=group
    cp rolloutd /usr/local/sbin/rolloutd
    cp rollout.init /etc/init.d/rollout
    cp rollout.default /etc/default/rollout
-   mkdir /usr/local/rollout
+   mkdir -p $BASEDIR
+   mkdir -p $BASEDIR/fragments
+   cp -r steps/ $BASEDIR/
+   cp RolloutConfigValidator.pm $BASEDIR/
+   cp rollout $BASEDIR/
    chmod 750 /usr/local/sbin/rolloutd
    chmod 755 /etc/init.d/rollout
    chmod 600 /etc/default/rollout
-   chown nobody:daemon /usr/local/rollout
+   chown -R $USER:$GROUP $BASEDIR
 
 3. Edit /etc/default/rollout to configure your server
 
@@ -24,23 +37,13 @@ Server Installation:
    ln -s /etc/init.d/rollout /etc/rc3.d/S70rollout
    ln -s /etc/init.d/rollout /etc/rc2.d/S70rollout
 
-5. Copy the default configuration or your own configuration into
-   /usr/local/rollout, or where you have configured teh $BASEDIR variable in
-   step 3.  The required files from the source are:
-   RolloutConfigValidator.pm
-   rollout
-   rollout.cfg
-   steps/*
-   fragments/*
+5. Copy the default configuration (rollout.cfg) or your own configuration into
+   $BASEDIR.
 
 6. Start the server with /etc/init.d/rollout start
-
 
 
 Client Installation:
 
 1. Run rollout on a client, using something like the following:
-   URL=http://rollout.domain:port; wget -O- $URL/rollout | perl - -u $URL -o setup
-
-   Replace "rollout.domain" with the hostname or IP of your rollout server.
-
+   URL=http://$ROLLOUT_SERVER:$ROLLOUTD_PORT; wget -O- $URL/rollout | perl - -u $URL -o setup
