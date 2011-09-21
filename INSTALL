@@ -7,7 +7,7 @@ Server Installation:
    Net::Netmask
    IO::Socket::SSL
 
-2. After extaction, run the following as root:
+2. After extraction, run the following as root:
    cp rolloutd /usr/local/sbin/rolloutd
    cp rollout.init /etc/init.d/rollout
    cp rollout.default /etc/default/rollout
