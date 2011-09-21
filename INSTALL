@@ -25,7 +25,9 @@ Server Installation:
    ln -s /etc/init.d/rollout /etc/rc2.d/S70rollout
 
 5. Copy the default configuration or your own configuration into
-   /usr/local/rollout. The required files from the source are:
+   /usr/local/rollout, or where you have configured teh $BASEDIR variable in
+   step 3.  The required files from the source are:
+   RolloutConfigValidator.pm
    rollout
    rollout.cfg
    steps/*
