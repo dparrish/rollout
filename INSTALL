@@ -3,8 +3,11 @@ Rollout Server installation instructions
 
 Server Installation:
 
-1. After extaction, run the following as root:
+1. You'll need the following perl modules:
+   Net::Netmask
+   IO::Socket::SSL
 
+2. After extaction, run the following as root:
    cp rolloutd /usr/local/sbin/rolloutd
    cp rollout.init /etc/init.d/rollout
    cp rollout.default /etc/default/rollout
@@ -14,21 +17,21 @@ Server Installation:
    chmod 600 /etc/default/rollout
    chown nobody:daemon /usr/local/rollout
 
-2. Edit /etc/default/rollout to configure your server
+3. Edit /etc/default/rollout to configure your server
 
-3. Add required symlinks to /etc/rc?.d/S??rollout to /etc/init.d/rollout:
+4. Add required symlinks to /etc/rc?.d/S??rollout to /etc/init.d/rollout:
    ln -s /etc/init.d/rollout /etc/rc1.d/K20rollout
    ln -s /etc/init.d/rollout /etc/rc3.d/S70rollout
    ln -s /etc/init.d/rollout /etc/rc2.d/S70rollout
 
-4. Copy the default configuration or your own configuration into
+5. Copy the default configuration or your own configuration into
    /usr/local/rollout. The required files from the source are:
    rollout
    rollout.cfg
    steps/*
    fragments/*
 
-5. Start the server with /etc/init.d/rollout start
+6. Start the server with /etc/init.d/rollout start
 
 
 
