@@ -79,9 +79,21 @@ while (my($service, $s) = each(%services)) {
     }
     untie %dir;
   } else {
-    if (-f "/etc/init.d/$service") {
-      system("/etc/init.d/$service status >/dev/null 2>/dev/null");
-      $running = ($? == 0);
+    if (i_distro("debian", "ubuntu")) {
+      $running = lc(qx/service $service status/);
+      if ($running =~ m/$service.*is running/i || $running =~ m/start\/running/i) {
+        $running = 1;
+      } elsif ($running =~ "$service is not running") {
+        $running = 0;
+      } else {
+        $running = 2;
+        l "The status($running) for $service is unknown.";
+      }
+    } else {
+      if (-f "/etc/init.d/$service") {
+        system("/etc/init.d/$service status >/dev/null 2>/dev/null");
+        $running = ($? == 0);
+      }
     }
   }
 
