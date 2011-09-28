@@ -80,7 +80,7 @@ while (my($service, $s) = each(%services)) {
     untie %dir;
   } else {
     if (i_distro("debian", "ubuntu")) {
-      $running = lc(qx/service $service status/);
+      $running = lc(qx/invoke-rc.d $service status/);
       if ($running =~ m/$service.*is running/i || $running =~ m/start\/running/i) {
         $running = 1;
       } elsif ($running =~ "$service is not running") {
