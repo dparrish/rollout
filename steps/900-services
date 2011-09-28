@@ -8,17 +8,44 @@
 
 Start or stop services and configure them to start or stop on boot.
 
+By default this will run startup scripts in /etc/init.d. This can be changed using the B<check>
+option.
+
+The value of B<check> can be either:
+
+=over
+
+=item
+
+A shell commandline which exits with 0 if the job is running or 1 otherwise.
+
+=item
+
+An anonymous subroutine which returns true or false depending on whether the job is running or not.
+
+=back
+
 =head1 EXAMPLE
 
   class Sample => {
     service => {
       # Run httpd
       httpd => 1,
+      # Run snmpd. The default snmp script checks the status of snmptrapd too, which we don't want
+      # to run.
+      snmp => {
+        status => 1,
+        proc => 'snmpd',
+      },
       # Run rollout, with custom checks
       rollout => {
         status => 1,
-        proc => 'rolloutd',
         check => "ps auxww | grep -q 'perl .*rolloutd'",
+      },
+      # Always return "not running" for snmptrapd, and don't try to run it
+      snmptrapd => {
+        status => 0,
+        check => sub { return 0 }.
       },
       # Don't run postfix
       postfix => 0,
@@ -46,7 +73,7 @@ validate_config {
       options => {
         proc => { type => "string", help => "Process name" },
         status => { type => "boolean", help => "Run service?" },
-        check => { type => "string", help => "Script to check process status" },
+        check => { type => [ "string", "code" ], help => "Script to check process status" },
       },
     },
   },
@@ -67,9 +94,14 @@ while (my($service, $s) = each(%services)) {
   }
 
   if ($check) {
-    v "Running check $check";
-    system("$check >/dev/null 2>/dev/null");
-    $running = !$?;
+    if (ref $check eq 'CODE') {
+      v "Running custom check code";
+      $running = $check->();
+    } else {
+      v "Running check $check";
+      system("$check >/dev/null 2>/dev/null");
+      $running = !$?;
+    }
   } elsif ($processname) {
     my %dir;
     tie %dir, 'IO::Dir', "/proc";
@@ -78,11 +110,12 @@ while (my($service, $s) = each(%services)) {
       $running = 1 if $exe =~ /\/$processname$/;
     }
     untie %dir;
-  } else {
-    if (-f "/etc/init.d/$service") {
-      system("/etc/init.d/$service status >/dev/null 2>/dev/null");
-      $running = ($? == 0);
-    }
+  } elsif (-x "/usr/sbin/invoke-rc.d") {
+    system("/usr/sbin/invoke-rc.d $service status >/dev/null 2>/dev/null");
+    $running = ($? == 0);
+  } elsif (-f "/etc/init.d/$service") {
+    system("/etc/init.d/$service status >/dev/null 2>/dev/null");
+    $running = ($? == 0);
   }
 
   v "Status is $running, should be $status";
@@ -100,11 +133,11 @@ while (my($service, $s) = each(%services)) {
     if ($status) {
       # Make sure service is running
       command("update-rc.d", $service, "defaults") unless $running;
-      command("/etc/init.d/$service", "start") unless $running;
+      command("invoke-rc.d", $service, "start") unless $running;
     } else {
       # Make sure service is stopped
       command("update-rc.d", $service, "remove") if $running;
-      command("/etc/init.d/$service", "stop") if $running;
+      command("invoke-rc.d", $service, "stop") if $running;
     }
   } else {
     w "Don't know how to control services";
