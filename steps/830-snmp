@@ -107,12 +107,12 @@ if (-f "/etc/default/snmpd") {
 }
 
 if (i_os("freebsd")) {
-  text_install(-file => "/usr/local/share/snmpd.conf", -text => join("\n", @options),
+  text_install(-file => "/usr/local/share/snmpd.conf", -text => join("", map { "$_\n" } @options),
                -uid => 'root', -mode => 0600) and $restart++;
   command("/usr/local/etc/rc.d/snmpd", "restart") if $restart;
 }
 elsif (i_os("solaris")) {
-  text_install(-file => "/opt/csw/share/snmp/snmpd.conf", -text => join("\n", @options),
+  text_install(-file => "/opt/csw/share/snmp/snmpd.conf", -text => join("", map { "$_\n" } @options),
                -uid => 'root', -mode => 0600) and $restart++;
 
   if (-x "/usr/sbin/svcadm") {
@@ -162,7 +162,7 @@ EOF
   }
 }
 elsif (-f "/etc/init.d/snmpd" && -d "/etc/snmp") {
-  text_install(-file => "/etc/snmp/snmpd.conf", -text => join("\n", @options),
+  text_install(-file => "/etc/snmp/snmpd.conf", -text => join("", map { "$_\n" } @options),
                -uid => 'root', -mode => 0600) and $restart++;
   command("/etc/init.d/snmpd", "restart") if $restart;
 }
