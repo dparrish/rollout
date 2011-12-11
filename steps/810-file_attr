@@ -25,7 +25,7 @@ Copyright 2010 David Parrish
 
 validate_config {
   file_attr => {
-    type => "hash_list",
+    type => "hash",
     key => {
       type => "path",
     },
