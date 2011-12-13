@@ -313,6 +313,8 @@ if (i_should("users") && %users) {
       $user->{gid} ||= $gid;
     }
 
+    $user->{uid} = $user->{uid} || lookup_user($username);
+    $user->{gid} = $user->{gid} || lookup_group($username);
     dir_check(-dir => $user->{home}, -mode => $user->{homedir_mode}, -uid => $user->{uid} || 0,
               -gid => $user->{gid} || 0)
       if $user->{home};
