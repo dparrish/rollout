@@ -124,6 +124,7 @@ while (my($dest, $f) = each(%files)) {
   next unless i_should($dest);
   if ($f->{source}) {
     file_install(-file => $dest, -src => $f->{source}, -cmd => $f->{command} || undef,
+                 -owner => $f->{owner}, -group => $f->{group},
                  -mode => $f->{mode}, -uid => $f->{uid}, -gid => $f->{gid});
   } elsif ($f->{text}) {
     if ($f->{text} =~ /^\n?(\s+)/m) {
@@ -134,6 +135,7 @@ while (my($dest, $f) = each(%files)) {
       foreach (@text) { s/^$strip//; $f->{text} .= "$_\n"; };
     }
     text_install(-file => $dest, -text => $f->{text}, -cmd => $f->{command} || undef,
+                 -owner => $f->{owner}, -group => $f->{group},
                  -mode => $f->{mode}, -uid => $f->{uid}, -gid => $f->{gid});
   }
 }

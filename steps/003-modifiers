@@ -459,6 +459,7 @@ sub set_attr {
 
 sub text_install {
   my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {},
+                             -owner => undef, -group => undef, -uid => undef, -gid => undef,
                              -skip_checksum => undef ];
   validate("text_install called with no filename" => $p->{-file});
   validate("text_install called without text for $p->{-file}", defined $p->{-text});
@@ -508,6 +509,7 @@ sub text_install {
 
 sub file_install {
   my $p = named_params @_, [ -file => undef, -src => undef, -cmd => undef, -flags => {},
+                             -owner => undef, -group => undef, -uid => undef, -guid => undef,
                              -modify => [] ];
   validate("Incorrect parameters to file_install", $p->{-file} && $p->{-src});
   return 0 if i_immutable_file($p->{-file});
