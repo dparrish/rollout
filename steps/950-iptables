@@ -12,6 +12,8 @@ This generates a file suitable for loading with C<iptables-restore>. The file co
 basic default rules that allow acceptable limits of ICMP, allow whatever is specified in the
 C<firewall_accept> block, and reject anything else.
 
+Comments can be added by adding a hash character followed by the comment.
+
 B<WARNING:> If you have I<any> C<firewall_accept> blocks, this step will be enabled. If you don't
 have any blocks that allow your SSH access, your session will be disconnected as soon as you run
 rollout. B<Be careful.>
@@ -23,10 +25,10 @@ options won't make your system inaccessable.
 =head1 EXAMPLE
 
   class Sample => {
-    fireweall_accept => [
-      home => '22',
+    firewall_accept => [
+      home => '22 # ssh',
       any => '80',
-      '192.168.1.0/24' => '53:udp',
+      '192.168.1.0/24' => '53:udp # DNS',
     ],
     firewall_drop => [
       '192.168.1.10' => '53:udp',
@@ -132,8 +134,11 @@ sub add_rules {
       $i--;
       next;
     }
+    my $comment = "";
+    $comment = $1 if ($port =~ s/\s*\#\s*(.*?)\s*$//);
     my $proto = "tcp";
     $proto = $1 if ($port =~ s/:(udp|tcp)$//);
+    my $comment = "";
 
     my @hosts = $source eq 'any' ? () : expand_network($source);
     if ($source ne 'any' && $source =~ /[a-zA-Z]/ && !@hosts) {
@@ -144,7 +149,7 @@ sub add_rules {
     }
     @hosts = (undef) unless @hosts;
     push @rules, "# $action $port from $source";
-    push @rules, "-A INPUT". ($_ ? " -s $_" : ""). " -p $proto --dport $port -j $action"
+    push @rules, "-A INPUT". ($_ ? " -s $_" : ""). " -p $proto --dport $port -j $action". (length($comment) ? " -m comment --comment \"$comment\"" : "")
       foreach @hosts;
   }
 }
