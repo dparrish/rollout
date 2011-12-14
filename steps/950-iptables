@@ -140,7 +140,7 @@ sub add_rules {
     $proto = $1 if ($port =~ s/:(udp|tcp)$//);
     my $comment = "";
 
-    my @hosts = $source eq 'any' ? () : expand_network($source);
+    my @hosts = $source eq 'any' ? () : _expand_network($source);
     if ($source ne 'any' && $source =~ /[a-zA-Z]/ && !@hosts) {
       # Class name, skip it
       w "Can't expand network $source" and next if $source =~ /^[A-Z]/;
