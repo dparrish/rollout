@@ -80,7 +80,7 @@ if (%shares) {
   while (my($dir, $x) = each(%shares)) {
     my %clients;
     while (my($client, $opts) = each(%$x)) {
-      my @c = expand_network($client);
+      my @c = _expand_network($client);
       if (@c) {
         foreach my $ip (@c) {
           $clients{$ip} = $opts;
