@@ -252,8 +252,10 @@ sub _expand_network {
   my @hosts;
 
   foreach my $d (keys %m) {
+    next if $d eq $hostname;
     next unless $m{$d}->{interfaces};
-    next unless $m{$d}->{network} && grep { $_ eq $network } @{$m{$d}->{network}};
+    my @networks = flatten_list(c("$d/network"));
+    next unless @networks && grep { $_ eq $network } @networks;
 
     foreach (values %{$m{$d}->{interfaces}}) {
       push @hosts, $_->{ip} if $_->{ip};
