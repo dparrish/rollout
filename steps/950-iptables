@@ -138,7 +138,6 @@ sub add_rules {
     $comment = $1 if ($port =~ s/\s*\#\s*(.*?)\s*$//);
     my $proto = "tcp";
     $proto = $1 if ($port =~ s/:(udp|tcp)$//);
-    my $comment = "";
 
     my @hosts = $source eq 'any' ? () : _expand_network($source);
     if ($source ne 'any' && $source =~ /[a-zA-Z]/ && !@hosts) {
