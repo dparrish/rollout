@@ -55,6 +55,7 @@ if ($^O eq 'linux') {
     chomp($o->{version} = lc `lsb_release -sr` || 'unknown');
 
     # Specific distribution hacks
+    $o->{distro} = 'debian' if $o->{distro} =~ /^debian/;
     $o->{distro} = 'ubuntu' if $o->{distro} =~ /^ubuntu/;
     $o->{distro} = 'centos' if $o->{distro} =~ /^"?centos/;
     $o->{distro} = 'opensuse' if $o->{distro} =~ /^"?opensuse/;
