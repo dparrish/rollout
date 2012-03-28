@@ -564,12 +564,11 @@ if (i_should("resolvconf")) {
                              uniq(flatten_list(c("$hostname/nameservers")))),
                 -match => qr/^nameserver\b/) && $changes++;
   }
-}
-
-if (i_should("domain_name")) {
-  foreach (c("$hostname/domain_name")) {
-    file_append("/etc/resolv.conf", "search $_", qr/^search /);
-    last;
+  if (i_should("domain_name")) {
+    foreach (c("$hostname/domain_name")) {
+      file_append("/etc/resolv.conf", "search $_", qr/^search /);
+      last;
+    }
   }
 }
 
