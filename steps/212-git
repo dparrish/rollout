@@ -15,8 +15,8 @@ Check out git modules to the local filesystem.
       '/tmp/checkout_path' => {
         source => 'http://git.domain/module/trunk.git',
         branch => 'master',
-        clone_options => '',
-        pull_options => '',
+        clone_options => [],
+        pull_options => [],
         cmd => 'ls -l',
       },
     },
