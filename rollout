@@ -568,7 +568,6 @@ sub i_ip {
   my %interfaces = flatten_hash(c("$host/interfaces"));
   while (my($name, $int) = each %interfaces) {
     next unless $int->{primary};
-    next unless $int->{gateway};
     next unless $int->{ip};
     return $int->{ip};
   }
