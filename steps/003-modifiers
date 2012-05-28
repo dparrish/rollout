@@ -242,8 +242,13 @@ sub file_append {
   safe_write(-file => $p->{-file}, -text => $t);
 
   if (defined $p->{-cmd} && !$safe_mode) {
-    l "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
+    if (ref $p->{-cmd} eq 'CODE') {
+      l "Running perl code to finish install of $p->{-file}";
+      $p->{-cmd}->();
+    } else {
+      l "Running $p->{-cmd} to finish install of $p->{-file}";
+      command($p->{-cmd});
+    }
   }
 
   return 1;
@@ -281,8 +286,13 @@ sub file_modify {
   safe_write(-file => $p->{-file}, -text => $f);
 
   if (defined $p->{-cmd} && !$safe_mode) {
-    l "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
+    if (ref $p->{-cmd} eq 'CODE') {
+      l "Running perl code to finish install of $p->{-file}";
+      $p->{-cmd}->();
+    } else {
+      l "Running $p->{-cmd} to finish install of $p->{-file}";
+      command($p->{-cmd});
+    }
   }
 
   return 1;
@@ -500,8 +510,13 @@ sub text_install {
 
   $changed += set_attr($p);
   if ($changed and defined $p->{-cmd}) {
-    l "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
+    if (ref $p->{-cmd} eq 'CODE') {
+      l "Running perl code to finish install of $p->{-file}";
+      $p->{-cmd}->();
+    } else {
+      l "Running $p->{-cmd} to finish install of $p->{-file}";
+      command($p->{-cmd});
+    }
   }
 
   $changed;
@@ -513,7 +528,7 @@ sub file_install {
                              -modify => [] ];
   validate("Incorrect parameters to file_install", $p->{-file} && $p->{-src});
   return 0 if i_immutable_file($p->{-file});
-  my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : $p->{-modify};
+  my @expr = ref $p->{-modify} eq 'ARRAY' ? @{$p->{-modify}} : $p->{-modify} || ();
   my $srctext;
 
   $p->{-src} =~ s/^rollout:/$config->{base_url}/;
@@ -671,7 +686,15 @@ sub dir_install {
     }
   }
 
-  command($p->{-cmd}) if $changed && $p->{-cmd};
+  if ($changed && $p->{-cmd}) {
+    if (ref $p->{-cmd} eq 'CODE') {
+      l "Running perl code to finish install of $p->{-dest}";
+      $p->{-cmd}->();
+    } else {
+      l "Running $p->{-cmd} to finish install of $p->{-dest}";
+      command($p->{-cmd});
+    }
+  }
   return $changed ? 1 : 0;
 }
 
@@ -710,8 +733,13 @@ sub file_comment_spec {
   l "$p->{-file} changed: commented out ". join(', ', keys %c);
 
   if (defined $p->{-cmd}) {
-    v "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
+    if (ref $p->{-cmd} eq 'CODE') {
+      l "Running perl code to finish install of $p->{-file}";
+      $p->{-cmd}->();
+    } else {
+      l "Running $p->{-cmd} to finish install of $p->{-file}";
+      command($p->{-cmd});
+    }
   }
 
   return $changes;
@@ -749,8 +777,13 @@ sub file_uncomment_spec {
   l "$p->{-file} changed: uncommented ". join(', ', keys %c);
 
   if (defined $p->{-cmd}) {
-    v "Running $p->{-cmd} to finish install of $p->{-file}";
-    command($p->{-cmd});
+    if (ref $p->{-cmd} eq 'CODE') {
+      l "Running perl code to finish install of $p->{-file}";
+      $p->{-cmd}->();
+    } else {
+      l "Running $p->{-cmd} to finish install of $p->{-file}";
+      command($p->{-cmd});
+    }
   }
 
   return $changes;

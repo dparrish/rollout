@@ -73,7 +73,7 @@ validate_config {
     value => {
       type => "options",
       options => {
-        command => { type => "string" },
+        command => { type => [ "string", "code" ] },
         dir_mode => { type => "int", range => [0, 07777], help => "Mode for directories" },
         gid => { type => "int", range => [0, 65535] },
         group => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
