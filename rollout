@@ -397,7 +397,7 @@ sub http_file(@) {
         unlink("$p->{-dest}.$$");
         throw LocalFileException "Error writing to $p->{-dest}.$$: $!";
       }
-      $res += length($chunk);
+      $res = ( $res || 0 ) + length($chunk);
     } else {
       $res .= $chunk;
     }
