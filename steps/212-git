@@ -84,7 +84,8 @@ return unless i_has('git');
 my %git = flatten_hash(c("$hostname/git"));
 package_check("git-core") if keys %git && (c("$hostname/_os_detection/distro") eq 'ubuntu' ||
                                            c("$hostname/_os_detection/distro") eq 'debian');
-while (my($dir, $x) = each(%git)) {
+foreach my $dir (sort(keys %git)) {
+  my $x = $git{$dir};
   if (!-d $dir) {
     # New checkout
     my $basedir = dirname($dir);
