@@ -327,7 +327,7 @@ if (-x "/usr/bin/apt-get" && -x "/usr/bin/dpkg") {
 
       if (c("$hostname/apt/always_check")) {
         v "Updating packages list";
-        command("apt-get", "-q", "update");
+        command("apt-get", "-qq", "update");
       }
     }
   };
