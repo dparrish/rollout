@@ -20,10 +20,10 @@ LWP
 </pre>
 
 1.  Get rollout source, and extract
-<pre>
+```bash
 ROLLOUT_TMP_DIR='/tmp/rollout'
 cd /tmp
-</pre>
+```
   + Using wget
 <pre>
 wget http://github.com/dparrish/rollout/archive/master.tar.gz
