@@ -26,18 +26,18 @@ LWP
 ROLLOUT_TMP_DIR='/tmp/rollout'
 cd /tmp
   ```
-  + Using wget
+  * Using wget
 
-  ```bash
+    ```bash
 wget http://github.com/dparrish/rollout/archive/master.tar.gz
 tar xzf master.tar.gz
 mv rollout-master rollout
-  ```
-  + Using git
+    ```
+  * Using git
 
-  ```bash
+    ```bash
 git clone https://github.com/dparrish/rollout.git
-  ```
+    ```
     
 
 1.  After extraction, run the following commands as root
@@ -77,17 +77,20 @@ ln -s /etc/init.d/rollout /etc/rc2.d/S70rollout
 $BASEDIR.
 
 1.  Decide which webserver to use.
-    + Use rolloutd
-      1.  Start rolloutd
+    * Use rolloutd
 
-    ```bash
+    1.  Start rolloutd
+
+      ```bash
 /etc/init.d/rollout start
-    ```
+      ```
 
-    + Use Apache2
-      1.  Add the following to Apache2 configuration
+    * Use Apache2
+
+    1.  Edit the Apache2 default configuration file
 
       **/etc/apache2/sites-enabled/000-default**
+
       ```apache
 Alias /rollout /app/rollout
 <Directory /app/rollout>
@@ -98,7 +101,7 @@ Alias /rollout /app/rollout
 </Directory>
       ```
 
-      1.  Restart Apache2
+    1.  Restart Apache2
 
       ```bash
 /etc/init.d/apache2 restart
@@ -126,12 +129,12 @@ The following example is the initial setup and configuration on
 a new installation of Ubuntu Server 12.10 32bit
 
 ##Server details
-+ Hostname - **server**
-+ OS - **Linux**
-+ Distribution - **Ubuntu Server 12.10**
-+ Architecture - **i386**
-+ IP Addresses - **10.9.8.1**
-+ Web Server - **Apache2 w/ PHP5**
+* Hostname - **server**
+* OS - **Linux**
+* Distribution - **Ubuntu Server 12.10**
+* Architecture - **i386**
+* IP Addresses - **10.9.8.1**
+* Web Server - **Apache2 w/ PHP5**
 
 I needed to have Apache2 installed for other reasons on this server, and have
 little control over the firewall, so Apache2 was chosen instead of the
@@ -177,7 +180,7 @@ apt-get -y install libapache2-mod-php5 liberror-perl libwww-perl
 vim /etc/apache2/sites-enabled/000-default
   ```
 
-**/etc/apache2/sites-enabled/000-default**
+  **/etc/apache2/sites-enabled/000-default**
 
   ```apache
 Alias /rollout /app/rollout
@@ -200,15 +203,15 @@ Alias /rollout /app/rollout
 The following example is the initial setup on a new installation of a client.
 
 ##Client details
-+ OS - Linux 
-+ Distribution - Ubuntu Server 12.04.1 LTS
-+ Architecture - i386
-+ hostname - client
-+ IP Address - 10.9.8.254
+* OS - Linux 
+* Distribution - Ubuntu Server 12.04.1 LTS
+* Architecture - i386
+* hostname - client
+* IP Address - 10.9.8.254
 
 1.  Create a new file for the client on the rollout server
 
-We want a directory hiearchy for our clients so we can better manage them.
+  We want a directory hiearchy for our clients so we can better manage them.
 
   ```bash
 mkdir -p $BASEDIR/fragments/clients/internal/testing/client
@@ -220,7 +223,7 @@ mkdir -p $BASEDIR/fragments/clients/internal/testing/client
 vim $BASEDIR/fragments/clients/internal/testing/client
   ```
 
-**$BASEDIR/rollout.cfg**
+  **$BASEDIR/rollout.cfg**
 
   ```perl
 #!/usr/bin/perl -w
