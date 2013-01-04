@@ -4,11 +4,11 @@
 ##Required Information
 1.  
 ```bash
-BASEDIR=&lt;/base/directoy/for/rolloutd/>
-USER=&lt;username_rolloutd_will_run_as>
-GROUP=&lt;groupname_rolloutd_will_run_as>
-ROLLOUT_SERVER=&lt;resolvable hostname | ip address>
-ROLLOUT_PORT=&lt;some port number>
+BASEDIR=</base/directoy/for/rolloutd/>
+USER=<username_rolloutd_will_run_as>
+GROUP=<groupname_rolloutd_will_run_as>
+ROLLOUT_SERVER=<resolvable hostname | ip address>
+ROLLOUT_PORT=<some port number>
 ```
 
 1.  You'll need the following perl modules
