@@ -3,13 +3,13 @@
 # Server Installation
 ##Required Information
 1.  
-<pre>
+```bash
 BASEDIR=&lt;/base/directoy/for/rolloutd/>
 USER=&lt;username_rolloutd_will_run_as>
 GROUP=&lt;groupname_rolloutd_will_run_as>
 ROLLOUT_SERVER=&lt;resolvable hostname | ip address>
 ROLLOUT_PORT=&lt;some port number>
-</pre>
+```
 
 1.  You'll need the following perl modules
 <pre>
