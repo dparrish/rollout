@@ -78,17 +78,17 @@ $BASEDIR.
 
 1.  Decide which webserver to use.
 
-  Use rolloutd
+  + Use rolloutd
 
-  Start rolloutd
+  1.  Start rolloutd
 
   ```bash
 /etc/init.d/rollout start
   ```
 
-  Use Apache2
+  + Use Apache2
 
-  Edit the Apache2 default configuration file
+  1.  Edit the Apache2 default configuration file
 
   **/etc/apache2/sites-enabled/000-default**
 
@@ -102,7 +102,7 @@ Alias /rollout /app/rollout
 </Directory>
   ```
 
-  Restart Apache2
+  1.  Restart Apache2
 
   ```bash
 /etc/init.d/apache2 restart
