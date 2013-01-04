@@ -13,12 +13,12 @@ ROLLOUT_PORT=<some port number>
 
 1.  You'll need the following perl modules
 
-<pre>
+  <pre>
 Net::Netmask
 IO::Socket::SSL
 Error
 LWP
-</pre>
+  </pre>
 
 1.  Get rollout source, and extract
 
