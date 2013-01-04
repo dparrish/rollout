@@ -25,12 +25,14 @@ ROLLOUT_TMP_DIR='/tmp/rollout'
 cd /tmp
 ```
   + Using wget
+
 ```bash
 wget http://github.com/dparrish/rollout/archive/master.tar.gz
 tar xzf master.tar.gz
 mv rollout-master rollout
 ```
   + Using git
+
 ```bash
 git clone https://github.com/dparrish/rollout.git
  ```
