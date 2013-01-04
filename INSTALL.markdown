@@ -2,7 +2,7 @@
 
 # Server Installation
 ##Required Information
-1.  
+
 ```bash
 BASEDIR=</base/directoy/for/rolloutd/>
 USER=<username_rolloutd_will_run_as>
@@ -12,6 +12,7 @@ ROLLOUT_PORT=<some port number>
 ```
 
 1.  You'll need the following perl modules
+
 <pre>
 Net::Netmask
 IO::Socket::SSL
@@ -20,6 +21,7 @@ LWP
 </pre>
 
 1.  Get rollout source, and extract
+
 ```bash
 ROLLOUT_TMP_DIR='/tmp/rollout'
 cd /tmp
@@ -39,6 +41,7 @@ git clone https://github.com/dparrish/rollout.git
     
 
 1.  After extraction, run the following commands as root
+
 ```bash
 BASEDIR=/usr/local/rollout
 USER=nobody
@@ -61,7 +64,9 @@ chown -R $USER:$GROUP $BASEDIR
 ```
 
 1.  Edit /etc/default/rollout to configure your server
+
 1.  Add required symlinks to /etc/rc?.d/S??rollout to /etc/init.d/rollout
+
 ```bash
 ln -s /etc/init.d/rollout /etc/rc1.d/K20rollout
 ln -s /etc/init.d/rollout /etc/rc3.d/S70rollout
@@ -73,11 +78,14 @@ $BASEDIR.
 1.  Decide which webserver to use.
     * Use rolloutd
       + Start rolloutd
+
 ```bash
 /etc/init.d/rollout start
 ```
+
     * Use Apache2
       + Add the following to Apache2 configuration
+
 ```apache
 Alias /rollout /app/rollout
 <Directory /app/rollout>
@@ -87,7 +95,9 @@ Alias /rollout /app/rollout
   allow from all
 </Directory>
 ```
+
       + Restart Apache2
+
 ```bash
 /etc/init.d/apache2 restart
 ```
@@ -96,10 +106,13 @@ Alias /rollout /app/rollout
 # Client Installation
 
 1. Install required perl modules
+
 ```bash
 apt-get -y install libapache2-mod-php5 liberror-perl libwww-perl
 ```
+
 1. Install rollout on a client
+
 ```bash
 URL=http://$ROLLOUT_SERVER:$ROLLOUT_PORT
 wget -O- $URL/rollout | perl - -u $URL -o setup
@@ -124,6 +137,7 @@ provided rolloutd which would be required to run an additional network port.
 
 ##Install and Configure
 1.  Run the following commands
+
 ```bash
 ROLLOUT_TMP_DIR="/tmp/rollout"
 BASEDIR="/app/rollout"
@@ -154,12 +168,15 @@ chown -R $USER:$GROUP $BASEDIR
 apt-get update
 apt-get -y install libapache2-mod-php5 liberror-perl libwww-perl
 ```
+
 1.  Edit the default Apache2 configuration
+
 ```bash
 vim /etc/apache2/sites-enabled/000-default
 ```
 
 **/etc/apache2/sites-enabled/000-default**
+
 ```apache
 Alias /rollout /app/rollout
 <Directory /app/rollout>
@@ -171,6 +188,7 @@ Alias /rollout /app/rollout
 ```
 
 1.  Restart Apache2
+
 ```bash
 /etc/init.d/apache2 restart  
 ```
@@ -187,17 +205,21 @@ The following example is the initial setup on a new installation of a client.
 + IP Address - 10.9.8.254
 
 1.  Create a new file for the client on the rollout server
+
 We want a directory hiearchy for our clients so we can better manage them.
+
 ```bash
 mkdir -p $BASEDIR/fragments/clients/internal/testing/client
 ```
 
 1.  Edit **rollout.cfg** on the rollout server
+
 ```bash
 vim $BASEDIR/fragments/clients/internal/testing/client
 ```
 
 **$BASEDIR/rollout.cfg**
+
 ```perl
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl foldmethod=marker
@@ -394,11 +416,13 @@ class Rollout_Server => { # {{{
 ```
 
 1.  Edit the client specific file
+
 ```bash
 vim $BASEDIR/fragments/clients/internal/testing/client
 ```
 
 **$BASEDIR/fragments/clients/internal/testing/client**
+
 ```perl
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl foldmethod=marker
@@ -421,6 +445,7 @@ device client => { # {{{
 ```
 
 1.  Run the following commands as root (or prepend sudo)
+
 ```bash
 apt-get update
 apt-get -y install libwww-perl libio-socket-ssl-perl liberror-perl wget &&
