@@ -3,13 +3,13 @@
 # Server Installation
 ##Required Information
 
-```bash
+  ```bash
 BASEDIR=</base/directoy/for/rolloutd/>
 USER=<username_rolloutd_will_run_as>
 GROUP=<groupname_rolloutd_will_run_as>
 ROLLOUT_SERVER=<resolvable hostname | ip address>
 ROLLOUT_PORT=<some port number>
-```
+  ```
 
 1.  You'll need the following perl modules
 
@@ -22,27 +22,27 @@ LWP
 
 1.  Get rollout source, and extract
 
-```bash
+  ```bash
 ROLLOUT_TMP_DIR='/tmp/rollout'
 cd /tmp
-```
+  ```
   + Using wget
 
-```bash
+  ```bash
 wget http://github.com/dparrish/rollout/archive/master.tar.gz
 tar xzf master.tar.gz
 mv rollout-master rollout
-```
+  ```
   + Using git
 
-```bash
+  ```bash
 git clone https://github.com/dparrish/rollout.git
- ```
+  ```
     
 
 1.  After extraction, run the following commands as root
 
-```bash
+  ```bash
 BASEDIR=/usr/local/rollout
 USER=nobody
 GROUP=group
@@ -61,32 +61,33 @@ chmod 750 /usr/local/sbin/rolloutd
 chmod 755 /etc/init.d/rollout
 chmod 600 /etc/default/rollout
 chown -R $USER:$GROUP $BASEDIR
-```
+  ```
 
 1.  Edit /etc/default/rollout to configure your server
 
 1.  Add required symlinks to /etc/rc?.d/S??rollout to /etc/init.d/rollout
 
-```bash
+  ```bash
 ln -s /etc/init.d/rollout /etc/rc1.d/K20rollout
 ln -s /etc/init.d/rollout /etc/rc3.d/S70rollout
 ln -s /etc/init.d/rollout /etc/rc2.d/S70rollout
-```
+  ```
 
 1.  Copy the default configuration (rollout.cfg) or your own configuration into
 $BASEDIR.
+
 1.  Decide which webserver to use.
     * Use rolloutd
       + Start rolloutd
 
-```bash
+  ```bash
 /etc/init.d/rollout start
-```
+  ```
 
     * Use Apache2
       + Add the following to Apache2 configuration
 
-```apache
+  ```apache
 Alias /rollout /app/rollout
 <Directory /app/rollout>
   Options Indexes FollowSymlinks
@@ -94,29 +95,29 @@ Alias /rollout /app/rollout
   Order allow,deny
   allow from all
 </Directory>
-```
+  ```
 
       + Restart Apache2
 
-```bash
+  ```bash
 /etc/init.d/apache2 restart
-```
+  ```
 
 
 # Client Installation
 
 1. Install required perl modules
 
-```bash
+  ```bash
 apt-get -y install libapache2-mod-php5 liberror-perl libwww-perl
-```
+  ```
 
 1. Install rollout on a client
 
-```bash
+  ```bash
 URL=http://$ROLLOUT_SERVER:$ROLLOUT_PORT
 wget -O- $URL/rollout | perl - -u $URL -o setup
-```
+  ```
 
 
 # Example Server Installation and setup
@@ -138,7 +139,7 @@ provided rolloutd which would be required to run an additional network port.
 ##Install and Configure
 1.  Run the following commands
 
-```bash
+  ```bash
 ROLLOUT_TMP_DIR="/tmp/rollout"
 BASEDIR="/app/rollout"
 ROLLOUT_SERVER="10.9.8.1"
@@ -167,17 +168,17 @@ chmod 600 /etc/default/rollout
 chown -R $USER:$GROUP $BASEDIR
 apt-get update
 apt-get -y install libapache2-mod-php5 liberror-perl libwww-perl
-```
+  ```
 
 1.  Edit the default Apache2 configuration
 
-```bash
+  ```bash
 vim /etc/apache2/sites-enabled/000-default
-```
+  ```
 
 **/etc/apache2/sites-enabled/000-default**
 
-```apache
+  ```apache
 Alias /rollout /app/rollout
 <Directory /app/rollout>
   Options Indexes FollowSymlinks
@@ -185,13 +186,13 @@ Alias /rollout /app/rollout
   Order allow,deny
   allow from all
 </Directory>
-```
+  ```
 
 1.  Restart Apache2
 
-```bash
+  ```bash
 /etc/init.d/apache2 restart  
-```
+  ```
 
 
 # Example Client Installation
@@ -208,19 +209,19 @@ The following example is the initial setup on a new installation of a client.
 
 We want a directory hiearchy for our clients so we can better manage them.
 
-```bash
+  ```bash
 mkdir -p $BASEDIR/fragments/clients/internal/testing/client
-```
+  ```
 
 1.  Edit **rollout.cfg** on the rollout server
 
-```bash
+  ```bash
 vim $BASEDIR/fragments/clients/internal/testing/client
-```
+  ```
 
 **$BASEDIR/rollout.cfg**
 
-```perl
+  ```perl
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl foldmethod=marker
 
@@ -413,17 +414,17 @@ class Rollout_Server => { # {{{
     },
   },
 }; # }}}
-```
+  ```
 
 1.  Edit the client specific file
 
-```bash
+  ```bash
 vim $BASEDIR/fragments/clients/internal/testing/client
-```
+  ```
 
 **$BASEDIR/fragments/clients/internal/testing/client**
 
-```perl
+  ```perl
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl foldmethod=marker
 
@@ -442,13 +443,13 @@ device client => { # {{{
     },
   },
 }; # }}}
-```
+  ```
 
 1.  Run the following commands as root (or prepend sudo)
 
-```bash
+  ```bash
 apt-get update
 apt-get -y install libwww-perl libio-socket-ssl-perl liberror-perl wget &&
 URL=http://10.9.8.1/rollout &&
 wget -O- $URL/rollout | perl - -u $URL/rollout -o setup
-```
+  ```
