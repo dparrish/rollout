@@ -229,7 +229,6 @@ vim $BASEDIR/fragments/clients/internal/testing/client
   ```perl
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl foldmethod=marker
-
 class SOE_Ubuntu => { # {{{
   nameservers => ['10.9.8.1],
   domain_name => "chrisdonovan.com.au,
@@ -383,7 +382,6 @@ class SOE_Ubuntu => { # {{{
     },
   },
 }; # }}}
-
 class Apache2_Server => { # {{{
   service => {
     apache2 => 1,
