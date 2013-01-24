@@ -27,6 +27,9 @@ options won't make your system inaccessable.
 =head1 EXAMPLE
 
   class Sample => {
+    domain_name => "example.com",
+    nameservers => [ '10.9.8.100', '10.9.8.200' ],
+    dns_search => [ "exaxmple.com", "env1.example.com", "env2.example.com" ],
     interfaces => {
       eth0 => {
         primary => 1,
@@ -149,6 +152,8 @@ A list of IP address of preferred DNS name servers.
 
 =item domain_name   The local domain name
 
+=item dns_search   The search suffix(es) for resolv.conf
+
 =back
 
 =head1 SKIPPABLE STEPS
@@ -182,6 +187,10 @@ Set the local hostname
 =item domain_name
 
 Set the local domain name
+
+=item dns_search
+
+Set the search suffix(es) for DNS lookups in resolv.conf
 
 =item resolvconf
 
@@ -274,6 +283,14 @@ validate_config {
   domain_name => {
     help => "Domain name to append to the hostname",
     type => "domainname",
+  },
+  dns_search => {
+    help => "Domain names to use for non-FQDN DNS lookups",
+    type => "list",
+    items => {
+      help => "Domain names",
+      type => "domainname",
+    },
   },
 };
 
@@ -566,8 +583,13 @@ if (i_should("resolvconf")) {
   }
   if (i_should("domain_name")) {
     foreach (c("$hostname/domain_name")) {
-      file_append("/etc/resolv.conf", "search $_", qr/^search /);
+      file_append("/etc/resolv.conf", "domain $_", qr/^domain /);
       last;
+    }
+  }
+  if (i_should("dns_search")) {
+    if (c("$hostname/dns_search")) {
+      file_append("/etc/resolv.conf", "search " . join(" ", @{c("$hostname/dns_search")}), qr/^search.*$/);
     }
   }
 }
