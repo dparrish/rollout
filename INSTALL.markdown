@@ -114,7 +114,7 @@ Alias /rollout /usr/local/rollout
 1. Install required perl modules
 
   ```bash
-apt-get -y install libapache2-mod-php5 liberror-perl libwww-perl
+apt-get -y install libapache2-mod-php5 libio-socket-ssl-perl liberror-perl libwww-perl
   ```
 
 1. Install rollout on a client
