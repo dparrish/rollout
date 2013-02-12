@@ -93,8 +93,8 @@ $BASEDIR.
   **/etc/apache2/sites-enabled/000-default**
 
   ```apache
-Alias /rollout /app/rollout
-<Directory /app/rollout>
+Alias /rollout /usr/local/rollout
+<Directory /usr/local/rollout>
   Options Indexes FollowSymlinks
   AllowOverride None
   Order allow,deny
