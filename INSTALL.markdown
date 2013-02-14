@@ -221,7 +221,7 @@ mkdir -p $BASEDIR/fragments/clients/internal/testing/client
 1.  Edit **rollout.cfg** on the rollout server
 
   ```bash
-vim $BASEDIR/fragments/clients/internal/testing/client
+vim $BASEDIR/rollout.cfg
   ```
 
   **$BASEDIR/rollout.cfg**
