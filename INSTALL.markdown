@@ -93,8 +93,8 @@ $BASEDIR.
   **/etc/apache2/sites-enabled/000-default**
 
   ```apache
-Alias /rollout /app/rollout
-<Directory /app/rollout>
+Alias /rollout /usr/local/rollout
+<Directory /usr/local/rollout>
   Options Indexes FollowSymlinks
   AllowOverride None
   Order allow,deny
@@ -114,7 +114,7 @@ Alias /rollout /app/rollout
 1. Install required perl modules
 
   ```bash
-apt-get -y install libapache2-mod-php5 liberror-perl libwww-perl
+apt-get -y install libapache2-mod-php5 libio-socket-ssl-perl liberror-perl libwww-perl
   ```
 
 1. Install rollout on a client
@@ -221,7 +221,7 @@ mkdir -p $BASEDIR/fragments/clients/internal/testing/client
 1.  Edit **rollout.cfg** on the rollout server
 
   ```bash
-vim $BASEDIR/fragments/clients/internal/testing/client
+vim $BASEDIR/rollout.cfg
   ```
 
   **$BASEDIR/rollout.cfg**
