@@ -301,7 +301,7 @@ sub file_modify {
 sub safe_write {
   my $p = named_params @_, [ -file => undef, -text => undef, -mode => undef, -comment => undef ];
 
-  validate("Incorrect parameters to safe_write", $p->{-file} && $p->{-text});
+  validate("Incorrect parameters to safe_write", $p->{-file} || $p->{-text});
   return 0 if i_immutable_file($p->{-file});
 
   my($dir, $file) = $p->{-file} =~ /(?:(.*)\/)?(.*)/;
@@ -314,7 +314,7 @@ sub safe_write {
 
   if (!-x "/usr/bin/ci" || i_unsafe_file($file) || i_unsafe_dir($dir)) {
     # RCS is not installed, don't do version control
-    safe_write_file(-file => $p->{-file}, -text => $p->{-text});
+    safe_write_file(-file => $p->{-file}, -text => $p->{-text}, -mode => $p->{-mode});
     chmod $p->{-mode}, $p->{-file} if $p->{-mode};
     return 1;
   }
@@ -327,7 +327,7 @@ sub safe_write {
     system("rcs", "-q", "-ko", "$dir/$file");
   }
 
-  safe_write_file(-file => $p->{-file}, -text => $p->{-text});
+  safe_write_file(-file => $p->{-file}, -text => $p->{-text}, -mode => $p->{-mode});
 
   if (-f "$dir/$file") {
     mkdir("$dir/RCS", 0700) if not -d "$dir/RCS" and -w $dir;
@@ -501,7 +501,7 @@ sub text_install {
     l "Installing $p->{-file} from $p->{-flags}->{srcfn}";
     d $p->{-text};
     try {
-      safe_write(-file => $p->{-file}, -text => $p->{-text})
+      safe_write(-file => $p->{-file}, -text => $p->{-text}, -mode => $p->{-mode})
     } catch LocalFileException with {
       my $ex = shift;
       $ex->throw("Unable to install $p->{-file}: ". $ex);
@@ -582,6 +582,8 @@ sub dir_check {
     dir_check($x);
   }
   $p->{-mode} ||= 0755;
+  $p->{-uid} ||= 0;
+  $p->{-gid} ||= 0;
 
   l sprintf("Creating directory %s with mode 0%o", $p->{-dir}, $p->{-mode});
   return 1 if $safe_mode;
@@ -589,6 +591,8 @@ sub dir_check {
   my $mask = umask 0;
   mkdir $p->{-dir}, $p->{-mode}
     or throw LocalFileException "Can't create directory $p->{-dir}: $!";
+  chown $p->{-uid}, $p->{-gid}, $p->{-dir}
+    or throw LocalFileException "Can't set permissions, $p->{uid}, $p->{gid}, on $p->{-dir}: $!";
   umask $mask;
   return 1;
 }
