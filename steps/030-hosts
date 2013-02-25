@@ -75,6 +75,10 @@ validate_config {
     help => "Domain name to append to the hostname",
     type => "domainname",
   },
+  dns_seach => {
+    help => "Domain names to append to the search suffixes",
+    type => "domainname",
+  },
   network => {
     help => "List of networks this host should join",
     type => "list",
