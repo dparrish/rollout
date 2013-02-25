@@ -21,6 +21,18 @@ Check out git modules to the local filesystem.
       },
     },
   };
+  class Sample_SSH => {
+    git => {
+      '/tmp/checkout_path' => {
+        source => 'ssh:git@git.domain/module/trunk.git',
+        identity_file => '/home/user/.ssh/id_dsa',
+        branch => 'master',
+        clone_options => [],
+        pull_options => [],
+        cmd => 'ls -l',
+      },
+    },
+  };
 
 =head1 OPTIONS
 
@@ -33,6 +45,11 @@ Check out the given module to path.
 =item git/I<path>/source
 
 The git URL that will be cloned
+
+=item git/I<path>/identity_file
+
+The SSH identity (key) used for authentication to the git server. This assumes that there is no
+passphrase on the SSH key itself.
 
 =item git/I<path>/branch
 
@@ -71,6 +88,7 @@ validate_config {
       type => "options",
       options => {
         source => { type => "string", required => 1 },
+        identity_file => { type => "string" },
         branch => { type => "string" },
         cmd => { type => "string", help => "Post checkout command to run (in checked out dir)" },
         clone_options => { type => "list", items => { type => "string" } },
@@ -86,6 +104,8 @@ package_check("git-core") if keys %git && (c("$hostname/_os_detection/distro") e
                                            c("$hostname/_os_detection/distro") eq 'debian');
 foreach my $dir (sort(keys %git)) {
   my $x = $git{$dir};
+  #my $method = split(':', $x->{source}, 2);
+  #print $method . "\n";
   if (!-d $dir) {
     # New checkout
     my $basedir = dirname($dir);
