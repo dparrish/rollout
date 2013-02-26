@@ -19,3 +19,5 @@ The idea behind Rollout is to automate all these steps in a configurable way.
 Rollout is by design idempotent - it can be run many times on a single server
 and produce the same results.
 
+There are examples in the docs directory.
+
