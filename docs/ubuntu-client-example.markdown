@@ -4,6 +4,7 @@ on the server.
 
 #Required Information
 ROLLOUT_SERVER : The hostname or IP address of the server running rollout.
+
 URL : The URL where rollout is being served from $ROLLOUT_SERVER
 
 # Client Installation
