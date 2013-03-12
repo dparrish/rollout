@@ -129,8 +129,7 @@ foreach (keys %keys) {
   }
   v "No keys found for $_" and next unless
     my $text = join("", grep defined, map { $all_keys{$_} } keys %{$keys{$_}});
-  dir_check(-dir => "$dir/.ssh", -mode => 0700, -uid => $uid, -gid => $gid);
   text_install(-file => "$dir/.ssh/authorized_keys", -text => $text, -mode => 0644, -uid => $uid,
-               -gid => $gid);
+               -gid => $gid, -dir_mode => 0700);
 }
 
