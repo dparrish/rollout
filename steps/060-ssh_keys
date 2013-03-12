@@ -109,7 +109,7 @@ try {
   my $text = http_file "conf/authorized_keys";
   foreach (split(/[\r\n]+/, $text)) {
     next if ($_ =~ /^#/);
-    my($key, $name) = $_ =~ /(.*) ([\w\@\-_]+)$/;
+    my($key, $name) = $_ =~ /(.*) ([\w\@\-_\.]+)$/;
     $all_keys{$name} ||= "";
     $all_keys{$name} .= "$_\n";
   }
