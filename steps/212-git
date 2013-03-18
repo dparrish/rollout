@@ -72,7 +72,8 @@ validate_config {
       options => {
         source => { type => "string", required => 1 },
         branch => { type => "string" },
-        cmd => { type => "string", help => "Post checkout command to run (in checked out dir)" },
+        cmd => { type => ["code", "string"], help => "Post checkout command to run (in checked out dir)" },
+        post_sub => { type => "code" },
         clone_options => { type => "list", items => { type => "string" } },
         pull_options => { type => "list", items => { type => "string" } },
       },
@@ -99,14 +100,36 @@ foreach my $dir (sort(keys %git)) {
     command(@cmd);
     if ($x->{cmd}) {
       chdir $dir or throw LocalFileException "Could not cd to new checked out dir $dir: $!";
-      command($x->{cmd});
+      if (ref $x->{cmd} eq 'CODE') {
+        l "Running perl code to finish checkout of $dir";
+        $x->{cmd}->();
+      } else {
+        l "Running $x->{cmd} to finish checkout of $dir";
+        command($x->{cmd});
+      }
     }
   } else {
     # Update existing checked out directory
     chdir $dir;
-    my @cmd = ("git", "pull", "-q");
+    my @cmd = ("git", "pull", "--all", "-q");
     push @cmd, @{$x->{pull_options} || []};
     v "Updating $dir from $x->{source}";
-    command(@cmd);
+    if ($x->{branch}) {
+      my $ret = command(@cmd);
+      if ($ret != 0) {
+        w "Error updating $dir from $x->{source}, not switching branches";
+        next;
+      }
+      command("git", "checkout", $x->{branch})
+    }
+    if ($x->{cmd}) {
+      if (ref $x->{cmd} eq 'CODE') {
+        l "Running perl code to finish update of $dir";
+        $x->{cmd}->();
+      } else {
+        l "Running $x->{cmd} to finish update of $dir";
+        command($x->{cmd});
+      }
+    }
   }
 }
