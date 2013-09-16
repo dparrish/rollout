@@ -77,6 +77,19 @@ validate_config {
       fail_on_unknown => 0,
     },
   },
+  ssh_keys_add_user => {
+    help => "Add keys to a users authorized_keys",
+    type => "hash",
+    key => {
+      help => "List of SSH keys to add to a users authorized_keys",
+      type => "string",
+    },
+    value => {
+      help => "ssh key for user",
+      type => "list",
+      items => { type => "string" },
+    },
+  },
   ssh_keys_add => {
     help => "List of SSH keys to add to root's authorized_keys",
     type => "list",
@@ -84,7 +97,7 @@ validate_config {
   },
 };
 
-return unless i_has("user") || i_has("ssh_keys_add");
+return unless i_has("user") || i_has("ssh_keys_add") || i_has("ssh_keys_add_user");
 
 my %keys;
 
@@ -94,6 +107,14 @@ if (i_should("user_keys")) {
     next unless $user && $username;
     $keys{$username} ||= { $username => 1 };
     $keys{$username}->{$_}++ foreach (@{$user->{ssh_keys} || []});
+  }
+}
+
+if (i_should("ssh_keys_add_user")) {
+  my %ssh_keys = flatten_hash(c("$hostname/ssh_keys_add_user"));
+  while (my($username, $_keys) = each(%ssh_keys)) {
+    next unless $_keys && $username;
+    $keys{$username}->{$_}++ foreach uniq(flatten_list(c("$hostname/ssh_keys_add_user/$username")));
   }
 }
 
@@ -109,6 +130,7 @@ try {
   my $text = http_file "conf/authorized_keys";
   foreach (split(/[\r\n]+/, $text)) {
     next if ($_ =~ /^#/);
+    s/\s+$//g;
     my($key, $name) = $_ =~ /(.*) ([\w\@\-_\.]+)$/;
     $all_keys{$name} ||= "";
     $all_keys{$name} .= "$_\n";
@@ -132,4 +154,3 @@ foreach (keys %keys) {
   text_install(-file => "$dir/.ssh/authorized_keys", -text => $text, -mode => 0644, -uid => $uid,
                -gid => $gid, -dir_mode => 0700);
 }
-
