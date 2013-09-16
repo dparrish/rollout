@@ -15,6 +15,7 @@ Check out git modules to the local filesystem.
       '/tmp/checkout_path' => {
         source => 'http://git.domain/module/trunk.git',
         branch => 'master',
+        user => 'jenkins',
         clone_options => [],
         pull_options => [],
         cmd => 'ls -l',
@@ -34,6 +35,11 @@ Check out the given module to path.
 
 The git URL that will be cloned
 
+=item git/I<path>/user
+
+The username or UID that will own the newly created directory and all the files underneath it. This
+user is the one that will run the git commands.
+
 =item git/I<path>/branch
 
 The branch to check out. If this changes, the current checked out version will be updated to match
@@ -42,7 +48,8 @@ the revision specified here.
 =item git/I<path>/cmd
 
 A shell command to be run after the checkout or any updates are applied. This command is run from
-inside the checked-out directory.
+inside the checked-out directory. This command will be run as root, no matter what the "user" option
+specifies.
 
 =item git/I<path>/clone_options
 
@@ -71,9 +78,9 @@ validate_config {
       type => "options",
       options => {
         source => { type => "string", required => 1 },
+        user => { type => "string", help => "Username or UID that will own the new directory and files" },
         branch => { type => "string" },
         cmd => { type => ["code", "string"], help => "Post checkout command to run (in checked out dir)" },
-        post_sub => { type => "code" },
         clone_options => { type => "list", items => { type => "string" } },
         pull_options => { type => "list", items => { type => "string" } },
       },
@@ -93,11 +100,11 @@ foreach my $dir (sort(keys %git)) {
     dir_check($basedir);
     chdir $basedir or throw LocalFileException "Could not cd to new dir $basedir: $!";
     v "Checking out $x->{source} to $dir";
-    my @cmd = ("git", "clone", "-q");
+    my @cmd = ("git", "clone");
     push @cmd, "--branch", $x->{branch} if $x->{branch};
     push @cmd, @{$x->{clone_options} || []};
     push @cmd, $x->{source}, $dir;
-    command(@cmd);
+    command(@cmd, { uid => $x->{user} });
     if ($x->{cmd}) {
       chdir $dir or throw LocalFileException "Could not cd to new checked out dir $dir: $!";
       if (ref $x->{cmd} eq 'CODE') {
@@ -115,12 +122,12 @@ foreach my $dir (sort(keys %git)) {
     push @cmd, @{$x->{pull_options} || []};
     v "Updating $dir from $x->{source}";
     if ($x->{branch}) {
-      my $ret = command(@cmd);
+      my $ret = command(@cmd, { uid => $x->{user} });
       if ($ret != 0) {
         w "Error updating $dir from $x->{source}, not switching branches";
         next;
       }
-      command("git", "checkout", $x->{branch})
+      command("git", "checkout", $x->{branch}, { uid => $x->{user} })
     }
     if ($x->{cmd}) {
       if (ref $x->{cmd} eq 'CODE') {
