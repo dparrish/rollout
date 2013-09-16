@@ -21,6 +21,19 @@ Check out git modules to the local filesystem.
       },
     },
   };
+  class Sample_SSH => {
+    git => {
+      '/tmp/checkout_path' => {
+        source => 'ssh:git@git.domain/module/trunk.git',
+        identity_file => '/home/user/.ssh/id_dsa',
+        user => 'jenkins',
+        branch => 'master',
+        clone_options => [],
+        pull_options => [],
+        cmd => 'ls -l',
+      },
+    },
+  };
 
 =head1 OPTIONS
 
@@ -33,6 +46,15 @@ Check out the given module to path.
 =item git/I<path>/source
 
 The git URL that will be cloned
+
+=item git/I<path>/identity_file
+
+The SSH identity (key) used for authentication to the git server. This assumes that there is no
+passphrase on the SSH key itself.
+
+=item git/I<path>/user
+
+The user to run git commands as
 
 =item git/I<path>/branch
 
@@ -71,6 +93,8 @@ validate_config {
       type => "options",
       options => {
         source => { type => "string", required => 1 },
+        identity_file => { type => "string" },
+        user => { type => "string" },
         branch => { type => "string" },
         cmd => { type => "string", help => "Post checkout command to run (in checked out dir)" },
         clone_options => { type => "list", items => { type => "string" } },
@@ -82,20 +106,26 @@ validate_config {
 
 return unless i_has('git');
 my %git = flatten_hash(c("$hostname/git"));
-package_check("git-core") if keys %git && (c("$hostname/_os_detection/distro") eq 'ubuntu' ||
+package_check("git-core", "sudo") if keys %git && (c("$hostname/_os_detection/distro") eq 'ubuntu' ||
                                            c("$hostname/_os_detection/distro") eq 'debian');
 foreach my $dir (sort(keys %git)) {
   my $x = $git{$dir};
   if (!-d $dir) {
     # New checkout
     my $basedir = dirname($dir);
-    dir_check($basedir);
-    chdir $basedir or throw LocalFileException "Could not cd to new dir $basedir: $!";
     v "Checking out $x->{source} to $dir";
-    my @cmd = ("git", "clone", "-q");
-    push @cmd, "--branch", $x->{branch} if $x->{branch};
+    my @cmd;
+    if ($x->{user}) {
+      @cmd = ("sudo", "-u", "$x->{user}", "git", "clone");
+      dir_check($basedir, undef, $x->{user});
+    } else {
+      @cmd = ("git", "clone");
+      dir_check($basedir);
+    }
+    push @cmd, "-b", $x->{branch} if $x->{branch};
     push @cmd, @{$x->{clone_options} || []};
     push @cmd, $x->{source}, $dir;
+    chdir $basedir or throw LocalFileException "Could not cd to new dir $basedir: $!";
     command(@cmd);
     if ($x->{cmd}) {
       chdir $dir or throw LocalFileException "Could not cd to new checked out dir $dir: $!";
@@ -104,7 +134,12 @@ foreach my $dir (sort(keys %git)) {
   } else {
     # Update existing checked out directory
     chdir $dir;
-    my @cmd = ("git", "pull", "-q");
+    my @cmd;
+    if ($x->{user}) {
+      @cmd = ("su", "-", "$x->{user}", "-c", "git pull -q");
+    } else {
+      @cmd = ("git", "pull", "-q");
+    }
     push @cmd, @{$x->{pull_options} || []};
     v "Updating $dir from $x->{source}";
     command(@cmd);
