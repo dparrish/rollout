@@ -921,6 +921,9 @@ sub command {
   $flags->{failure} ||= "FAILED: '$command' failed.";
   $flags->{success} ||= "Finished running '$command'.";
   $flags->{timeout} = undef unless $flags->{timeout};
+  if (exists $flags->{uid} && $flags->{uid} !~ /^\d+$/) {
+    $flags->{uid} = getpwnam $flags->{uid};
+  }
 
   v "CMD: $command";
   $printed++ if $verbosity > 1;
@@ -940,6 +943,12 @@ sub command {
     setsid;
     open STDIN, '</dev/null';
     open(STDERR, '>&STDOUT');
+
+    # Set the UID if required
+    if ($flags->{uid}) {
+      v "SetUID $flags->{uid}";
+      $> = $flags->{uid} if $flags->{uid};
+    }
 
     $|=1;
     exec @_;

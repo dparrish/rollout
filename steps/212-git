@@ -15,6 +15,7 @@ Check out git modules to the local filesystem.
       '/tmp/checkout_path' => {
         source => 'http://git.domain/module/trunk.git',
         branch => 'master',
+        user => 'jenkins',
         clone_options => [],
         pull_options => [],
         cmd => 'ls -l',
@@ -47,14 +48,10 @@ Check out the given module to path.
 
 The git URL that will be cloned
 
-=item git/I<path>/identity_file
-
-The SSH identity (key) used for authentication to the git server. This assumes that there is no
-passphrase on the SSH key itself.
-
 =item git/I<path>/user
 
-The user to run git commands as
+The username or UID that will own the newly created directory and all the files underneath it. This
+user is the one that will run the git commands.
 
 =item git/I<path>/branch
 
@@ -64,7 +61,8 @@ the revision specified here.
 =item git/I<path>/cmd
 
 A shell command to be run after the checkout or any updates are applied. This command is run from
-inside the checked-out directory.
+inside the checked-out directory. This command will be run as root, no matter what the "user" option
+specifies.
 
 =item git/I<path>/clone_options
 
@@ -93,10 +91,9 @@ validate_config {
       type => "options",
       options => {
         source => { type => "string", required => 1 },
-        identity_file => { type => "string" },
-        user => { type => "string" },
+        user => { type => "string", help => "Username or UID that will own the new directory and files" },
         branch => { type => "string" },
-        cmd => { type => "string", help => "Post checkout command to run (in checked out dir)" },
+        cmd => { type => ["code", "string"], help => "Post checkout command to run (in checked out dir)" },
         clone_options => { type => "list", items => { type => "string" } },
         pull_options => { type => "list", items => { type => "string" } },
       },
@@ -114,34 +111,43 @@ foreach my $dir (sort(keys %git)) {
     # New checkout
     my $basedir = dirname($dir);
     v "Checking out $x->{source} to $dir";
-    my @cmd;
-    if ($x->{user}) {
-      @cmd = ("sudo", "-u", "$x->{user}", "git", "clone");
-      dir_check($basedir, undef, $x->{user});
-    } else {
-      @cmd = ("git", "clone");
-      dir_check($basedir);
-    }
-    push @cmd, "-b", $x->{branch} if $x->{branch};
+    my @cmd = ("git", "clone");
+    push @cmd, "--branch", $x->{branch} if $x->{branch};
     push @cmd, @{$x->{clone_options} || []};
     push @cmd, $x->{source}, $dir;
-    chdir $basedir or throw LocalFileException "Could not cd to new dir $basedir: $!";
-    command(@cmd);
+    command(@cmd, { uid => $x->{user} });
     if ($x->{cmd}) {
       chdir $dir or throw LocalFileException "Could not cd to new checked out dir $dir: $!";
-      command($x->{cmd});
+      if (ref $x->{cmd} eq 'CODE') {
+        l "Running perl code to finish checkout of $dir";
+        $x->{cmd}->();
+      } else {
+        l "Running $x->{cmd} to finish checkout of $dir";
+        command($x->{cmd});
+      }
     }
   } else {
     # Update existing checked out directory
     chdir $dir;
-    my @cmd;
-    if ($x->{user}) {
-      @cmd = ("su", "-", "$x->{user}", "-c", "git pull -q");
-    } else {
-      @cmd = ("git", "pull", "-q");
-    }
+    my @cmd = ("git", "pull", "--all", "-q");
     push @cmd, @{$x->{pull_options} || []};
     v "Updating $dir from $x->{source}";
-    command(@cmd);
+    if ($x->{branch}) {
+      my $ret = command(@cmd, { uid => $x->{user} });
+      if ($ret != 0) {
+        w "Error updating $dir from $x->{source}, not switching branches";
+        next;
+      }
+      command("git", "checkout", $x->{branch}, { uid => $x->{user} })
+    }
+    if ($x->{cmd}) {
+      if (ref $x->{cmd} eq 'CODE') {
+        l "Running perl code to finish update of $dir";
+        $x->{cmd}->();
+      } else {
+        l "Running $x->{cmd} to finish update of $dir";
+        command($x->{cmd});
+      }
+    }
   }
 }

@@ -68,6 +68,10 @@ options won't make your system inaccessable.
         netmask => '255.255.255.0',
         gateway => '192.168.1.1',
         bond => [ 'eth0', 'eth1' ],
+        'bond-mode' => '802.3ad',
+        'bond-miicom' => 100,
+        'bond-lacp-rate' => 1,
+        'bond-slaves' => 'none',
         multicast => 'no',
         stp => 'off',
         'bond-mode' => '802.3ad',
@@ -264,6 +268,10 @@ validate_config {
         type => { type => "string" },
         userctl => { type => "string" },
         vendor => { type => "string" },
+        'pre-up' => { type => "list", items => { type => "string" } },
+        'pre-down' => { type => "list", items => { type => "string" } },
+        'post-up' => { type => "list", items => { type => "string" } },
+        'post-down' => { type => "list", items => { type => "string" } },
       },
       fail_on_unknown => 1,
     },
@@ -429,18 +437,16 @@ elsif (i_should("interface") && -f "/etc/network/interfaces") {
     push @{$x{$_}}, ref $d->{$_} ? @{$d->{$_}} : $d->{$_}
       foreach qw( pre-up up post-up pre-down down post-down );
 
-    my %sub;
     if (i_should("bond") && $d->{bond}) {
       # Bonding Interfaces
       foreach my $slaves ($d->{bond}) {
         foreach my $slave (@$slaves) {
-          %sub = (
+          $interfaces{$slave} = {
             _auto => $slave,
             _addrfam => "inet",
             _method => "manual",
-                  'bond-master' => $device,
-          );
-          $interfaces{$slave} = \%sub;
+            'bond-master' => $device,
+          };
         }
       }
     }
