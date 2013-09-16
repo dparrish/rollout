@@ -19,6 +19,11 @@ See L<http://sites.dparrish.com/rollout/ssh-keys> for more information on using 
       },
     },
     ssh_keys_add => [ 'dparrish', 'testuser', 'adminuser' ],
+    ssh_keys_add_user => { # {{{
+      cdonovan => [
+        'cdonovan@desktop',
+        'cdonovan@server',
+      ],
   };
 
 =head1 OPTIONS
