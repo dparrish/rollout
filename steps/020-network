@@ -68,6 +68,10 @@ options won't make your system inaccessable.
         netmask => '255.255.255.0',
         gateway => '192.168.1.1',
         bond => [ 'eth0', 'eth1' ],
+        'bond-mode' => '802.3ad',
+        'bond-miicom' => 100,
+        'bond-lacp-rate' => 1,
+        'bond-slaves' => 'none',
         multicast => 'no',
         stp => 'off',
       },
@@ -217,7 +221,11 @@ validate_config {
       type => "options",
       options => {
         arp => { type => "string" },
-        bond => { type => "list" },
+        bond => { type => "list", items => { type => "string" } },
+        'bond-mode' => { type => "string" },
+        'bond-miicom' => { type => "int" },
+        'bond-lacp-rate' => { type => "int" },
+        'bond-slaves' => { type => "string" },
         bootfile => { type => "string" },
         bootproto => { type => "string" },
         bridge => { type => "string" },
@@ -421,9 +429,23 @@ elsif (i_should("interface") && -f "/etc/network/interfaces") {
     $x{$_} = $d->{$_}
       foreach qw( bootfile broadcast client gateway hostname hwaddress leasehours leasetime media
                   metric mtu network pointopoint provider server vendor frame netnum endpoint local
-                  ttl );
+                  ttl bond-mode bond-miicom bond-lacp-rate bond-slaves );
     push @{$x{$_}}, ref $d->{$_} ? @{$d->{$_}} : $d->{$_}
       foreach qw( pre-up up post-up pre-down down post-down );
+
+    if (i_should("bond") && $d->{bond}) {
+      # Bonding Interfaces
+      foreach my $slaves ($d->{bond}) {
+        foreach my $slave (@$slaves) {
+          $interfaces{$slave} = {
+            _auto => $slave,
+            _addrfam => "inet",
+            _method => "manual",
+            'bond-master' => $device,
+          };
+        }
+      }
+    }
 
     if (i_should("bridge") && $d->{bridge}) {
       # Bridging Interface
@@ -602,4 +624,3 @@ if ($safe_mode && $changes) {
   w "Network config is considered dangerous, changes won't be applied unless you specify the ".
     "\"-f network\" argument.";
 }
-
