@@ -29,14 +29,14 @@ cd /tmp
   * Using wget
 
     ```bash
-wget http://github.com/dparrish/rollout/archive/master.tar.gz
+wget http://github.com/alienresidents/rollout/archive/master.tar.gz
 tar xzf master.tar.gz
 mv rollout-master rollout
     ```
   * Using git
 
     ```bash
-git clone https://github.com/dparrish/rollout.git
+git clone https://github.com/alienresidents/rollout.git
     ```
 
 
@@ -138,7 +138,7 @@ mkdir -p $BASEDIR
 groupadd $GROUP
 useradd -g $GROUP $USER
 cd /tmp
-wget http://github.com/dparrish/rollout/archive/master.tar.gz
+wget http://github.com/alienresidents/rollout/archive/master.tar.gz
 tar xzf master.tar.gz
 mv rollout-master $ROLLOUT_TMP_DIR
 cp -i $ROLLOUT_TMP_DIR/rolloutd /usr/local/sbin/rolloutd
