@@ -5,8 +5,6 @@
 
   ```bash
 BASEDIR=</base/directoy/for/rolloutd/>
-USER=<username_rolloutd_will_run_as>
-GROUP=<groupname_rolloutd_will_run_as>
 ROLLOUT_SERVER=<resolvable hostname | ip address>
 ROLLOUT_PORT=<some port number>
   ```
@@ -33,22 +31,13 @@ wget http://github.com/alienresidents/rollout/archive/master.tar.gz
 tar xzf master.tar.gz
 mv rollout-master rollout
     ```
-  * Using git
-
-    ```bash
-git clone https://github.com/alienresidents/rollout.git
-    ```
 
 
 1.  After extraction, run the following commands as root
 
   ```bash
 BASEDIR=/usr/local/rollout
-USER=nobody
-GROUP=group
 ROLLOUT_TMP_DIR="/tmp/rollout"
-groupadd $GROUP
-useradd -g $GROUP $USER
 cp -i $ROLLOUT_TMP_DIR/rolloutd /usr/local/sbin/rolloutd
 cp -i $ROLLOUT_TMP_DIR/rollout.init /etc/init.d/rollout
 cp -i $ROLLOUT_TMP_DIR/rollout.default /etc/default/rollout
@@ -60,7 +49,6 @@ cp -i $ROLLOUT_TMP_DIR/rollout $BASEDIR/
 chmod 750 /usr/local/sbin/rolloutd
 chmod 755 /etc/init.d/rollout
 chmod 600 /etc/default/rollout
-chown -R $USER:$GROUP $BASEDIR
   ```
 
 1.  Edit /etc/default/rollout to configure your server
@@ -76,21 +64,11 @@ ln -s /etc/init.d/rollout /etc/rc2.d/S70rollout
 1.  Copy the default configuration (rollout.cfg) or your own configuration into
 $BASEDIR.
 
-1.  Decide which webserver to use.
-
-  + Use rolloutd
-
-  1.  Start rolloutd
-
-  ```bash
-/etc/init.d/rollout start
-  ```
-
-  + Use Apache2
+1.  Setup Apache
 
   1.  Edit the Apache2 default configuration file
 
-  **/etc/apache2/sites-enabled/000-default**
+  **/etc/apache2/sites-available/000-default**
 
   ```apache
 Alias /rollout /usr/local/rollout
@@ -118,7 +96,7 @@ a new installation of Ubuntu Server 12.10 32bit
 * Distribution - **Ubuntu Server 12.10**
 * Architecture - **i386**
 * IP Addresses - **10.9.8.1**
-* Web Server - **Apache2 w/ PHP5**
+* Web Server - **Apache2**
 
 I needed to have Apache2 installed for other reasons on this server, and have
 little control over the firewall, so Apache2 was chosen instead of the
@@ -132,11 +110,7 @@ ROLLOUT_TMP_DIR="/tmp/rollout"
 BASEDIR="/app/rollout"
 ROLLOUT_SERVER="10.9.8.1"
 ROLLOUT_PORT="80"
-GROUP="rollout"
-USER="rollout"
 mkdir -p $BASEDIR
-groupadd $GROUP
-useradd -g $GROUP $USER
 cd /tmp
 wget http://github.com/alienresidents/rollout/archive/master.tar.gz
 tar xzf master.tar.gz
@@ -153,18 +127,17 @@ ln -sf /app/rollout/rollout /usr/local/sbin
 chmod 750 /usr/local/sbin/rolloutd
 chmod 755 /etc/init.d/rollout
 chmod 600 /etc/default/rollout
-chown -R $USER:$GROUP $BASEDIR
 apt-get update
-apt-get -y install libapache2-mod-php5 liberror-perl libwww-perl
+apt-get -y install apache2 liberror-perl libwww-perl
   ```
 
 1.  Edit the default Apache2 configuration
 
   ```bash
-vim /etc/apache2/sites-enabled/000-default
+vim /etc/apache2/sites-available/000-default
   ```
 
-  **/etc/apache2/sites-enabled/000-default**
+  **/etc/apache2/sites-available/000-default**
 
   ```apache
 Alias /rollout /app/rollout
