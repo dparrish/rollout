@@ -5,8 +5,6 @@
 
   ```bash
 BASEDIR=</base/directoy/for/rolloutd/>
-ROLLOUT_SERVER=<resolvable hostname | ip address>
-ROLLOUT_PORT=<some port number>
   ```
 
 All commands must be run as root, unless otherwise specified.
