@@ -15,7 +15,7 @@ All commands must be run as root, unless otherwise specified.
   ```bash
   apt-get install -y git
   cd $(dirname $BASEDIR)
-  git clone https://github.com/alienresidents/rollout
+  git clone https://github.com/AlienResidents/rollout.git
   ```
 
 1.  Setup Apache
