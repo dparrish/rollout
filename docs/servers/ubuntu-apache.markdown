@@ -1,6 +1,6 @@
-#This is an example on how to install the rollout server on Ubuntu.
+#This is an example on how to configure Apache2, to serve rollout files.
 
-# Server Installation
+# Rollout Installation
 ##Required Information
 
   ```bash
