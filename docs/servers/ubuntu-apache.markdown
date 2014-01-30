@@ -9,14 +9,6 @@ ROLLOUT_SERVER=<resolvable hostname | ip address>
 ROLLOUT_PORT=<some port number>
   ```
 
-1.  You'll need the following perl modules
-
-  <pre>
-Net::Netmask
-IO::Socket::SSL
-Error
-LWP
-  </pre>
 
 1.  Get rollout source, and extract
 
