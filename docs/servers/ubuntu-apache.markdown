@@ -42,7 +42,7 @@ Alias /rollout /usr/local/rollout
 
 # Example Server Installation and setup
 The following example is the initial setup and configuration on
-a new installation of Ubuntu Server 12.10 32bit
+a new installation of Ubuntu Server 12.c04.3 x86_64
 
 ##Server details
 * Hostname - **rollout-srv**
