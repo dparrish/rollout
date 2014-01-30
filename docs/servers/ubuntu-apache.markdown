@@ -4,7 +4,7 @@
 ##Required Information
 
   ```bash
-BASEDIR=</base/directoy/for/rolloutd/>
+BASEDIR=</base/directory/for/rollout>
   ```
 
 All commands must be run as root, unless otherwise specified.
