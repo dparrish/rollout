@@ -14,6 +14,12 @@ All commands must be run as root, unless otherwise specified.
   git clone https://github.com/AlienResidents/rollout.git
   ```
 
+1.  Install Apache
+
+  ```bash
+  apt-get -y install apache2
+  ```
+
 1.  Setup Apache
 
   1.  Edit the Apache2 default configuration file
