@@ -24,7 +24,7 @@ All commands must be run as root, unless otherwise specified.
 
   1.  Edit the Apache2 default configuration file
 
-  **/etc/apache2/sites-available/000-default**
+  **/etc/apache2/sites-available/default**
 
   ```apache
 Alias /rollout /usr/local/rollout
@@ -39,7 +39,7 @@ Alias /rollout /usr/local/rollout
   1.  Restart Apache2
 
   ```bash
-/etc/init.d/apache2 restart
+/etc/init.d/apache2 reload
   ```
 
 # Example Server Installation and setup
@@ -67,14 +67,20 @@ git clone https://github.com/alienresidents/rollout.git
 1.  Edit the default Apache2 configuration
 
   ```bash
-vim /etc/apache2/sites-available/000-default
+vim /etc/apache2/sites-available/default
+  ```
+  
+  or if you are using nano
+  
+  ```bash
+  nano /etc/apache2/sites-available/default
   ```
 
-  **/etc/apache2/sites-available/000-default**
+  **/etc/apache2/sites-available/default**
 
   ```apache
-Alias /rollout /app/rollout
-<Directory /app/rollout>
+Alias /rollout /data/rollout
+<Directory /data/rollout>
   Options Indexes FollowSymlinks
   AllowOverride None
   Order allow,deny
@@ -91,6 +97,6 @@ Alias /rollout /app/rollout
 1.  Test the apache changes
 
   ```bash
-wget -O- http://localhost/rollout/README
+wget -q -O- http://localhost/rollout/README
   ```
 You should be presented with the contents of the README file.
