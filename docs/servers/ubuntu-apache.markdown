@@ -1,11 +1,7 @@
 #This is an example on how to configure Apache2, to serve rollout files.
 
 # Rollout Installation
-##Required Information
 
-  ```bash
-BASEDIR=</base/directory/for/rollout>
-  ```
 
 All commands must be run as root, unless otherwise specified.
 
