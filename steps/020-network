@@ -74,6 +74,10 @@ options won't make your system inaccessable.
         'bond-slaves' => 'none',
         multicast => 'no',
         stp => 'off',
+        'bond-mode' => '802.3ad',
+        'bond-miicom' => 100,
+        'bond-lacp-rate' => 1,
+        'bond-slaves' => 'none',
       },
     },
   };
@@ -204,7 +208,7 @@ Modify /etc/resolv.conf, including name servers and resolver options.
 
 =head1 COPYRIGHT
 
-Copyright 2010 David Parrish
+RolloutNG is based heavily on Rollout (https://github.com/dparrish/rollout) by David Parrish, Copyright 2010.   RolloutNG is Copyright by Chris Donovan 2014.
 
 =cut
 

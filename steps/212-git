@@ -22,6 +22,19 @@ Check out git modules to the local filesystem.
       },
     },
   };
+  class Sample_SSH => {
+    git => {
+      '/tmp/checkout_path' => {
+        source => 'ssh:git@git.domain/module/trunk.git',
+        identity_file => '/home/user/.ssh/id_dsa',
+        user => 'jenkins',
+        branch => 'master',
+        clone_options => [],
+        pull_options => [],
+        cmd => 'ls -l',
+      },
+    },
+  };
 
 =head1 OPTIONS
 
@@ -63,7 +76,7 @@ Any options to add to the git pull command line
 
 =head1 COPYRIGHT
 
-Copyright 2010 David Parrish
+RolloutNG is based heavily on Rollout (https://github.com/dparrish/rollout) by David Parrish, Copyright 2010.   RolloutNG is Copyright by Chris Donovan 2014.
 
 =cut
 
@@ -90,15 +103,13 @@ validate_config {
 
 return unless i_has('git');
 my %git = flatten_hash(c("$hostname/git"));
-package_check("git-core") if keys %git && (c("$hostname/_os_detection/distro") eq 'ubuntu' ||
+package_check("git-core", "sudo") if keys %git && (c("$hostname/_os_detection/distro") eq 'ubuntu' ||
                                            c("$hostname/_os_detection/distro") eq 'debian');
 foreach my $dir (sort(keys %git)) {
   my $x = $git{$dir};
   if (!-d $dir) {
     # New checkout
     my $basedir = dirname($dir);
-    dir_check($basedir);
-    chdir $basedir or throw LocalFileException "Could not cd to new dir $basedir: $!";
     v "Checking out $x->{source} to $dir";
     my @cmd = ("git", "clone");
     push @cmd, "--branch", $x->{branch} if $x->{branch};

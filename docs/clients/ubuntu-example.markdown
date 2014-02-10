@@ -26,7 +26,7 @@ wget -O- $URL/rollout | perl - -u $URL -o setup
 The following example is the initial setup on a new installation of an Ubuntu client.
 
 ##Client details
-* OS - Linux 
+* OS - Linux
 * Distribution - Ubuntu Server 12.04 LTS
 * Architecture - i386
 * Hostname - client

@@ -2,7 +2,7 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 #
 #    Rollout
-#    Copyright (C) 2007 David Parrish
+#    RolloutNG is based heavily on Rollout (https://github.com/dparrish/rollout) by David Parrish, Copyright 2010.   RolloutNG is Copyright by Chris Donovan 2014.
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -439,6 +439,19 @@ sub http_index(@) {
       $entry{size} = int($entry{size} || 0);
       $entry{mtime} = int($entry{mtime} || 0);
       push @files, \%entry;
+    }
+  } elsif ($html =~ /^<a href="([^"]+)">(.+?)<\/a>/m) {
+    # Look for Nginx style directory listing
+    while ($html =~ /^<a href="([^"]+)">(.+?)<\/a>/mg) {
+      my($filename, $name) = ($1, $2);
+      next if !$filename || $name =~ /\.\.\//i;
+      push @files, {
+        filename => $filename,
+        type => ($filename =~ /\/$/) ? "directory" : "file",
+        size => 0,
+        mtime => 0,
+        checksum => "",
+      }
     }
   } else {
     # Look for Apache style directory listing
@@ -1246,7 +1259,7 @@ and produce the same results.
 
 =head1 COPYRIGHT
 
-Copyright 2007 David Parrish
+RolloutNG is based heavily on Rollout (https://github.com/dparrish/rollout) by David Parrish, Copyright 2010.   RolloutNG is Copyright by Chris Donovan 2014.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
