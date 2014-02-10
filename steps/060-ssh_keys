@@ -8,17 +8,15 @@
 
 Manage SSH keys for users to login without passwords.
 
-See L<http://sites.dparrish.com/rollout/ssh-keys> for more information on using this.
-
 =head1 EXAMPLE
 
   class Sample => {
     user => {
-      dparrish => {
-        ssh_keys => [ 'dparrish' ],  # This is implied when a dparrish user exists
+      cdonovan => {
+        ssh_keys => [ 'cdonovan' ],  # This is implied when a cdonovan user exists
       },
     },
-    ssh_keys_add => [ 'dparrish', 'testuser', 'adminuser' ],
+    ssh_keys_add => [ 'cdonovan', 'testuser', 'adminuser' ],
     ssh_keys_add_user => {
       cdonovan => [
         'cdonovan@desktop',

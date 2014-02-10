@@ -67,7 +67,6 @@ homedir_mode option, but the owner will always be this user.
 =item user/C<username>/ssh_keys
 
 A list of SSH key names that will be allowed to connect as this user without using a password. See
-http://sites.dparrish.com/rollout/ssh-keys for details on this option.
 
 =item group/C<groupname>/gid
 
