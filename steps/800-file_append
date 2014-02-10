@@ -62,7 +62,7 @@ Replace the token %HOSTNAME% in the string with the current hostname.
 =item expand_domain
 
 Replace the token %DOMAIN% in the string with the current domain name (Configured by the
-C<domain_name config key).
+C<domain_name> config key).
 
 =item expand_ip
 
