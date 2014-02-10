@@ -21,7 +21,7 @@ Create and maintain files of crontab entries.
 
 =head1 COPYRIGHT
 
-Copyright 2010 David Parrish
+RolloutNG is based heavily on Rollout (https://github.com/dparrish/rollout) by David Parrish, Copyright 2010.   RolloutNG is Copyright by Chris Donovan 2014.
 
 =cut
 

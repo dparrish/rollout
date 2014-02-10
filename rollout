@@ -2,7 +2,7 @@
 # vim:tw=100 sw=2 expandtab ft=perl
 #
 #    Rollout
-#    Copyright (C) 2007 David Parrish
+#    RolloutNG is based heavily on Rollout (https://github.com/dparrish/rollout) by David Parrish, Copyright 2010.   RolloutNG is Copyright by Chris Donovan 2014.
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -1259,7 +1259,7 @@ and produce the same results.
 
 =head1 COPYRIGHT
 
-Copyright 2007 David Parrish
+RolloutNG is based heavily on Rollout (https://github.com/dparrish/rollout) by David Parrish, Copyright 2010.   RolloutNG is Copyright by Chris Donovan 2014.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
