@@ -49,7 +49,7 @@ validate_config {
     value => {
       help => "List of commands to allow",
       type => "list",
-      items => { type => [ "path", "string" ], regex => qr/^ALL$/ },
+      items => { type => [ "path", "string" ] },
     },
   },
 };
