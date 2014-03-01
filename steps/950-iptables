@@ -33,6 +33,7 @@ options won't make your system inaccessable.
     firewall_drop => [
       '192.168.1.10' => '53:udp',
     ],
+    iptables_file => "/var/run/iptables/active",
   };
 
 =head1 SKIPPABLE STEPS
@@ -77,6 +78,10 @@ validate_config {
       type => "string",
     },
   },
+  iptables_file => {
+    help => "Location of the iptables rule file, expected to be loaded at startup",
+    type => "string",
+  },
 };
 
 dangerous_step;
@@ -90,7 +95,6 @@ return unless (@accept || @drop || @append);
 # Make sure iptables is installed
 if (i_distro("debian", "ubuntu")) {
   package_check("iptables");
-  dir_check("/var/lib/iptables");
   file_modify("/etc/default/iptables", undef,
               [ 's/enable_autosave=true/enable_autosave=false/',
                 's/enable_save_counters=true/enable_save_counters=false/' ])
@@ -198,9 +202,9 @@ if (i_distro("redhat")) {
   text_install("/etc/sysconfig/iptables", $text,
                "iptables-restore /etc/sysconfig/iptables") and $changes++;
 } elsif (i_distro("debian", "ubuntu")) {
-  dir_check("/var/lib/iptables");
-  text_install("/var/lib/iptables/active", $text,
-               "iptables-restore /var/lib/iptables/active") and $changes++;
+  my $rules_file = c("$hostname/iptables_file") || "/var/lib/iptables/active";
+  dir_check(dirname($rules_file));
+  text_install($rules_file, $text, "iptables-restore $rules_file") and $changes++;
 }
 
 if ($safe_mode && $changes) {
