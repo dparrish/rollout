@@ -193,7 +193,7 @@ if (i_should("users") && %users) {
     next unless defined $user;
     $user->{name} ||= "";
     $user->{name} =~ s/\$hostname/$hostname/;
-    $user->{homedir_mode} ||= 0750;
+    $user->{homedir_mode} ||= 0755;
 
     my($name, $passwd, $uid, $gid, $quota, $comment, $gcos, $dir, $shell, $expire) =
       getpwnam($username);
