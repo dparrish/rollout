@@ -283,7 +283,7 @@ sub file_modify {
   return unless $changes;
 
   l "Modified $p->{-file} with ". join(", ", @expr);
-  safe_write(-file => $p->{-file}, -text => $f);
+  safe_write(-file => $p->{-file}, -text => $f) or l "Error writing file";
 
   if (defined $p->{-cmd} && !$safe_mode) {
     if (ref $p->{-cmd} eq 'CODE') {
