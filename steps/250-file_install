@@ -123,11 +123,11 @@ my %files = flatten_hash(c("$hostname/file_install"));
 while (my($dest, $f) = each(%files)) {
   next if $done_files{$dest}++;
   next unless i_should($dest);
-  if ($f->{source}) {
+  if (defined $f->{source}) {
     file_install(-file => $dest, -src => $f->{source}, -cmd => $f->{command} || undef,
                  -owner => $f->{owner}, -group => $f->{group},
                  -mode => $f->{mode}, -uid => $f->{uid}, -gid => $f->{gid}, -modify => $f->{modify});
-  } elsif ($f->{text}) {
+  } elsif (defined $f->{text}) {
     if ($f->{text} =~ /^\n?(\s+)/m) {
       my $strip = $1;
       my @text = split(/\n/, $f->{text});
