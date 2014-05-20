@@ -440,7 +440,7 @@ sub http_index(@) {
       $entry{mtime} = int($entry{mtime} || 0);
       push @files, \%entry;
     }
-  } else {
+  } elsif ($html =~ /^<tr>/) {
     # Look for Apache style directory listing
     while ($html =~ /^(?:<tr><td valign="top">)?<img src="[^"]+" alt="[^"]+">(?:<\/td><td>| )?<a href="([^"]+)">(.+?)<\/a>(?:<\/td>| )/mg) {
       my($filename, $name) = ($1, $2);
@@ -453,6 +453,22 @@ sub http_index(@) {
         checksum => "",
       }
     }
+  } elsif ($html =~ /^<a href="([^"]+)">(.+?)<\/a>/m) {
+    # Look for Nginx style directory listing
+    while ($html =~ /^<a href="([^"]+)">(.+?)<\/a>/mg) {
+      my($filename, $name) = ($1, $2);
+      next if !$filename || $name =~ /\.\.\//i;
+      push @files, {
+        filename => $filename,
+        type => ($filename =~ /\/$/) ? "directory" : "file",
+        size => 0,
+        mtime => 0,
+        checksum => "",
+      }
+    }
+  } else {
+    print "$html\n";
+    throw ConfigException "Can't determine which web server you're running\n";
   }
   return @files;
 }
@@ -561,20 +577,6 @@ sub i_isa {
   return 0;
 }
 eval { memoize('i_isa') };
-
-sub get_interface_address {
-  my($iface) = @_;
-  my $socket;
-  require 'sys/ioctl.ph';
-  socket($socket, PF_INET, SOCK_STREAM, (getprotobyname('tcp'))[2]) || die "unable to create a socket: $!\n";
-  my $buf = pack('a256', $iface);
-  if (ioctl($socket, SIOCGIFADDR(), $buf) && (my @address = unpack('x20 C4', $buf))) {
-    close($socket);
-    return join('.', @address);
-  }
-  close($socket);
-  return undef;
-}
 
 sub i_ip {
   my($host) = @_;
@@ -758,7 +760,7 @@ sub queue_step {
 my $errors = 0;
 sub run_step {
   my($filename) = @_;
-  validate("Attempt to run a step with no filename", $filename);
+  validate("Attempt to run a step with no filename\n", $filename);
   $safe_mode = $restore_safe_mode;
   $current_step = $filename;
   _print_step_name() unless $no_step_labels || $verbosity < 1;
@@ -798,7 +800,7 @@ sub run_step {
 
 sub step_help {
   my($filename, $indent) = @_;
-  validate("Attempt to run a step with no filename", $filename);
+  validate("Attempt to run a step with no filename\n", $filename);
   try {
     $steps_code{$filename} ||= http_file -url => "steps/$filename";
   } catch HttpException with {
@@ -935,9 +937,6 @@ sub command {
   $flags->{failure} ||= "FAILED: '$command' failed.";
   $flags->{success} ||= "Finished running '$command'.";
   $flags->{timeout} = undef unless $flags->{timeout};
-  if (exists $flags->{uid} && $flags->{uid} !~ /^\d+$/) {
-    $flags->{uid} = getpwnam $flags->{uid};
-  }
 
   v "CMD: $command";
   $printed++ if $verbosity > 1;
@@ -957,12 +956,6 @@ sub command {
     setsid;
     open STDIN, '</dev/null';
     open(STDERR, '>&STDOUT');
-
-    # Set the UID if required
-    if ($flags->{uid}) {
-      v "SetUID $flags->{uid}";
-      $> = $flags->{uid} if $flags->{uid};
-    }
 
     $|=1;
     exec @_;
