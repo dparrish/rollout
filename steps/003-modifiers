@@ -626,8 +626,8 @@ sub symlink_check {
 }
 
 # Install a whole directory's files
-  my %new_files;
-  my %files_to_delete;
+my %new_files;
+my %files_to_delete;
 sub dir_install {
   my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => {},
                              -dir_flags => {}, -mode => undef, -uid => undef, -owner => undef,
@@ -706,7 +706,7 @@ sub dir_install {
         $files_to_delete{$File::Find::name} = 1;
       }
     }
-    find(\&find_files, $p->{-dest});
+    find(\&find_files, $p->{-dest}) if -d $p->{-dest};
     my $key_count = scalar(keys %files_to_delete);
     if ($key_count > 0) {
       l "Cleaning up files for $p->{-dest}";
