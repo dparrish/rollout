@@ -709,7 +709,6 @@ sub dir_install {
     find(\&find_files, $p->{-dest});
     my $key_count = scalar(keys %files_to_delete);
     if ($key_count > 0) {
-      l $key_count;
       l "Cleaning up files for $p->{-dest}";
       foreach my $file (keys %files_to_delete) {
           l "Removing file $file";
