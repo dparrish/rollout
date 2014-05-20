@@ -440,7 +440,7 @@ sub http_index(@) {
       $entry{mtime} = int($entry{mtime} || 0);
       push @files, \%entry;
     }
-  } else {
+  } elsif ($html =~ /^<tr>/) {
     # Look for Apache style directory listing
     while ($html =~ /^(?:<tr><td valign="top">)?<img src="[^"]+" alt="[^"]+">(?:<\/td><td>| )?<a href="([^"]+)">(.+?)<\/a>(?:<\/td>| )/mg) {
       my($filename, $name) = ($1, $2);
@@ -453,6 +453,22 @@ sub http_index(@) {
         checksum => "",
       }
     }
+  } elsif ($html =~ /^<a href="([^"]+)">(.+?)<\/a>/m) {
+    # Look for Nginx style directory listing
+    while ($html =~ /^<a href="([^"]+)">(.+?)<\/a>/mg) {
+      my($filename, $name) = ($1, $2);
+      next if !$filename || $name =~ /\.\.\//i;
+      push @files, {
+        filename => $filename,
+        type => ($filename =~ /\/$/) ? "directory" : "file",
+        size => 0,
+        mtime => 0,
+        checksum => "",
+      }
+    }
+  } else {
+    print "$html\n";
+    throw ConfigException "Can't determine which web server you're running\n";
   }
   return @files;
 }
@@ -758,7 +774,7 @@ sub queue_step {
 my $errors = 0;
 sub run_step {
   my($filename) = @_;
-  validate("Attempt to run a step with no filename", $filename);
+  validate("Attempt to run a step with no filename\n", $filename);
   $safe_mode = $restore_safe_mode;
   $current_step = $filename;
   _print_step_name() unless $no_step_labels || $verbosity < 1;
@@ -798,7 +814,7 @@ sub run_step {
 
 sub step_help {
   my($filename, $indent) = @_;
-  validate("Attempt to run a step with no filename", $filename);
+  validate("Attempt to run a step with no filename\n", $filename);
   try {
     $steps_code{$filename} ||= http_file -url => "steps/$filename";
   } catch HttpException with {
