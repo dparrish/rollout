@@ -630,9 +630,9 @@ sub dir_install {
   my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => {},
                              -dir_flags => {}, -mode => undef, -uid => undef, -owner => undef,
                              -gid => undef, -group => undef, -dir_mode => undef,
-                             -sync => undef, -selfCalled => undef ];
+                             -delete => undef, -selfCalled => undef ];
 
-  $p->{-sync} ||= 0;
+  $p->{-delete} ||= 0;
   $p->{-dir_flags}{-mode} ||= $p->{-dir_mode} if $p->{-dir_mode};
   $p->{-flags}{-mode} ||= $p->{-mode} if $p->{-mode};
   foreach (qw( uid gid owner group )) {
@@ -664,7 +664,7 @@ sub dir_install {
         if (!$p->{-flags}{no_recurse}) {
           v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
           dir_install(-src => "$p->{-src}/$filename",
-                      -sync => $p->{-sync},
+                      -delete => $p->{-delete},
                       -dest => "$p->{-dest}/$filename",
                       -flags => $p->{-flags},
                       -selfCalled => 1,
@@ -698,7 +698,7 @@ sub dir_install {
       }
     }
   }
-    if (!$p->{-selfCalled} && $p->{-sync}) {
+    if (!$p->{-selfCalled} && $p->{-delete}) {
       use File::Find;
       v "Cleaning up files for $p->{-dest}";
       sub findFiles {
