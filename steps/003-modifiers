@@ -22,6 +22,8 @@ Copyright 2010 David Parrish
 
 =cut
 
+use File::Find;
+
 sub config_file {
   my $p = named_params @_, [ -file => undef, -sections => undef, -cmd => undef, -type => "ini",
                              -uid => undef, -owner => undef, -gid => undef, -group => undef,
@@ -624,13 +626,13 @@ sub symlink_check {
 }
 
 # Install a whole directory's files
-my @curFiles;
-my @newFiles;
+  my %new_files;
+  my %files_to_delete;
 sub dir_install {
   my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => {},
                              -dir_flags => {}, -mode => undef, -uid => undef, -owner => undef,
                              -gid => undef, -group => undef, -dir_mode => undef,
-                             -delete => undef, -selfCalled => undef ];
+                             -delete => undef, -self_called => undef ];
 
   $p->{-delete} ||= 0;
   $p->{-dir_flags}{-mode} ||= $p->{-dir_mode} if $p->{-dir_mode};
@@ -657,20 +659,20 @@ sub dir_install {
     return w "Empty index $p->{-src}" unless @files;
     foreach (@files) {
       my $filename = $_->{filename};
-      push(@newFiles, "$p->{-dest}/$filename");
       if ($_->{type} eq 'directory') {
         # It's a directory
         $filename =~ s/\/$//;
         if (!$p->{-flags}{no_recurse}) {
           v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
           dir_install(-src => "$p->{-src}/$filename",
-                      -delete => $p->{-delete},
-                      -dest => "$p->{-dest}/$filename",
-                      -flags => $p->{-flags},
-                      -selfCalled => 1,
-                      -dir_flags => $p->{-dir_flags}) && $changed++;
+                                     -delete => $p->{-delete},
+                                     -dest => "$p->{-dest}/$filename",
+                                     -flags => $p->{-flags},
+                                     -self_called => 1,
+                                     -dir_flags => $p->{-dir_flags}) && $changed++;
         }
       } else {
+        $new_files{"$p->{-dest}/$filename"} = 1;
         my @stat = stat("$p->{-dest}/$filename");
         if (@stat && $_->{mtime} <= $stat[9] && $_->{size} == $stat[7]) {
           # Same file size and newer locally, check the checksum to see if it should be skipped
@@ -698,19 +700,28 @@ sub dir_install {
       }
     }
   }
-    if (!$p->{-selfCalled} && $p->{-delete}) {
-      use File::Find;
-      v "Cleaning up files for $p->{-dest}";
-      sub findFiles {
-        push(@curFiles, $File::Find::name) if ($File::Find::name !~ /RCS.*,v$/);
+  if (!$p->{-self_called} && $p->{-delete}) {
+    sub find_files {
+      if (!$new_files{$File::Find::name} && -f $File::Find::name && $File::Find::name !~ /^.*\/RCS\/[^\/]*,v$/) {
+        $files_to_delete{$File::Find::name} = 1;
       }
-      find(\&findFiles, $p->{-dest});
-      my (@diff, %diff);
-      @diff{@curFiles} = @curFiles;
-      delete @diff{@newFiles};
-      foreach (keys %diff) { -f and !$safe_mode and l "$_"};
     }
-
+    find(\&find_files, $p->{-dest});
+    my $key_count = scalar(keys %files_to_delete);
+    if ($key_count > 0) {
+      l $key_count;
+      l "Cleaning up files for $p->{-dest}";
+      foreach my $file (keys %files_to_delete) {
+          l "Removing file $file";
+        if (-f $file) {
+          l "Removing file $file";
+          if (!$safe_mode) {
+            unlink $file;
+          }
+        }
+      }
+    }
+  }
   if ($changed && $p->{-cmd}) {
     if (ref $p->{-cmd} eq 'CODE') {
       l "Running perl code to finish install of $p->{-dest}";

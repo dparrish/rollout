@@ -14,11 +14,11 @@ Downloads and installs a directory of files locally
     dir_install => {
       '/tmp/test' => {
         source => 'rollout:/files/test',
-        delete => 1,
         dir_mode => 0755,
         mode => 0644,
         owner => 'root',
         group => 'daemon',
+        delete => 1,
         command => "find /tmp/test -ls",
       },
     },
@@ -36,12 +36,6 @@ Download the given directory of files and install them into I<path>.
 
 The source of the directory. This can be a local file, a HTTP url, or a path starting with C<rollout:> which will be replaced with the Rollout server's base URL.
 
-=item dir_install/I<path>/delete
-
-The delete mode.
-0 : Just download, don't delete anything
-1 : Download, and ensure that only the regular files downloaded are in directory tree
-
 =item dir_install/I<path>/mode
 
 Set the mode of files.
@@ -57,6 +51,10 @@ Set the owner of files and directories. This can be a name or an ID.
 =item dir_install/I<path>/group
 
 Set the group of files and directories. This can be a name or an ID.
+
+=item dir_install/I<path>/delete
+
+Delete non-downloaded files in directory
 
 =item dir_install/I<path>/command
 
