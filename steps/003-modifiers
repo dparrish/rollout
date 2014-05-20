@@ -470,7 +470,7 @@ sub set_attr {
 sub text_install {
   my $p = named_params @_, [ -file => undef, -text => undef, -cmd => undef, -flags => {},
                              -owner => undef, -group => undef, -uid => undef, -gid => undef,
-                             -skip_checksum => undef, -dir_mode => undef ];
+                             -skip_checksum => undef, -mode => undef, -dir_mode => undef ];
   validate("text_install called with no filename" => $p->{-file});
   validate("text_install called without text for $p->{-file}", defined $p->{-text});
   return 0 if i_immutable_file($p->{-file});
@@ -478,9 +478,10 @@ sub text_install {
   my $changed = 1;
 
   # Create containing directory if it doesn't exist
+  $p->{-mode} ||= 0644;
+  $p->{-dir_mode} ||= 0755;
   my $path = dirname($p->{-file});
-  $p->{-mode} ||= 0755;
-  dir_check(-dir => $path, -mode => $p->{-mode}) if $path and $path ne $p->{-file} and ! -d $path;
+  dir_check(-dir => $path, -mode => $p->{-dir_mode}) if $path and $path ne $p->{-file} and ! -d $path;
 
   $p->{-flags}->{srcfn} ||= "text";
 
