@@ -624,11 +624,15 @@ sub symlink_check {
 }
 
 # Install a whole directory's files
+my @curFiles;
+my @newFiles;
 sub dir_install {
   my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => {},
                              -dir_flags => {}, -mode => undef, -uid => undef, -owner => undef,
-                             -gid => undef, -group => undef, -dir_mode => undef ];
+                             -gid => undef, -group => undef, -dir_mode => undef,
+                             -sync => undef, -selfCalled => undef ];
 
+  $p->{-sync} ||= 0;
   $p->{-dir_flags}{-mode} ||= $p->{-dir_mode} if $p->{-dir_mode};
   $p->{-flags}{-mode} ||= $p->{-mode} if $p->{-mode};
   foreach (qw( uid gid owner group )) {
@@ -641,9 +645,10 @@ sub dir_install {
 
   $p->{-src} =~ s/^rollout:/$config->{base_url}/;
   my $changed = 0;
+  my $removed = 0;
   d($p);
+  my @files;
   if ($p->{-src} =~ /^https?:\/\//) {
-    my @files;
     try {
       @files = http_index $p->{-src};
     } catch HttpException with {
@@ -652,14 +657,17 @@ sub dir_install {
     return w "Empty index $p->{-src}" unless @files;
     foreach (@files) {
       my $filename = $_->{filename};
+      push(@newFiles, "$p->{-dest}/$filename");
       if ($_->{type} eq 'directory') {
         # It's a directory
         $filename =~ s/\/$//;
         if (!$p->{-flags}{no_recurse}) {
           v "Recursing into $filename ($p->{-src}/$filename => $p->{-dest}/$filename)";
           dir_install(-src => "$p->{-src}/$filename",
+                      -sync => $p->{-sync},
                       -dest => "$p->{-dest}/$filename",
                       -flags => $p->{-flags},
+                      -selfCalled => 1,
                       -dir_flags => $p->{-dir_flags}) && $changed++;
         }
       } else {
@@ -690,6 +698,18 @@ sub dir_install {
       }
     }
   }
+    if (!$p->{-selfCalled} && $p->{-sync}) {
+      use File::Find;
+      v "Cleaning up files for $p->{-dest}";
+      sub findFiles {
+        push(@curFiles, $File::Find::name) if ($File::Find::name !~ /RCS.*,v$/);
+      }
+      find(\&findFiles, $p->{-dest});
+      my (@diff, %diff);
+      @diff{@curFiles} = @curFiles;
+      delete @diff{@newFiles};
+      foreach (keys %diff) { -f and !$safe_mode and l "$_"};
+    }
 
   if ($changed && $p->{-cmd}) {
     if (ref $p->{-cmd} eq 'CODE') {

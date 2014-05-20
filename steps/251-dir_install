@@ -14,6 +14,7 @@ Downloads and installs a directory of files locally
     dir_install => {
       '/tmp/test' => {
         source => 'rollout:/files/test',
+        sync => 1,
         dir_mode => 0755,
         mode => 0644,
         owner => 'root',
@@ -34,6 +35,12 @@ Download the given directory of files and install them into I<path>.
 =item dir_install/I<path>/source
 
 The source of the directory. This can be a local file, a HTTP url, or a path starting with C<rollout:> which will be replaced with the Rollout server's base URL.
+
+=item dir_install/I<path>/sync
+
+The sync mode.
+0 : Just download, don't delete anything
+1 : Download, and ensure that only the regular files downloaded are in directory tree
 
 =item dir_install/I<path>/mode
 
@@ -80,6 +87,7 @@ validate_config {
         mode => { type => "int", range => [0, 07777], help => "Mode for files" },
         owner => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
         source => { type => "string" },
+        sync => { type => "boolean" },
         uid => { type => "int", range => [0, 65535] },
       },
     },
