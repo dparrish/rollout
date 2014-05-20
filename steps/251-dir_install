@@ -98,7 +98,13 @@ while (my($dest, $src) = each(%dir_install)) {
   $src = { -src => $src } if ref $src ne 'HASH';
   $src = { map { (/^-/ ? $_ : "-$_") => $src->{$_} } keys %$src };
   $src->{-dest} |= $dest;
+  # Safe to assume we can remove trailing slashes, or double slashes;
+  $src->{-dest} =~ s/\/$//;
+  $src->{-dest} =~ s/\/\///;
   $src->{-src} ||= $src->{-source} if $src->{-source};
+  # Safe to assume we can remove trailing slashes, or double slashes;
+  $src->{-src} =~ s/\/$//;
+  $src->{-src} =~ s/\/\///;
   $src->{-cmd} ||= $src->{-command} if $src->{-command};
   dir_install(%$src);
 }
