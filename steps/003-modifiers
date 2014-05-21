@@ -22,6 +22,8 @@ Copyright 2010 David Parrish
 
 =cut
 
+use File::Find;
+
 sub config_file {
   my $p = named_params @_, [ -file => undef, -sections => undef, -cmd => undef, -type => "ini",
                              -uid => undef, -owner => undef, -gid => undef, -group => undef,
@@ -343,7 +345,7 @@ sub safe_write {
 sub safe_write_file {
   my $p = named_params @_, [ -file => undef, -text => undef ];
 
-  validate("Incorrect parameters to safe_write_file", $p->{-file} && $p->{-text});
+  validate("Incorrect parameters to safe_write_file", $p->{-file} && defined $p->{-text});
   my $file = $p->{-file};
 
   return 1 if $safe_mode;
@@ -628,7 +630,8 @@ sub symlink_check {
 sub dir_install {
   my $p = named_params @_, [ -src => undef, -dest => undef, -cmd => undef, -flags => {},
                              -dir_flags => {}, -mode => undef, -uid => undef, -owner => undef,
-                             -gid => undef, -group => undef, -dir_mode => undef ];
+                             -gid => undef, -group => undef, -dir_mode => undef,
+                             -delete => undef, -depth => 0, -new_files => {}, ];
 
   $p->{-dir_flags}{-mode} ||= $p->{-dir_mode} if $p->{-dir_mode};
   $p->{-flags}{-mode} ||= $p->{-mode} if $p->{-mode};
@@ -661,9 +664,13 @@ sub dir_install {
           dir_install(-src => "$p->{-src}/$filename",
                       -dest => "$p->{-dest}/$filename",
                       -flags => $p->{-flags},
+                      -delete => $p->{-delete},
+                      -depth => $p->{-depth} + 1,
+                      -new_files => $p->{-new_files},
                       -dir_flags => $p->{-dir_flags}) && $changed++;
         }
       } else {
+        $p->{-new_files}{"$p->{-dest}/$filename"} = 1;
         my @stat = stat("$p->{-dest}/$filename");
         if (@stat && $_->{mtime} <= $stat[9] && $_->{size} == $stat[7]) {
           # Same file size and newer locally, check the checksum to see if it should be skipped
@@ -691,7 +698,26 @@ sub dir_install {
       }
     }
   }
-
+  if ($p->{-depth} == 0 && $p->{-delete}) {
+    # Delete any left-over files, keeping the RCS/* local history
+    my %extra_files;
+    find({
+           wanted => sub {
+             $extra_files{$_} = 1 if !defined $p->{-new_files}{$_} && -f $_ && !m!/RCS/[^/]+,v$!
+           },
+           no_chdir => 1,
+         },
+         $p->{-dest}) if -d $p->{-dest};
+    if (%extra_files) {
+      v "Cleaning up files in $p->{-dest}";
+      foreach my $file (keys %extra_files) {
+        l "Removing file $file";
+        if (!$safe_mode) {
+          unlink $file and $changed++;
+        }
+      }
+    }
+  }
   if ($changed && $p->{-cmd}) {
     if (ref $p->{-cmd} eq 'CODE') {
       l "Running perl code to finish install of $p->{-dest}";

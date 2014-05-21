@@ -18,6 +18,7 @@ Downloads and installs a directory of files locally
         mode => 0644,
         owner => 'root',
         group => 'daemon',
+        delete => 0,
         command => "find /tmp/test -ls",
       },
     },
@@ -51,6 +52,10 @@ Set the owner of files and directories. This can be a name or an ID.
 
 Set the group of files and directories. This can be a name or an ID.
 
+=item dir_install/I<path>/delete
+
+Delete any files from the destination directory that do not exist in the source. This will keep any RCS/* local history files in the destination.
+
 =item dir_install/I<path>/command
 
 Shell command to run after extraction. This command will be run from inside the destination directory of the extraction.
@@ -80,6 +85,7 @@ validate_config {
         mode => { type => "int", range => [0, 07777], help => "Mode for files" },
         owner => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
         source => { type => "string" },
+        delete => { type => "boolean" },
         uid => { type => "int", range => [0, 65535] },
       },
     },
