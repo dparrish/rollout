@@ -480,8 +480,8 @@ sub text_install {
   my $changed = 1;
 
   # Create containing directory if it doesn't exist
-  $p->{-mode} ||= $p->{-flags}{-mode} ||= 0644;
-  $p->{-dir_mode} ||= $p->{-flags}{-dir_mode} ||= 0755;
+  $p->{-mode} ||= $p->{-flags}{-mode} || 0644;
+  $p->{-dir_mode} ||= $p->{-flags}{-dir_mode} || 0755;
   my $path = dirname($p->{-file});
   dir_check(-dir => $path, -mode => $p->{-dir_mode}) if $path and $path ne $p->{-file} and ! -d $path;
 
