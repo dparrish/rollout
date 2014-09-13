@@ -6,14 +6,12 @@ RUN apt-get update && apt-get install -y libwww-perl liberror-perl libnet-netmas
 
 # Rollout Configuration
 VOLUME /config/fragments
-VOLUME /config/conf
 VOLUME /config/files
 
 ADD rolloutd /usr/local/sbin/rolloutd
 ADD rollout /config/rollout
 ADD RolloutConfigValidator.pm /config/
 ADD rollout.cfg /config/rollout.cfg
-ADD conf /config/conf
 ADD steps /config/steps
 ADD fragments /config/fragments
 
