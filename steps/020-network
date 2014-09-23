@@ -257,7 +257,7 @@ validate_config {
         pointopoint => { type => "string" },
         primary => { type => "boolean" },
         provider => { type => "string" },
-        routes => { type => "hash_list" },
+        routes => { type => "hash" },
         server => { type => "string" },
         stp => { type => "string" },
         ttl => { type => "int" },
