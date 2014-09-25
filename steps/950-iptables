@@ -94,7 +94,7 @@ return unless (@accept || @drop || @append);
 
 # Make sure iptables is installed
 if (i_distro("debian", "ubuntu")) {
-  package_check("iptables");
+  package_check("iptables", "iptables-persistent");
   file_modify("/etc/default/iptables", undef,
               [ 's/enable_autosave=true/enable_autosave=false/',
                 's/enable_save_counters=true/enable_save_counters=false/' ])
