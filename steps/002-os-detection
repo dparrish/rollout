@@ -31,6 +31,7 @@ $m{$hostname}{_os_detection} = {
   version => 'unknown',
   arch => 'unknown',
 };
+my %_info;
 my $o = $m{$hostname}{_os_detection};
 my($sysname, $nodename, $version, $release, $arch) = POSIX::uname();
 $o->{version} = $version;
@@ -48,6 +49,14 @@ if ($^O eq 'linux') {
   if (-f '/etc/gentoo-release') {
     $o->{distro} = 'gentoo';
     ($o->{version}) = (lc(slurp_file('/etc/gentoo-release')) =~ /^.*?([\d.]+)/);
+  }
+
+  if (-f '/etc/os-release') {
+    open(my $fh, '/etc/os-release');
+    %_info = map { chomp; s/"//g; split /=/; } <$fh>;
+    close $fh;
+    $o->{distro} = $_info{ID};
+    $o->{version} = $_info{VERSION_ID};
   }
 
   if (!$o->{distro} || $o->{distro} eq 'unknown') {
