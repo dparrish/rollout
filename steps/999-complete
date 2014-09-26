@@ -54,19 +54,22 @@ if (!$safe_mode) {
   my $fn = c("$hostname/rollout/logfile");
   if ($fn && (my $fh = new IO::File ">>$fn"))
   {
-    my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
+    my($host, $srcport, $sshport) = split(/\s/, $ENV{SSH_CLIENT}) if $ENV{SSH_CLIENT};
+    ($host, $srcport, $sshport) = (`tty`, "", "") if !$host;
     if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
       $host = $1 || "127.0.0.1";
-      $port = $2 || 0;
-      my $x = `host $host` || "";
-      $host = $1 if $x =~ /domain name pointer (.*)\./;
+      $sshport = $1 || 0;
+      my $ip_type;
+      ($host =~ m/:/) ? $ip_type = 'AF_INET6' : $ip_type = 'AF_INET6';
+      my $x = gethostbyaddr(inet_aton($host),$ip_type);
+      $host = $1 if $x == "localhost";
     }
 
     print $fh "-------------------------------------------------\n";
     print $fh "START: ". localtime($start_time). "\n";
     print $fh "DURATION: $duration\n";
     print $fh "COMMENT: $rollout_comment\n";
-    print $fh "FROM: $host $port\n";
+    print $fh "FROM: $host $sshport\n";
     print $fh "HOSTNAME: $hostname\n";
     print $fh "\n$log\n";
     print $fh "\n";
