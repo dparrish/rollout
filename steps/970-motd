@@ -49,7 +49,7 @@ my($host, $srcport, $sshport) = split(/\s/, $ENV{SSH_CLIENT}) if $ENV{SSH_CLIENT
 ($host, $srcport, $sshport) = (`tty`, "", "") if !$host;
 if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
   $host = $1 || "127.0.0.1";
-  $sshport = $1 || 0;
+  $sshport = $2 || 0;
   my $ip_type;
   ($host =~ m/:/) ? $ip_type = 'AF_INET6' : $ip_type = 'AF_INET6';
   my $x = gethostbyaddr(inet_aton($host),$ip_type);
