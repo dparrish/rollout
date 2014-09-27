@@ -55,14 +55,13 @@ if (!$safe_mode) {
   if ($fn && (my $fh = new IO::File ">>$fn"))
   {
     my($host, $srcport, $sshport) = split(/\s/, $ENV{SSH_CLIENT}) if $ENV{SSH_CLIENT};
-    ($host, $srcport, $sshport) = (`tty`, "", "") if !$host;
+    $host ||= POSIX::ttyname(1);
     if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
       $host = $1 || "127.0.0.1";
       $sshport = $2 || 0;
       my $ip_type;
-      ($host =~ m/:/) ? $ip_type = 'AF_INET6' : $ip_type = 'AF_INET6';
-      my $x = gethostbyaddr(inet_aton($host),$ip_type);
-      $host = $1 if $x == "localhost";
+      my $ip_type = ($host =~ /:/) ? 'AF_INET' : 'AF_INET6';
+      my $x = gethostbyaddr(inet_aton($host), $ip_type);
     }
 
     print $fh "-------------------------------------------------\n";
