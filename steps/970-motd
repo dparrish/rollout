@@ -1,5 +1,8 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+use POSIX qw( ttyname );
+use Socket qw( getaddrinfo getnameinfo );
+
 =head1 NAME
 
 970-motd
@@ -44,15 +47,17 @@ validate_config {
 
 my $text = `uname -a`;
 
-my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
-if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
-  $host = $1 || "127.0.0.1";
-  $port = $2 || 0;
-  my $x = `host $host` || "";
-  $host = $1 if $x =~ /domain name pointer (.*)\./;
+
+my($src, $srcport, $sshport) = split(/\s/, $ENV{SSH_CLIENT}) if $ENV{SSH_CLIENT};
+$src ||= POSIX::ttyname(1);
+# $src will be blank if coming from cron.
+$src ||= "cron";
+if ($src =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
+  my ($error, @src_info) = getaddrinfo($src, 0);
+  ($error, $src) = getnameinfo($src_info[0]->{addr});
 }
 
-$text .= "\nUpdated by rollout at ". localtime(time). " from $host\n\n".
-   join("\n", flatten_list(c("$hostname/motd")));
+$text .= "\nUpdated by rollout at ". localtime(time). " from $src";
+$text .= "\n\n".  join("\n", flatten_list(c("$hostname/motd")));
 
 text_install("/etc/motd", $text);

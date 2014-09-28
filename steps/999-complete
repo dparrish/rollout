@@ -1,5 +1,8 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
+use POSIX qw( ttyname );
+use Socket qw( getaddrinfo getnameinfo );
+
 =head1 NAME
 
 999-complete
@@ -54,19 +57,20 @@ if (!$safe_mode) {
   my $fn = c("$hostname/rollout/logfile");
   if ($fn && (my $fh = new IO::File ">>$fn"))
   {
-    my($host, $port) = ($ENV{SSH_CLIENT} || "console", "");
-    if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
-      $host = $1 || "127.0.0.1";
-      $port = $2 || 0;
-      my $x = `host $host` || "";
-      $host = $1 if $x =~ /domain name pointer (.*)\./;
+    my($src, $srcport, $sshport) = split(/\s/, $ENV{SSH_CLIENT}) if $ENV{SSH_CLIENT};
+    $src ||= POSIX::ttyname(1);
+    # $src will be blank if coming from cron.
+    $src ||= "cron";
+    if ($src =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
+      my ($error, @src_info) = getaddrinfo($src, 0); 
+      ($error, $src) = getnameinfo($src_info[0]->{addr});
     }
 
     print $fh "-------------------------------------------------\n";
     print $fh "START: ". localtime($start_time). "\n";
     print $fh "DURATION: $duration\n";
     print $fh "COMMENT: $rollout_comment\n";
-    print $fh "FROM: $host $port\n";
+    print $fh "FROM: $src\n";
     print $fh "HOSTNAME: $hostname\n";
     print $fh "\n$log\n";
     print $fh "\n";
