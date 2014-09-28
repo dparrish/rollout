@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 # vim:tw=100 sw=2 expandtab ft=perl
 use POSIX qw( ttyname );
+use Socket qw( getaddrinfo getnameinfo );
 
 =head1 NAME
 
@@ -52,10 +53,8 @@ $src ||= POSIX::ttyname(1);
 # $src will be blank if coming from cron.
 $src ||= "cron";
 if ($src =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
-  $src = $1 || "127.0.0.1";
-  $sshport = $2 || 0;
-  my $ip_type = ($src =~ /:/) ? 'AF_INET' : 'AF_INET6';
-  $src = gethostbyaddr(inet_aton($src), $ip_type);
+  my ($error, @src_info) = getaddrinfo($src, 0);
+  ($error, my $src) = getnameinfo($src_info[0]->{addr});
 }
 
 $text .= "\nUpdated by rollout at ". localtime(time). " from $src";
