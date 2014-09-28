@@ -63,7 +63,7 @@ if (!$safe_mode) {
     $src ||= "cron";
     if ($src =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
       my ($error, @src_info) = getaddrinfo($src, 0); 
-      ($error, my $src) = getnameinfo($src_info[0]->{addr});
+      ($error, $src) = getnameinfo($src_info[0]->{addr});
     }
 
     print $fh "-------------------------------------------------\n";
