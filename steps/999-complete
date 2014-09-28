@@ -56,21 +56,22 @@ if (!$safe_mode) {
   my $fn = c("$hostname/rollout/logfile");
   if ($fn && (my $fh = new IO::File ">>$fn"))
   {
-    my($host, $srcport, $sshport) = split(/\s/, $ENV{SSH_CLIENT}) if $ENV{SSH_CLIENT};
-    $host ||= POSIX::ttyname(1);
-    if ($host =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
-      $host = $1 || "127.0.0.1";
+    my($src, $srcport, $sshport) = split(/\s/, $ENV{SSH_CLIENT}) if $ENV{SSH_CLIENT};
+    $src ||= POSIX::ttyname(1);
+    # $src will be blank if coming from cron.
+    $src ||= "cron";
+    if ($src =~ /(?:::ffff:)?(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+\d+/) {
+      $src = $1 || "127.0.0.1";
       $sshport = $2 || 0;
-      my $ip_type;
-      my $ip_type = ($host =~ /:/) ? 'AF_INET' : 'AF_INET6';
-      my $x = gethostbyaddr(inet_aton($host), $ip_type);
+      my $ip_type = ($src =~ /:/) ? 'AF_INET' : 'AF_INET6';
+      $src = gethostbyaddr(inet_aton($src), $ip_type);
     }
 
     print $fh "-------------------------------------------------\n";
     print $fh "START: ". localtime($start_time). "\n";
     print $fh "DURATION: $duration\n";
     print $fh "COMMENT: $rollout_comment\n";
-    print $fh "FROM: $host $sshport\n";
+    print $fh "FROM: $src\n";
     print $fh "HOSTNAME: $hostname\n";
     print $fh "\n$log\n";
     print $fh "\n";
