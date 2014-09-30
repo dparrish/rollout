@@ -226,6 +226,9 @@ validate_config {
         'bond-miicom' => { type => "int" },
         'bond-lacp-rate' => { type => "int" },
         'bond-slaves' => { type => "string" },
+        'bond-arp-interval' => { type => "int" },
+        'bond-arp-ip-target' => { type => "ip" },
+        'bond-primary' => { type => "string" },
         bootfile => { type => "string" },
         bootproto => { type => "string" },
         bridge => { type => "string" },
@@ -429,7 +432,8 @@ elsif (i_should("interface") && -f "/etc/network/interfaces") {
     $x{$_} = $d->{$_}
       foreach qw( bootfile broadcast client gateway hostname hwaddress leasehours leasetime media
                   metric mtu network pointopoint provider server vendor frame netnum endpoint local
-                  ttl bond-mode bond-miicom bond-lacp-rate bond-slaves );
+                  ttl bond-mode bond-miicom bond-lacp-rate bond-slaves bond-primary
+                  bond-arp-interval bond-arp-ip-target );
     push @{$x{$_}}, ref $d->{$_} ? @{$d->{$_}} : $d->{$_}
       foreach qw( pre-up up post-up pre-down down post-down );
 
