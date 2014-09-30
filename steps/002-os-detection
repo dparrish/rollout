@@ -31,6 +31,7 @@ $m{$hostname}{_os_detection} = {
   version => 'unknown',
   arch => 'unknown',
 };
+my %_info;
 my $o = $m{$hostname}{_os_detection};
 my($sysname, $nodename, $version, $release, $arch) = POSIX::uname();
 $o->{version} = $version;
