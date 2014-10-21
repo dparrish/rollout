@@ -201,8 +201,10 @@ if (i_should("users") && %users) {
     if (!$name) {
       # Create User
       l "Create user $username";
-      my $base_homedir = dirname($user->{home});
-      dir_check(-dir => $base_homedir, -uid => 0, -gid => 0, -mode => 0755) if ! -d $base_homedir;
+      if ($user->{home}) {
+        my $base_homedir = dirname($user->{home});
+        dir_check(-dir => $base_homedir, -uid => 0, -gid => 0, -mode => 0755) if ! -d $base_homedir;
+      }
       if (i_os("linux")) {
         command("useradd",
           ($user->{uid} ? ("-u", $user->{uid}, "-o") : ()),
