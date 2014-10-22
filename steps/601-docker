@@ -89,7 +89,7 @@ while (my($job, $c) = each(%docker)) {
   push @cmd, "--add-host", $_ foreach @{$c->{"add-host"}};
   push @cmd, "--link", $_ foreach @{$c->{link}};
   push @cmd, "-e", $_ foreach @{$c->{environment}};
-
+  push @cmd, "-m", $c->{memory} if $c->{memory};
   push @cmd, "-h", $c->{hostname} if $c->{hostname};
   push @cmd, "--cpu-shares", $c->{cpu} if $c->{cpu};
   push @cmd, "--cpuset", $c->{cpuset} if $c->{cpuset};
