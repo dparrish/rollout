@@ -137,6 +137,10 @@ try {
     next if ($_ =~ /^#/);
     s/\s+$//g;
     my($key, $name) = $_ =~ /(.*) ([\w\@\-_\.]+)$/;
+    if (!$name) {
+      l "Invalid SSH Key:\n$_";
+      next;
+    }
     $all_keys{$name} ||= "";
     $all_keys{$name} .= "$_\n";
   }
