@@ -1,0 +1,113 @@
+#!/usr/bin/perl -w
+# vim:tw=100 sw=2 expandtab ft=perl
+=head1 NAME
+
+601-docker
+
+=head1 DESCRIPTION
+
+Run Docker images
+
+=head1 EXAMPLE
+
+  class Sample => {
+    docker => {
+      'nginx-proxy' => {
+        image => 'jwilder/nginx-proxy',
+        ports => [ '80:80' ],
+        volumes => [ '/var/run/docker.sock:/tmp/docker.sock' ],
+      },
+    },
+  };
+
+=head1 COPYRIGHT
+
+Copyright 2014 David Parrish
+
+=cut
+
+
+validate_config {
+  docker => {
+    type => "hash",
+    key => {
+      help => "Name of job to run",
+      type => "string",
+    },
+    value => {
+      help => "Configuration for the job",
+      type => "options",
+      options => {
+        image => { type => "string", help => "Name of image to pull and run. Defaults to job name." },
+        ports => { type => "list", items => { type => 'string' }, help => "Publish a container's port to the host format: ip:hostPort:containerPort | ip::containerPort | hostPort:containerPort | containerPort" },
+        volumes => { type => "list", items => { type => 'string' }, help => "Bind mount a volume (e.g., from the host: -v /host:/container)" },
+        link => { type => "list", items => { type => 'string' }, help => "Add link to another container in the form of name:alias" },
+        environment => { type => "list", items => { type => 'string' }, help => "Set environment variables" },
+        expose_ports => { type => "boolean", help => "Publish all exposed ports" },
+        privileged => { type => "boolean", help => "Give extended privileges to this container" },
+        tty => { type => "boolean", help => "Allocate a pseudo-TTY" },
+        interactive => { type => "boolean", help => "Keep STDIN open even if not attached" },
+        restart => { type => "string", help => "Restart policy. Defaults to always" },
+        memory => { type => "string", help => "Memory limit (format: <number><optional unit>, where unit = b, k, m or g)" },
+        cpu => { type => "string", help => "CPU shares (relative weight)" },
+        cpuset => { type => "string", help => "CPUs in which to allow execution (0-3, 0,1)" },
+        hostname => { type => "string", help => "Container host name" },
+        dns => { type => "list", items => { type => "string" }, help => "Set custom DNS servers" },
+        "add-host" => { type => "list", items => { type => "string" }, help => "Add a custom host-to-IP mapping (host:ip)" },
+      },
+    },
+  },
+};
+
+
+my %docker = flatten_hash(c("$hostname/docker"));
+return unless %docker;
+
+require 'JSON.pm';
+
+# Location of the docker binary.
+# This should probably be a configuration option.
+my $docker = "/usr/bin/docker";
+unless (-x $docker) {
+  # Probably not installed
+  v "Installing docker";
+  command("curl -sL https://get.docker.io | sh");
+}
+
+while (my($job, $c) = each(%docker)) {
+  v "Checking docker container $job";
+  my @cmd = ($docker, "run", "-d");
+  push @cmd, "--restart", $c->{restart} || "always";
+  push @cmd, "-P" if $c->{expose_ports};
+  push @cmd, "--privileged" if $c->{privileged};
+  push @cmd, "-t" if $c->{tty};
+  push @cmd, "-i" if $c->{interactive};
+  push @cmd, "--name", $job;
+  push @cmd, "-p", $_ foreach @{$c->{ports}};
+  push @cmd, "-v", $_ foreach @{$c->{volumes}};
+  push @cmd, "--dns", $_ foreach @{$c->{dns}};
+  push @cmd, "--add-host", $_ foreach @{$c->{"add-host"}};
+  push @cmd, "--link", $_ foreach @{$c->{link}};
+  push @cmd, "-e", $_ foreach @{$c->{environment}};
+
+  push @cmd, "-h", $c->{hostname} if $c->{hostname};
+  push @cmd, "--cpu-shares", $c->{cpu} if $c->{cpu};
+  push @cmd, "--cpuset", $c->{cpuset} if $c->{cpuset};
+  push @cmd, $c->{image} || $job;
+
+  # Get current status
+  my $filename = "/etc/.rollout_docker/$job";
+  my @old_cmd;
+  @old_cmd = slurp_file($filename) if -f $filename;
+  if (join(" ", @cmd) ne join("", @old_cmd)) {
+    if (@old_cmd) {
+      l "Stopping docker container $job due to changed arguments";
+      command($docker, "rm", "-f", $job);
+    }
+    # Container doesn't exist
+    l "Running docker container $job";
+    command(@cmd);
+
+    text_install(-file => $filename, -text => join(" ", @cmd));
+  }
+}
