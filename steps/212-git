@@ -59,6 +59,10 @@ Any options to add to the git clone command line
 
 Any options to add to the git pull command line
 
+=item git/I<path>/always_pull
+
+Automatically pull updates. Defaults to true.
+
 =back
 
 =head1 COPYRIGHT
@@ -83,6 +87,7 @@ validate_config {
         cmd => { type => ["code", "string"], help => "Post checkout command to run (in checked out dir)" },
         clone_options => { type => "list", items => { type => "string" } },
         pull_options => { type => "list", items => { type => "string" } },
+        always_pull => { type => "boolean" },
       },
     },
   },
@@ -94,6 +99,7 @@ package_check("git-core") if keys %git && (c("$hostname/_os_detection/distro") e
                                            c("$hostname/_os_detection/distro") eq 'debian');
 foreach my $dir (sort(keys %git)) {
   my $x = $git{$dir};
+  $x->{always_pull} = 1 unless defined $x->{always_pull};
   if (!-d $dir) {
     # New checkout
     my $basedir = dirname($dir);
@@ -115,7 +121,7 @@ foreach my $dir (sort(keys %git)) {
         command($x->{cmd});
       }
     }
-  } else {
+  } elsif ($x->{always_pull}) {
     # Update existing checked out directory
     chdir $dir;
     my @cmd = ("git", "pull", "--all", "-q");
