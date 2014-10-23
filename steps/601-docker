@@ -106,9 +106,10 @@ while (my($job, $c) = each(%docker)) {
   close(CMD);
   my @old_cmd;
 
+  my $filename = "/etc/.rollout_docker/$job";
+
   if ($? == 0) {
     # Container is already running, get current arguments
-    my $filename = "/etc/.rollout_docker/$job";
     @old_cmd = slurp_file($filename) if -f $filename;
   } else {
     v "Container $job does not exist";
