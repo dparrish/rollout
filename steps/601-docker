@@ -68,6 +68,7 @@ require 'JSON.pm';
 # Location of the docker binary.
 # This should probably be a configuration option.
 my $docker = "/usr/bin/docker";
+
 unless (-x $docker) {
   # Probably not installed
   v "Installing docker";
@@ -89,16 +90,30 @@ while (my($job, $c) = each(%docker)) {
   push @cmd, "--add-host", $_ foreach @{$c->{"add-host"}};
   push @cmd, "--link", $_ foreach @{$c->{link}};
   push @cmd, "-e", $_ foreach @{$c->{environment}};
+
   push @cmd, "-m", $c->{memory} if $c->{memory};
   push @cmd, "-h", $c->{hostname} if $c->{hostname};
   push @cmd, "--cpu-shares", $c->{cpu} if $c->{cpu};
   push @cmd, "--cpuset", $c->{cpuset} if $c->{cpuset};
-  push @cmd, $c->{image} || $job;
+  if (ref $c->{image} eq 'ARRAY') {
+    push @cmd, $_ foreach @{$c->{image}};
+  } else {
+    push @cmd, $c->{image} || $job;
+  }
 
-  # Get current status
-  my $filename = "/etc/.rollout_docker/$job";
+  open(CMD, '-|', $docker, 'inspect', $job);
+  my $output = join("", <CMD>);
+  close(CMD);
   my @old_cmd;
-  @old_cmd = slurp_file($filename) if -f $filename;
+
+  if ($? == 0) {
+    # Container is already running, get current arguments
+    my $filename = "/etc/.rollout_docker/$job";
+    @old_cmd = slurp_file($filename) if -f $filename;
+  } else {
+    v "Container $job does not exist";
+  }
+
   if (join(" ", @cmd) ne join("", @old_cmd)) {
     if (@old_cmd) {
       l "Stopping docker container $job due to changed arguments";
