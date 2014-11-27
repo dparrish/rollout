@@ -43,7 +43,7 @@ validate_config {
     value => {
       type => "options",
       options => {
-        command => { type => "string" },
+        command => { type => [ "string", "code" ] },
         gid => { type => "int", range => [0, 65535] },
         group => { type => "string", regex => qr/^[a-z0-9_\-.]+$/ },
         mode => { type => "int", range => [0, 07777] },
