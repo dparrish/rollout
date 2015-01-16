@@ -149,17 +149,17 @@ try {
   $ex->throw("Can't get authorized_keys file: $ex");
 };
 
-foreach (keys %keys) {
+foreach (sort keys %keys) {
   my($name,$passwd,$uid,$gid,$quota,$comment,$gcos,$dir,$shell,$expire) = getpwnam($_);
   w "User $_ doesn't exist" and next unless $name;
   w "User ${name}'s homedir doesn't exist" and next unless -d $dir;
-  v "Checking keys for $_ -> ". join(", ", keys %{$keys{$_}});
-  foreach (keys %{$keys{$_}}) {
+  v "Checking keys for $_ -> ". join(", ", sort keys %{$keys{$_}});
+  foreach (sort keys %{$keys{$_}}) {
     throw ConfigException "Missing key \"$_\" for user $name, should be in authorized_keys"
       if (!$all_keys{$_} && $_ ne $name);
   }
   v "No keys found for $_" and next unless
-    my $text = join("", grep defined, map { $all_keys{$_} } keys %{$keys{$_}});
+    my $text = join("", grep defined, map { $all_keys{$_} } sort keys %{$keys{$_}});
   text_install(-file => "$dir/.ssh/authorized_keys", -text => $text, -mode => 0644, -uid => $uid,
                -gid => $gid, -dir_mode => 0755);
 }
