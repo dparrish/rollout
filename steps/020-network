@@ -366,7 +366,7 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
 
     if (i_should("routes")) {
       my $routes = join("", map { "$_ via $d->{routes}->{$_} dev $device\n" }
-        keys %{$d->{routes} || {}});
+        sort keys %{$d->{routes} || {}});
       if ($routes && text_install("/etc/sysconfig/network-scripts/route-$device", $routes, undef,
           { mode => 0644 })) {
         $changes++;
@@ -379,9 +379,9 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
   }
 
   my $alerted = 0;
-  if (keys %interface_files) {
+  if (sort keys %interface_files) {
     if (i_should("bond")) {
-      if (grep /^bond\d+$/, keys %interface_files) {
+      if (grep /^bond\d+$/, sort keys %interface_files) {
         file_append("/etc/modprobe.conf",
                     "options bonding mode=1 miimon=100 downdelay=300 updelay=300 max_bonds=4",
                     qr/^options bond(?:\d+|ing) /);
@@ -479,7 +479,7 @@ elsif (i_should("interface") && -f "/etc/network/interfaces") {
     $interfaces{$device} = \%x;
   }
 
-  if (keys %interfaces) {
+  if (sort keys %interfaces) {
     my $text = "# This file describes the network interfaces available on your system\n".
                "# and how to activate them. For more information, see interfaces(5).\n";
     while (my($name, $int) = each %interfaces) {
