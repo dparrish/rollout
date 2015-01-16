@@ -226,6 +226,9 @@ validate_config {
         'bond-miicom' => { type => "int" },
         'bond-lacp-rate' => { type => "int" },
         'bond-slaves' => { type => "string" },
+        'bond-arp-interval' => { type => "int" },
+        'bond-arp-ip-target' => { type => "ip" },
+        'bond-primary' => { type => "string" },
         bootfile => { type => "string" },
         bootproto => { type => "string" },
         bridge => { type => "string" },
@@ -363,7 +366,7 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
 
     if (i_should("routes")) {
       my $routes = join("", map { "$_ via $d->{routes}->{$_} dev $device\n" }
-        keys %{$d->{routes} || {}});
+        sort keys %{$d->{routes} || {}});
       if ($routes && text_install("/etc/sysconfig/network-scripts/route-$device", $routes, undef,
           { mode => 0644 })) {
         $changes++;
@@ -376,9 +379,9 @@ if (i_should("interface") && -d "/etc/sysconfig/network-scripts") {
   }
 
   my $alerted = 0;
-  if (keys %interface_files) {
+  if (sort keys %interface_files) {
     if (i_should("bond")) {
-      if (grep /^bond\d+$/, keys %interface_files) {
+      if (grep /^bond\d+$/, sort keys %interface_files) {
         file_append("/etc/modprobe.conf",
                     "options bonding mode=1 miimon=100 downdelay=300 updelay=300 max_bonds=4",
                     qr/^options bond(?:\d+|ing) /);
@@ -429,7 +432,8 @@ elsif (i_should("interface") && -f "/etc/network/interfaces") {
     $x{$_} = $d->{$_}
       foreach qw( bootfile broadcast client gateway hostname hwaddress leasehours leasetime media
                   metric mtu network pointopoint provider server vendor frame netnum endpoint local
-                  ttl bond-mode bond-miicom bond-lacp-rate bond-slaves );
+                  ttl bond-mode bond-miicom bond-lacp-rate bond-slaves bond-primary
+                  bond-arp-interval bond-arp-ip-target );
     push @{$x{$_}}, ref $d->{$_} ? @{$d->{$_}} : $d->{$_}
       foreach qw( pre-up up post-up pre-down down post-down );
 
@@ -475,7 +479,7 @@ elsif (i_should("interface") && -f "/etc/network/interfaces") {
     $interfaces{$device} = \%x;
   }
 
-  if (keys %interfaces) {
+  if (sort keys %interfaces) {
     my $text = "# This file describes the network interfaces available on your system\n".
                "# and how to activate them. For more information, see interfaces(5).\n";
     while (my($name, $int) = each %interfaces) {

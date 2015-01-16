@@ -150,7 +150,7 @@ my %users = flatten_hash(c("$hostname/user"));
 
 if (i_should("groups") && %groups) {
   # Deal with groups first
-  v "Checking groups: ". join(" ", keys %groups);
+  v "Checking groups: ". join(" ", sort keys %groups);
   while (my($name, $group) = each(%groups)) {
     next unless defined $group;
     my $gid = getgrnam($name);
@@ -187,7 +187,7 @@ if (i_should("groups") && %groups) {
 
 # Now all the users
 if (i_should("users") && %users) {
-  v "Checking users: ". join(" ", keys %users);
+  v "Checking users: ". join(" ", sort keys %users);
 
   while (my($username, $user) = each(%users)) {
     next unless defined $user;
